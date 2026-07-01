@@ -11,5 +11,8 @@ langchain-openai>=0.2
 langchain-ollama>=0.2
 langchain-anthropic>=0.2
 
+# Front end
+chainlit>=2.0
+
 # Convenience
 python-dotenv>=1.0

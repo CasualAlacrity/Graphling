@@ -22,5 +22,8 @@ build/
 .langchain/
 .cache/
 
+# Chainlit auto-generated locale files
+.chainlit/translations/
+
 # OS
 .DS_Store
