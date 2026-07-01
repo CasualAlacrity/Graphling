@@ -9,6 +9,7 @@ pydantic>=2.7
 # LLM provider (swap/add others as needed: langchain-anthropic, langchain-google-genai, etc.)
 langchain-openai>=0.2
 langchain-ollama>=0.2
+langchain-anthropic>=0.2
 
 # Convenience
 python-dotenv>=1.0
