@@ -49,6 +49,9 @@ is a "later, maybe" — don't build for it preemptively.
 
 - `LANGSMITH_TRACING`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT` — enables tracing automatically,
   no code-side setup needed once loaded into the environment.
+- `LANGSMITH_ENDPOINT=https://eu.api.smith.langchain.com` — required for this account, which is
+  on LangSmith's EU tenant. Without it, the SDK defaults to the US endpoint and every trace
+  ingestion call fails with a 403 Forbidden, even with a valid API key.
 - Provider keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) as needed — omit entirely if running fully
   local via Ollama.
 - `.env` is not auto-loaded; call `load_dotenv()` early in the entry point, or note if PyCharm's

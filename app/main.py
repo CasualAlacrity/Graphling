@@ -10,8 +10,8 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from pydantic import BaseModel
 
-from app.llm import get_chat_llm
-from app.persona import load_persona
+from llm import get_chat_llm
+from persona import load_persona
 
 load_dotenv()
 
@@ -20,10 +20,10 @@ class CompanionState(BaseModel):
     messages: Annotated[list[BaseMessage], add_messages]
 
 
-def respond(state: CompanionState) -> dict:
+async def respond(state: CompanionState) -> dict:
     llm = get_chat_llm()
     system_prompt = SystemMessage(load_persona())
-    response = llm.invoke([system_prompt] + state.messages)
+    response = await llm.ainvoke([system_prompt] + state.messages)
     return {"messages": [response]}
 
 
@@ -47,6 +47,6 @@ async def handle_message(message: cl.Message):
     user_message = HumanMessage(content=str(message.content))
     state_input = CompanionState(messages=[user_message])
 
-    result = companion_graph.invoke(state_input, config=config)
+    result = await companion_graph.ainvoke(state_input, config=config)
 
     await cl.Message(content=result["messages"][-1].content).send()
