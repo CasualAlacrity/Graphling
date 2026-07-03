@@ -16,3 +16,6 @@ chainlit>=2.0
 
 # Convenience
 python-dotenv>=1.0
+
+requests
+rapidfuzz
