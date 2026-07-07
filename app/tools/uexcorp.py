@@ -4,10 +4,27 @@ from typing import Any
 
 import requests
 from langchain_core.tools import BaseTool
-from pydantic import BaseModel, Field, PrivateAttr
+from langsmith import traceable
+from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from rapidfuzz import process
 
-from uexcorp_reference_cache import UexReferenceCache, CachedCommodity, CachedStarSystem, CachedOrbit, CachedTerminal
+from tools.uexcorp_reference_cache import UexReferenceCache, CachedCommodity, CachedStarSystem, CachedOrbit, \
+    CachedTerminal
+
+
+class CommodityTradeData(BaseModel):
+    terminal_name: str
+    star_system_name: str | None
+    orbit_name: str | None
+    moon_name: str | None
+    planet_name: str | None
+    price_buy: float | None
+    price_sell: float | None
+
+    @field_validator("price_buy", "price_sell")
+    @classmethod
+    def zero_means_not_offered(cls, value: float) -> float | None:
+        return None if value == 0 else value
 
 
 class UEXCorpClient(BaseModel):
@@ -16,6 +33,7 @@ class UEXCorpClient(BaseModel):
     bearer_token: str
     _uex_cache: UexReferenceCache | None = PrivateAttr(default=None)
 
+    @traceable(name="uex_get_reference_cache")
     async def get_uex_cache(self) -> UexReferenceCache:
         uex_cache = self._uex_cache
         if uex_cache:
@@ -51,7 +69,8 @@ class UEXCorpClient(BaseModel):
 
         return uex_cache
 
-    async def get_commodity_prices(self, commodity_id: int) -> list[dict]:
+    @traceable(name="uex_get_commodity_prices")
+    async def get_commodity_prices(self, commodity_id: int) -> list[CommodityTradeData]:
         response = await asyncio.to_thread(
             requests.get,
             self.API_BASE_URL + 'commodities_prices',
@@ -59,11 +78,10 @@ class UEXCorpClient(BaseModel):
             headers=self.get_header(),
         )
         response.raise_for_status()
-        return response.json()["data"]
+        return [CommodityTradeData.model_validate(row) for row in response.json()["data"]]
 
     def get_header(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.bearer_token}"}
-
 
 
 class CommodityPriceArgs(BaseModel):
@@ -128,16 +146,16 @@ class CommodityPriceTool(BaseTool):
                 star_system, [s.name for s in cache.star_systems], score_cutoff=60
             )
             if match:
-                rows = [r for r in rows if r["star_system_name"] == match[0]]
+                rows = [r for r in rows if r.star_system_name == match[0]]
 
         if orbit:
             match = process.extractOne(orbit, [o.name for o in cache.orbits], score_cutoff=60)
             if match:
-                rows = [r for r in rows if r["orbit_name"] == match[0]]
+                rows = [r for r in rows if r.orbit_name == match[0]]
 
         if terminal:
             match = process.extractOne(terminal, [t.name for t in cache.terminals], score_cutoff=60)
             if match:
-                rows = [r for r in rows if r["terminal_name"] == match[0]]
+                rows = [r for r in rows if r.terminal_name == match[0]]
 
-        return rows
+        return [r.model_dump(exclude_none=True) for r in rows]

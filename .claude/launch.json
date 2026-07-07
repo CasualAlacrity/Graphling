@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "graphling-chainlit",
+      "runtimeExecutable": ".venv/bin/chainlit",
+      "runtimeArgs": ["run", "app/main.py", "-h"],
+      "port": 8000
+    }
+  ]
+}

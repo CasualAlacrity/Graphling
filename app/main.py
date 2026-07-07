@@ -1,37 +1,14 @@
-from typing import Annotated
+import logging
 
 import chainlit as cl
 from dotenv import load_dotenv
-from langchain_core.messages import BaseMessage
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
-from langgraph.checkpoint.memory import MemorySaver
-from langgraph.graph import END, START, StateGraph
-from langgraph.graph.message import add_messages
-from pydantic import BaseModel
 
-from llm import get_chat_llm
-from persona import load_persona
+from graph import State, graph
 
 load_dotenv()
-
-
-class CompanionState(BaseModel):
-    messages: Annotated[list[BaseMessage], add_messages]
-
-
-async def respond(state: CompanionState) -> dict:
-    llm = get_chat_llm()
-    system_prompt = SystemMessage(load_persona())
-    response = await llm.ainvoke([system_prompt] + state.messages)
-    return {"messages": [response]}
-
-
-graph = StateGraph(CompanionState)
-graph.add_node("respond", respond)
-graph.add_edge(START, "respond")
-graph.add_edge("respond", END)
-companion_graph = graph.compile(checkpointer=MemorySaver())
+logger = logging.getLogger(__name__)
 
 
 @cl.on_chat_start
@@ -42,11 +19,22 @@ async def start_chat():
 @cl.on_message
 async def handle_message(message: cl.Message):
     thread_id = cl.user_session.get("thread_id")
-    config: RunnableConfig = {"configurable": {"thread_id": thread_id}}
+    config: RunnableConfig = {
+        "configurable": {"thread_id": thread_id},
+        "callbacks": [cl.LangchainCallbackHandler()],
+    }
 
     user_message = HumanMessage(content=str(message.content))
-    state_input = CompanionState(messages=[user_message])
+    state_input = State(messages=[user_message])
 
-    result = await companion_graph.ainvoke(state_input, config=config)
-
-    await cl.Message(content=result["messages"][-1].content).send()
+    msg = cl.Message(content="")
+    try:
+        async for event in graph.astream_events(state_input, config=config, version="v2"):
+            if event["event"] == "on_chat_model_stream" and event["metadata"].get("langgraph_node") == "respond":
+                chunk = event["data"]["chunk"]
+                if chunk.content:
+                    await msg.stream_token(chunk.content)
+        await msg.send()
+    except Exception:
+        logger.exception("Error while generating a response")
+        await cl.Message(content="Something went wrong on my end — mind trying that again?").send()

@@ -7,7 +7,6 @@ class CachedCommodity(BaseModel):
     id: int
     name: str
     code: str
-    slug: str
 
 
 class CachedStarSystem(BaseModel):
