@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from tools.uexcorp_args import LocationArgs
 from tools.uexcorp_client import UEXCorpClient
-from tools.uexcorp_matching import filter_by_match, match_by_name_or_code
+from tools.uexcorp_matching import filter_by_match, match_by_name_or_code, filter_by_distance
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,8 @@ class CommodityPriceTool(BaseTool):
         raise NotImplementedError("CommodityPriceTool only supports async execution — use _arun.")
 
     async def _arun(self, commodity: str, star_system: str | None = None, orbit: str | None = None,
-                    terminal: str | None = None, moon: str | None = None
+                    terminal: str | None = None, moon: str | None = None, near: str | None = None,
+                    max_distance: float | None = None,
                     ) -> dict[str, Any] | str:
         try:
             cache = await self.client.get_uex_cache()
@@ -71,6 +72,9 @@ class CommodityPriceTool(BaseTool):
             rows = filter_by_match(rows, orbit, cache.orbits, "orbit_name")
             rows = filter_by_match(rows, terminal, cache.terminals, "terminal_name")
             rows = filter_by_match(rows, moon, cache.moons, "moon_name")
+
+            if near and max_distance:
+                rows = await filter_by_distance(rows, near, max_distance, cache, self.client)
 
             buy_rows = [r for r in rows if r.price_you_pay_to_acquire is not None]
             sell_rows = [r for r in rows if r.price_you_receive_when_selling is not None]
