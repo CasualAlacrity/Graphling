@@ -1,5 +1,6 @@
 import logging
-from typing import Any
+from operator import attrgetter
+from typing import Any, TypeVar
 
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field, field_validator
@@ -8,6 +9,22 @@ from rapidfuzz import process
 from tools.uexcorp_client import UEXCorpClient
 
 logger = logging.getLogger(__name__)
+
+_HasNameAndCode = TypeVar("_HasNameAndCode")
+
+
+def match_by_name_or_code(query: str, items: list[_HasNameAndCode], score_cutoff: int = 60) -> _HasNameAndCode | None:
+    choices = []
+    lookup = []
+    for item in items:
+        choices.append(item.name)
+        lookup.append(item)
+        if item.code:
+            choices.append(item.code)
+            lookup.append(item)
+
+    match = process.extractOne(query, choices, score_cutoff=score_cutoff)
+    return lookup[match[2]] if match else None
 
 
 class CommodityTradeData(BaseModel):
@@ -51,11 +68,15 @@ class CommodityPriceArgs(BaseModel):
 class CommodityPriceTool(BaseTool):
     name: str = "commodity_price_lookup"
     description: str = (
-        "associated terminals. Returns one row per terminal that trades it, including star system, "
-        "planet/moon, and terminal name, alongside price_you_pay_to_acquire (per SCU) and "
-        "price_you_receive_when_selling (per SCU). A broad query with no system/orbit/terminal may "
-        "return many rows — reason over them yourself to answer the user (e.g. best price, price "
-        "in a given system) instead of calling this tool again for the same commodity."
+        "Look up current buy and sell prices for a Star Citizen trade commodity across its "
+        "associated terminals. Returns cheapest_to_buy (the single best terminal to purchase from) "
+        "and best_to_sell (the single best terminal to sell to) — these are already computed for "
+        "you, use them directly for 'best'/'cheapest'/'highest' questions rather than scanning "
+        "all_results yourself, since manually comparing many rows is error-prone. all_results lists "
+        "every matching terminal, for when the user wants alternatives or a specific location "
+        "instead of the single best option. A broad query with no system/orbit/terminal may return "
+        "many rows in all_results — reuse this same result for a follow-up narrowing question "
+        "(e.g. 'what about in a specific system') instead of calling this tool again."
     )
     args_schema: type[BaseModel] = CommodityPriceArgs
     client: UEXCorpClient
@@ -65,26 +86,21 @@ class CommodityPriceTool(BaseTool):
 
     async def _arun(self, commodity: str, star_system: str | None = None, orbit: str | None = None,
                     terminal: str | None = None,
-                    ) -> list[dict] | str:
+                    ) -> dict[str, Any] | str:
         try:
             cache = await self.client.get_uex_cache()
 
-            commodity_match = process.extractOne(
-                commodity, [c.name for c in cache.commodities], score_cutoff=60
-            )
-            if commodity_match is None:
+            matched_commodity = match_by_name_or_code(commodity, cache.commodities)
+            if matched_commodity is None:
                 return f"No commodity matching '{commodity}' was found."
 
-            matched_commodity = cache.commodities[commodity_match[2]]
             rows = [CommodityTradeData.model_validate(row) for row in
                     await self.client.get_commodity_prices(matched_commodity.id)]
 
             if star_system:
-                match = process.extractOne(
-                    star_system, [s.name for s in cache.star_systems], score_cutoff=60
-                )
+                match = match_by_name_or_code(star_system, cache.star_systems)
                 if match:
-                    rows = [r for r in rows if r.star_system_name == match[0]]
+                    rows = [r for r in rows if r.star_system_name == match.name]
 
             if orbit:
                 match = process.extractOne(orbit, [o.name for o in cache.orbits], score_cutoff=60)
@@ -96,7 +112,17 @@ class CommodityPriceTool(BaseTool):
                 if match:
                     rows = [r for r in rows if r.terminal_name == match[0]]
 
-            return [r.model_dump(exclude_none=True) for r in rows]
+            buy_rows = [r for r in rows if r.price_you_pay_to_acquire is not None]
+            sell_rows = [r for r in rows if r.price_you_receive_when_selling is not None]
+
+            cheapest_to_buy = min(buy_rows, key=attrgetter("price_you_pay_to_acquire"), default=None)
+            best_to_sell = max(sell_rows, key=attrgetter("price_you_receive_when_selling"), default=None)
+
+            return {
+                "cheapest_to_buy": cheapest_to_buy.model_dump(exclude_none=True) if cheapest_to_buy else None,
+                "best_to_sell": best_to_sell.model_dump(exclude_none=True) if best_to_sell else None,
+                "all_results": [r.model_dump(exclude_none=True) for r in rows],
+            }
         except Exception:
             logger.exception("commodity_price_lookup failed")
             return "The UEX pricing API is temporarily unavailable. Tell the user their request couldn't be completed and suggest trying again shortly."
