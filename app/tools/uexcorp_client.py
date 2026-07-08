@@ -65,5 +65,19 @@ class UEXCorpClient(BaseModel):
         response.raise_for_status()
         return response.json()["data"]
 
+    @traceable(name="uex_get_orbit_distances")
+    async def get_orbit_distances(self, origin_orbit_id: int, origin_star_system_id: int) -> list[dict]:
+        response = await asyncio.to_thread(
+            requests.get,
+            self.API_BASE_URL + 'orbits_distances',
+            params={
+                "id_orbit_origin": origin_orbit_id,
+                "id_star_system_origin": origin_star_system_id,
+            },
+            headers=self.get_header(),
+        )
+        response.raise_for_status()
+        return response.json()["data"]
+
     def get_header(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.bearer_token}"}

@@ -1,8 +1,14 @@
 from typing import TypeVar
 
+from pydantic import BaseModel
 from rapidfuzz import process
 
 _HasNameAndCode = TypeVar("_HasNameAndCode")
+
+
+class OrbitDistance(BaseModel):
+    orbit_destination_name: str
+    distance: float
 
 
 def match_by_name_or_code(query: str, items: list[_HasNameAndCode], score_cutoff: int = 60) -> _HasNameAndCode | None:
