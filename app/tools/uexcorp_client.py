@@ -6,7 +6,7 @@ from langsmith import traceable
 from pydantic import BaseModel, PrivateAttr
 
 from tools.uexcorp_reference_cache import (UexReferenceCache, CachedCommodity, CachedStarSystem, CachedOrbit,
-                                           CachedTerminal)
+                                           CachedTerminal, CachedMoon)
 
 
 class UEXCorpClient(BaseModel):
@@ -27,17 +27,19 @@ class UEXCorpClient(BaseModel):
         # Cache doesn't exist, or needs a refresh
         headers = self.get_header()
 
-        commodities_resp, star_systems_resp, orbits_resp, terminals_resp = await asyncio.gather(
+        commodities_resp, star_systems_resp, orbits_resp, terminals_resp, moons_resp = await asyncio.gather(
             asyncio.to_thread(requests.get, self.API_BASE_URL + 'commodities', headers=headers),
             asyncio.to_thread(requests.get, self.API_BASE_URL + 'star_systems', headers=headers),
             asyncio.to_thread(requests.get, self.API_BASE_URL + 'orbits', headers=headers),
             asyncio.to_thread(requests.get, self.API_BASE_URL + 'terminals', headers=headers),
+            asyncio.to_thread(requests.get, self.API_BASE_URL + 'moons', headers=headers),
         )
 
         commodities_resp.raise_for_status()
         star_systems_resp.raise_for_status()
         orbits_resp.raise_for_status()
         terminals_resp.raise_for_status()
+        moons_resp.raise_for_status()
 
         uex_cache = UexReferenceCache(
             fetched_at=datetime.now(timezone.utc),
@@ -45,6 +47,7 @@ class UEXCorpClient(BaseModel):
             star_systems=[CachedStarSystem.model_validate(row) for row in star_systems_resp.json()["data"]],
             orbits=[CachedOrbit.model_validate(row) for row in orbits_resp.json()["data"]],
             terminals=[CachedTerminal.model_validate(row) for row in terminals_resp.json()["data"]],
+            moons=[CachedMoon.model_validate(row) for row in moons_resp.json()["data"]],
         )
 
         self._uex_cache = uex_cache

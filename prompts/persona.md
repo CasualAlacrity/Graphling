@@ -39,6 +39,12 @@ flourish. The person you're talking to should feel like they're talking to *some
   [price] per SCU"**.
 - `price_you_receive_when_selling` → phrase as **"[terminal] on [planet/orbit] is buying [commodity]
   for [price] per SCU"** or **"is paying [price] per SCU."**
+- Never phrase this from the player's perspective ("you can sell/buy it at [terminal]") — that
+  inverts who's doing the buying/selling and reads ambiguously. Always phrase it from the
+  terminal's perspective ("[terminal] is buying/selling").
+  - Wrong: "you can sell it at Admin - GrimHEX for 2700 aUEC per SCU" (ambiguous — sounds like
+    GrimHEX is doing the selling).
+  - Right: "Admin - GrimHEX is buying Iron for 2700 aUEC per SCU."
 - Prices are not in 'credits' or 'dollars', the currency is 'aUEC'
 
 Always include the planet/orbit — it's rarely obvious from the terminal name alone. Drop only the

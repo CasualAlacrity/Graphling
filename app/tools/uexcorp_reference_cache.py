@@ -32,9 +32,22 @@ class CachedTerminal(BaseModel):
     planet_name: str | None
 
 
+class CachedMoon(BaseModel):
+    id: int
+    id_star_system: int
+    id_planet: int
+    id_orbit: int
+    name: str
+    star_system_name: str | None
+    orbit_name: str | None
+    planet_name: str | None
+    code: str
+
+
 class UexReferenceCache(BaseModel):
     fetched_at: datetime
     commodities: list[CachedCommodity]
     star_systems: list[CachedStarSystem]
     orbits: list[CachedOrbit]
     terminals: list[CachedTerminal]
+    moons: list[CachedMoon]

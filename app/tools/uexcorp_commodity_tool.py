@@ -1,30 +1,14 @@
 import logging
 from operator import attrgetter
-from typing import Any, TypeVar
+from typing import Any
 
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field, field_validator
-from rapidfuzz import process
 
 from tools.uexcorp_client import UEXCorpClient
+from tools.uexcorp_matching import filter_by_match, match_by_name_or_code
 
 logger = logging.getLogger(__name__)
-
-_HasNameAndCode = TypeVar("_HasNameAndCode")
-
-
-def match_by_name_or_code(query: str, items: list[_HasNameAndCode], score_cutoff: int = 60) -> _HasNameAndCode | None:
-    choices = []
-    lookup = []
-    for item in items:
-        choices.append(item.name)
-        lookup.append(item)
-        if item.code:
-            choices.append(item.code)
-            lookup.append(item)
-
-    match = process.extractOne(query, choices, score_cutoff=score_cutoff)
-    return lookup[match[2]] if match else None
 
 
 class CommodityTradeData(BaseModel):
@@ -55,13 +39,19 @@ class CommodityPriceArgs(BaseModel):
     )
     orbit: str | None = Field(
         default=None,
-        description="The planet or moon to narrow the search to, e.g. 'microTech', 'Yela', 'Hurston'. "
-                    "This is what players usually mean when they say 'planet' or 'moon'."
+        description="The planet to narrow the search to, e.g. 'microTech', 'Hurston'. "
+                    "This is what players usually mean when they say 'planet'."
     )
     terminal: str | None = Field(
         default=None,
         description="An exact trading terminal/location name, e.g. 'Area18', 'Port Tressler', "
                     "'Ambitious Dream Refueling'. Only set this if the user named a specific location."
+    )
+    moon: str | None = Field(
+        default=None,
+        description="The moon to narrow the search to, e.g. 'Yela', 'Daymar'. "
+                    "This is what players usually mean when they say 'moon'. "
+                    "The player may mistakenly refer to these celestial bodies as 'planets'."
     )
 
 
@@ -85,7 +75,7 @@ class CommodityPriceTool(BaseTool):
         raise NotImplementedError("CommodityPriceTool only supports async execution — use _arun.")
 
     async def _arun(self, commodity: str, star_system: str | None = None, orbit: str | None = None,
-                    terminal: str | None = None,
+                    terminal: str | None = None, moon: str | None = None
                     ) -> dict[str, Any] | str:
         try:
             cache = await self.client.get_uex_cache()
@@ -97,20 +87,10 @@ class CommodityPriceTool(BaseTool):
             rows = [CommodityTradeData.model_validate(row) for row in
                     await self.client.get_commodity_prices(matched_commodity.id)]
 
-            if star_system:
-                match = match_by_name_or_code(star_system, cache.star_systems)
-                if match:
-                    rows = [r for r in rows if r.star_system_name == match.name]
-
-            if orbit:
-                match = process.extractOne(orbit, [o.name for o in cache.orbits], score_cutoff=60)
-                if match:
-                    rows = [r for r in rows if r.orbit_name == match[0]]
-
-            if terminal:
-                match = process.extractOne(terminal, [t.name for t in cache.terminals], score_cutoff=60)
-                if match:
-                    rows = [r for r in rows if r.terminal_name == match[0]]
+            rows = filter_by_match(rows, star_system, cache.star_systems, "star_system_name")
+            rows = filter_by_match(rows, orbit, cache.orbits, "orbit_name")
+            rows = filter_by_match(rows, terminal, cache.terminals, "terminal_name")
+            rows = filter_by_match(rows, moon, cache.moons, "moon_name")
 
             buy_rows = [r for r in rows if r.price_you_pay_to_acquire is not None]
             sell_rows = [r for r in rows if r.price_you_receive_when_selling is not None]
