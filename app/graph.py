@@ -12,7 +12,8 @@ from pydantic import BaseModel
 
 from llm import get_chat_llm
 from persona import load_persona
-from tools.uexcorp import UEXCorpClient, CommodityPriceTool
+from tools.uexcorp_client import UEXCorpClient
+from tools.uexcorp_commodity_tool import CommodityPriceTool
 
 load_dotenv()
 
