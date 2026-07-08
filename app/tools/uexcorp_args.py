@@ -25,10 +25,10 @@ class LocationArgs(BaseModel):
     )
     near: str | None = Field(
         default=None,
-        description="A reference planet or moon to measure distance from, e.g. 'Yela', 'Crusader'. "
-                    "Only set this when the user gives a distance constraint (e.g. 'within 30gm of "
-                    "Crusader') — pair it with max_distance, since near by itself doesn't filter "
-                    "anything."
+        description="A reference planet, moon, or trading terminal/station to measure distance from, "
+                    "e.g. 'Yela', 'Crusader', 'CRU-L1'. Only set this when the user gives a distance "
+                    "constraint (e.g. 'within 30gm of Crusader') — pair it with max_distance, since "
+                    "near by itself doesn't filter anything."
     )
     max_distance: float | None = Field(
         default=None,
