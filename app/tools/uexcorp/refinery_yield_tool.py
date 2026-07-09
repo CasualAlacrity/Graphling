@@ -7,7 +7,8 @@ from pydantic import BaseModel, Field
 
 from tools.uexcorp.args import LocationArgs
 from tools.uexcorp.client import UEXCorpClient
-from tools.uexcorp.matching import DEFAULT_NEAR_DISTANCE, filter_by_match, match_by_name_or_code, filter_by_distance
+from tools.uexcorp.matching import (DEFAULT_NEAR_DISTANCE, filter_by_match, match_by_name_or_code, filter_by_distance,
+                                    find_commodity_by_id)
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +18,7 @@ def _resolve_raw_commodity(matched_commodity, cache):
         return matched_commodity
 
     if matched_commodity.is_refined and matched_commodity.id_parent:
-        for c in cache.commodities:
-            if c.id == matched_commodity.id_parent:
-                return c
+        return find_commodity_by_id(cache, matched_commodity.id_parent)
 
     return None
 

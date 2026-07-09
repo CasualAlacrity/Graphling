@@ -51,6 +51,13 @@ def _find_orbit_by_name(cache, orbit_name):
     return None
 
 
+def find_commodity_by_id(cache, commodity_id):
+    for c in cache.commodities:
+        if c.id == commodity_id:
+            return c
+    return None
+
+
 async def filter_by_distance(rows, near, max_distance, cache, client):
     origin = match_by_name_or_code(near, cache.orbits)
     if origin:

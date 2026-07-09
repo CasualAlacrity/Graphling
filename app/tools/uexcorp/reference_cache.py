@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class CachedBase(BaseModel):
@@ -8,11 +8,35 @@ class CachedBase(BaseModel):
     name: str
 
 
+def _parse_id_list(value: str | list[int] | None) -> list[int]:
+    if not value:
+        return []
+
+    if isinstance(value, list):
+        return value
+
+    ids = []
+    for part in value.split(","):
+        if part:
+            ids.append(int(part))
+    return ids
+
+
 class CachedCommodity(CachedBase):
     code: str
     id_parent: int
     is_raw: bool
     is_refined: bool
+    ids_star_systems: list[int]
+    ids_planets: list[int]
+    ids_moons: list[int]
+    ids_orbits: list[int]
+    ids_poi: list[int]
+
+    @field_validator("ids_star_systems", "ids_planets", "ids_moons", "ids_orbits", "ids_poi", mode="before")
+    @classmethod
+    def parse_id_lists(cls, value: str | list[int] | None) -> list[int]:
+        return _parse_id_list(value)
 
 
 class CachedStarSystem(CachedBase):
@@ -64,6 +88,14 @@ class CachedRefineryYield(BaseModel):
     yield_bonus_percent: float = Field(validation_alias="value")
 
 
+class CachedPoi(CachedBase):
+    type: str
+    star_system_name: str | None
+    orbit_name: str | None
+    moon_name: str | None
+    planet_name: str | None
+
+
 class UexReferenceCache(BaseModel):
     fetched_at: datetime
     commodities: list[CachedCommodity]
@@ -75,3 +107,4 @@ class UexReferenceCache(BaseModel):
     items: list[CachedItem]
     vehicles: list[CachedVehicle]
     refinery_yields: list[CachedRefineryYield]
+    poi: list[CachedPoi]
