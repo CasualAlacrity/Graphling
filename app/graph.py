@@ -12,11 +12,11 @@ from pydantic import BaseModel
 
 from llm import get_chat_llm
 from persona import load_persona
-from tools.uexcorp_client import UEXCorpClient
-from tools.uexcorp_commodity_tool import CommodityPriceTool
-from tools.uexcorp_item_tool import ItemPriceTool
-from tools.uexcorp_vehicle_purchase_tool import VehiclePurchaseTool
-from tools.uexcorp_vehicle_rental_tool import VehicleRentalTool
+from tools.uexcorp.client import UEXCorpClient
+from tools.uexcorp.commodity_tool import CommodityPriceTool
+from tools.uexcorp.item_tool import ItemPriceTool
+from tools.uexcorp.vehicle_purchase_tool import VehiclePurchaseTool
+from tools.uexcorp.vehicle_rental_tool import VehicleRentalTool
 
 load_dotenv()
 

@@ -5,9 +5,9 @@ from typing import Any
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
-from tools.uexcorp_args import LocationArgs
-from tools.uexcorp_client import UEXCorpClient
-from tools.uexcorp_matching import DEFAULT_NEAR_DISTANCE, filter_by_match, match_by_name_or_code, filter_by_distance
+from tools.uexcorp.args import LocationArgs
+from tools.uexcorp.client import UEXCorpClient
+from tools.uexcorp.matching import DEFAULT_NEAR_DISTANCE, filter_by_match, match_by_name_or_code, filter_by_distance
 
 logger = logging.getLogger(__name__)
 

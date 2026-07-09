@@ -2,8 +2,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from tools.uex_trade_tool import TradePriceTool
-from tools.uexcorp_args import LocationArgs
+from tools.uexcorp.trade_tool import TradePriceTool
+from tools.uexcorp.args import LocationArgs
 
 
 class VehiclePurchaseArgs(LocationArgs):

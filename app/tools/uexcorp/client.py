@@ -5,7 +5,7 @@ import requests
 from langsmith import traceable
 from pydantic import BaseModel, PrivateAttr
 
-from tools.uexcorp_reference_cache import (UexReferenceCache, CachedCommodity, CachedStarSystem, CachedOrbit,
+from tools.uexcorp.reference_cache import (UexReferenceCache, CachedCommodity, CachedStarSystem, CachedOrbit,
                                            CachedTerminal, CachedMoon, CachedItemCategory, CachedItem,
                                            CachedVehicle)
 
