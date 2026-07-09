@@ -1,19 +1,12 @@
 import logging
 from typing import Any
 
-from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from tools.uex_trade_tool import TradePriceTool
 from tools.uexcorp_args import LocationArgs
-from tools.uexcorp_client import UEXCorpClient
-from tools.uexcorp_matching import filter_by_match, match_by_name_or_code, filter_by_distance
-from tools.uexcorp_trade_data import UEXTradeData
 
 logger = logging.getLogger(__name__)
-
-
-class ItemTradeData(UEXTradeData):
-    pass
 
 
 class ItemArgs(LocationArgs):
@@ -24,7 +17,7 @@ class ItemArgs(LocationArgs):
     )
 
 
-class ItemTool(BaseTool):
+class ItemPriceTool(TradePriceTool):
     name: str = "item_price_lookup"
     description: str = (
         "Look up current buy and sell prices for a Star Citizen ship or personal item (weapons, "
@@ -37,13 +30,12 @@ class ItemTool(BaseTool):
         "option."
     )
     args_schema: type[BaseModel] = ItemArgs
-    client: UEXCorpClient
-
-    def _run(self, *args: Any, **kwargs: Any) -> Any:
-        raise NotImplementedError("ItemTool only supports async execution — use _arun.")
 
     async def _arun(self, item: str, star_system: str | None = None, orbit: str | None = None,
                     terminal: str | None = None, moon: str | None = None, near: str | None = None,
-                    max_distance: float | None = None,
-                    ) -> dict[str, Any] | str:
-        pass
+                    max_distance: float | None = None) -> dict[str, Any] | str:
+        return await self._lookup(
+            item, lambda cache: cache.items, self.client.get_item_prices, "item",
+            star_system=star_system, orbit=orbit, terminal=terminal, moon=moon,
+            near=near, max_distance=max_distance,
+        )

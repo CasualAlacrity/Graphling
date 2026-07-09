@@ -1,20 +1,12 @@
 import logging
-from operator import attrgetter
 from typing import Any
 
-from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from tools.uex_trade_tool import TradePriceTool
 from tools.uexcorp_args import LocationArgs
-from tools.uexcorp_client import UEXCorpClient
-from tools.uexcorp_matching import filter_by_match, match_by_name_or_code, filter_by_distance
-from tools.uexcorp_trade_data import UEXTradeData
 
 logger = logging.getLogger(__name__)
-
-
-class CommodityTradeData(UEXTradeData):
-    pass
 
 
 class CommodityPriceArgs(LocationArgs):
@@ -25,7 +17,7 @@ class CommodityPriceArgs(LocationArgs):
     )
 
 
-class CommodityPriceTool(BaseTool):
+class CommodityPriceTool(TradePriceTool):
     name: str = "commodity_price_lookup"
     description: str = (
         "Look up current buy and sell prices for a Star Citizen trade commodity across its "
@@ -39,44 +31,12 @@ class CommodityPriceTool(BaseTool):
         "(e.g. 'what about in a specific system') instead of calling this tool again."
     )
     args_schema: type[BaseModel] = CommodityPriceArgs
-    client: UEXCorpClient
-
-    def _run(self, *args: Any, **kwargs: Any) -> Any:
-        raise NotImplementedError("CommodityPriceTool only supports async execution — use _arun.")
 
     async def _arun(self, commodity: str, star_system: str | None = None, orbit: str | None = None,
                     terminal: str | None = None, moon: str | None = None, near: str | None = None,
-                    max_distance: float | None = None,
-                    ) -> dict[str, Any] | str:
-        try:
-            cache = await self.client.get_uex_cache()
-
-            matched_commodity = match_by_name_or_code(commodity, cache.commodities)
-            if matched_commodity is None:
-                return f"No commodity matching '{commodity}' was found."
-
-            rows = [CommodityTradeData.model_validate(row) for row in
-                    await self.client.get_commodity_prices(matched_commodity.id)]
-
-            rows = filter_by_match(rows, star_system, cache.star_systems, "star_system_name")
-            rows = filter_by_match(rows, orbit, cache.orbits, "orbit_name")
-            rows = filter_by_match(rows, terminal, cache.terminals, "terminal_name")
-            rows = filter_by_match(rows, moon, cache.moons, "moon_name")
-
-            if near and max_distance is not None:
-                rows = await filter_by_distance(rows, near, max_distance, cache, self.client)
-
-            buy_rows = [r for r in rows if r.price_you_pay_to_acquire is not None]
-            sell_rows = [r for r in rows if r.price_you_receive_when_selling is not None]
-
-            cheapest_to_buy = min(buy_rows, key=attrgetter("price_you_pay_to_acquire"), default=None)
-            best_to_sell = max(sell_rows, key=attrgetter("price_you_receive_when_selling"), default=None)
-
-            return {
-                "cheapest_to_buy": cheapest_to_buy.model_dump(exclude_none=True) if cheapest_to_buy else None,
-                "best_to_sell": best_to_sell.model_dump(exclude_none=True) if best_to_sell else None,
-                "all_results": [r.model_dump(exclude_none=True) for r in rows],
-            }
-        except Exception:
-            logger.exception("commodity_price_lookup failed")
-            return "The UEX pricing API is temporarily unavailable. Tell the user their request couldn't be completed and suggest trying again shortly."
+                    max_distance: float | None = None) -> dict[str, Any] | str:
+        return await self._lookup(
+            commodity, lambda cache: cache.commodities, self.client.get_commodity_prices, "commodity",
+            star_system=star_system, orbit=orbit, terminal=terminal, moon=moon,
+            near=near, max_distance=max_distance,
+        )
