@@ -5,13 +5,11 @@ from typing import Any, Callable
 from langchain_core.tools import BaseTool
 
 from tools.uexcorp_client import UEXCorpClient
-from tools.uexcorp_matching import filter_by_match, match_by_name_or_code, filter_by_distance
+from tools.uexcorp_matching import DEFAULT_NEAR_DISTANCE, filter_by_match, match_by_name_or_code, filter_by_distance
 from tools.uexcorp_reference_cache import UexReferenceCache
 from tools.uexcorp_trade_data import UEXTradeData
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_NEAR_DISTANCE = 25  # gm
 
 
 class TradePriceTool(BaseTool):

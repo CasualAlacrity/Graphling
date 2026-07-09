@@ -47,6 +47,10 @@ class CachedItemCategory(CachedBase):
     section: str
 
 
+class CachedVehicle(CachedBase):
+    pass
+
+
 class UexReferenceCache(BaseModel):
     fetched_at: datetime
     commodities: list[CachedCommodity]
@@ -56,3 +60,4 @@ class UexReferenceCache(BaseModel):
     moons: list[CachedMoon]
     item_categories: list[CachedItemCategory]
     items: list[CachedItem]
+    vehicles: list[CachedVehicle]

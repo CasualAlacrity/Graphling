@@ -15,6 +15,8 @@ from persona import load_persona
 from tools.uexcorp_client import UEXCorpClient
 from tools.uexcorp_commodity_tool import CommodityPriceTool
 from tools.uexcorp_item_tool import ItemPriceTool
+from tools.uexcorp_vehicle_purchase_tool import VehiclePurchaseTool
+from tools.uexcorp_vehicle_rental_tool import VehicleRentalTool
 
 load_dotenv()
 
@@ -25,8 +27,12 @@ uex_client = UEXCorpClient(
 
 commodity_price_tool = CommodityPriceTool(client=uex_client)
 item_price_tool = ItemPriceTool(client=uex_client)
+vehicle_purchase_tool = VehiclePurchaseTool(client=uex_client)
+vehicle_rental_tool = VehicleRentalTool(client=uex_client)
 
-llm = get_chat_llm().bind_tools([commodity_price_tool, item_price_tool])
+tools = [commodity_price_tool, item_price_tool, vehicle_purchase_tool, vehicle_rental_tool]
+
+llm = get_chat_llm().bind_tools(tools)
 
 
 class State(BaseModel):
@@ -43,7 +49,7 @@ graph_builder = StateGraph(State)
 graph_builder.add_node("respond", respond)
 graph_builder.add_edge(START, "respond")
 
-tool_node = ToolNode([commodity_price_tool, item_price_tool])
+tool_node = ToolNode(tools)
 graph_builder.add_node("tools", tool_node)
 graph_builder.add_conditional_edges("respond", tools_condition)
 graph_builder.add_edge("tools", "respond")

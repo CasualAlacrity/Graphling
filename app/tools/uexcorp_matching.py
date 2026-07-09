@@ -5,6 +5,8 @@ from rapidfuzz import process
 
 _HasNameAndCode = TypeVar("_HasNameAndCode")
 
+DEFAULT_NEAR_DISTANCE = 25  # gm — used when 'near' is set without an explicit max_distance
+
 
 class OrbitDistance(BaseModel):
     orbit_destination_name: str
