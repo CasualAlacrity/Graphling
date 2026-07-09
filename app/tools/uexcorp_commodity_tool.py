@@ -3,28 +3,18 @@ from operator import attrgetter
 from typing import Any
 
 from langchain_core.tools import BaseTool
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 from tools.uexcorp_args import LocationArgs
 from tools.uexcorp_client import UEXCorpClient
 from tools.uexcorp_matching import filter_by_match, match_by_name_or_code, filter_by_distance
+from tools.uexcorp_trade_data import UEXTradeData
 
 logger = logging.getLogger(__name__)
 
 
-class CommodityTradeData(BaseModel):
-    terminal_name: str
-    star_system_name: str | None
-    orbit_name: str | None
-    moon_name: str | None
-    planet_name: str | None
-    price_you_pay_to_acquire: float | None = Field(validation_alias="price_buy")
-    price_you_receive_when_selling: float | None = Field(validation_alias="price_sell")
-
-    @field_validator("price_you_pay_to_acquire", "price_you_receive_when_selling")
-    @classmethod
-    def zero_means_not_offered(cls, value: float) -> float | None:
-        return None if value == 0 else value
+class CommodityTradeData(UEXTradeData):
+    pass
 
 
 class CommodityPriceArgs(LocationArgs):
@@ -73,7 +63,7 @@ class CommodityPriceTool(BaseTool):
             rows = filter_by_match(rows, terminal, cache.terminals, "terminal_name")
             rows = filter_by_match(rows, moon, cache.moons, "moon_name")
 
-            if near and max_distance:
+            if near and max_distance is not None:
                 rows = await filter_by_distance(rows, near, max_distance, cache, self.client)
 
             buy_rows = [r for r in rows if r.price_you_pay_to_acquire is not None]

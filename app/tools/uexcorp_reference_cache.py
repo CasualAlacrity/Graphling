@@ -3,28 +3,25 @@ from datetime import datetime
 from pydantic import BaseModel
 
 
-class CachedCommodity(BaseModel):
+class CachedBase(BaseModel):
     id: int
     name: str
+
+
+class CachedCommodity(CachedBase):
     code: str
 
 
-class CachedStarSystem(BaseModel):
-    id: int
-    name: str
+class CachedStarSystem(CachedBase):
     code: str
 
 
-class CachedOrbit(BaseModel):
-    id: int
+class CachedOrbit(CachedBase):
     id_star_system: int
-    name: str
     star_system_name: str | None
 
 
-class CachedTerminal(BaseModel):
-    id: int
-    name: str
+class CachedTerminal(CachedBase):
     type: str
     star_system_name: str | None
     orbit_name: str | None
@@ -32,16 +29,22 @@ class CachedTerminal(BaseModel):
     planet_name: str | None
 
 
-class CachedMoon(BaseModel):
-    id: int
+class CachedMoon(CachedBase):
     id_star_system: int
     id_planet: int
     id_orbit: int
-    name: str
     star_system_name: str | None
     orbit_name: str | None
     planet_name: str | None
     code: str
+
+
+class CachedItem(CachedBase):
+    slug: str
+
+
+class CachedItemCategory(CachedBase):
+    section: str
 
 
 class UexReferenceCache(BaseModel):
@@ -51,3 +54,5 @@ class UexReferenceCache(BaseModel):
     orbits: list[CachedOrbit]
     terminals: list[CachedTerminal]
     moons: list[CachedMoon]
+    item_categories: list[CachedItemCategory]
+    items: list[CachedItem]
