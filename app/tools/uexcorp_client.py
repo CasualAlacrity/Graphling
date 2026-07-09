@@ -49,7 +49,14 @@ class UEXCorpClient(BaseModel):
                 task = asyncio.to_thread(requests.get, self.API_BASE_URL + 'items', headers=headers,
                                          params={"id_category": category["id"]})
                 item_tasks.append(task)
-        items_resp = await asyncio.gather(*item_tasks)
+        item_responses = await asyncio.gather(*item_tasks)
+
+        items_data = []
+        for response in item_responses:
+            response.raise_for_status()
+            category_items = response.json()["data"]
+            if category_items:
+                items_data.extend(category_items)
 
         uex_cache = UexReferenceCache(
             fetched_at=datetime.now(timezone.utc),
@@ -59,7 +66,7 @@ class UEXCorpClient(BaseModel):
             terminals=[CachedTerminal.model_validate(row) for row in terminals_resp.json()["data"]],
             moons=[CachedMoon.model_validate(row) for row in moons_resp.json()["data"]],
             item_categories=[CachedItemCategory.model_validate(row) for row in categories_resp.json()["data"]],
-            items=[CachedItem.model_validate(row) for row in items_resp.json()["data"]],
+            items=[CachedItem.model_validate(row) for row in items_data],
         )
 
         self._uex_cache = uex_cache
