@@ -7,7 +7,7 @@ from pydantic import BaseModel, PrivateAttr
 
 from tools.uexcorp.reference_cache import (UexReferenceCache, CachedCommodity, CachedStarSystem, CachedOrbit,
                                            CachedTerminal, CachedMoon, CachedItemCategory, CachedItem,
-                                           CachedVehicle)
+                                           CachedVehicle, CachedRefineryYield)
 
 
 class UEXCorpClient(BaseModel):
@@ -43,7 +43,7 @@ class UEXCorpClient(BaseModel):
     async def _build_uex_cache(self) -> UexReferenceCache:
         headers = self.get_header()
 
-        commodities_resp, star_systems_resp, orbits_resp, terminals_resp, moons_resp, categories_resp, vehicles_resp = await asyncio.gather(
+        commodities_resp, star_systems_resp, orbits_resp, terminals_resp, moons_resp, categories_resp, vehicles_resp, refinery_yields_resp = await asyncio.gather(
             asyncio.to_thread(requests.get, self.API_BASE_URL + 'commodities', headers=headers),
             asyncio.to_thread(requests.get, self.API_BASE_URL + 'star_systems', headers=headers),
             asyncio.to_thread(requests.get, self.API_BASE_URL + 'orbits', headers=headers),
@@ -51,6 +51,7 @@ class UEXCorpClient(BaseModel):
             asyncio.to_thread(requests.get, self.API_BASE_URL + 'moons', headers=headers),
             asyncio.to_thread(requests.get, self.API_BASE_URL + 'categories', headers=headers, params={"type": 'item'}),
             asyncio.to_thread(requests.get, self.API_BASE_URL + 'vehicles', headers=headers),
+            asyncio.to_thread(requests.get, self.API_BASE_URL + 'refineries_yields', headers=headers),
         )
 
         commodities_resp.raise_for_status()
@@ -60,6 +61,7 @@ class UEXCorpClient(BaseModel):
         moons_resp.raise_for_status()
         categories_resp.raise_for_status()
         vehicles_resp.raise_for_status()
+        refinery_yields_resp.raise_for_status()
 
         item_tasks = []
         for category in categories_resp.json()["data"]:
@@ -86,6 +88,7 @@ class UEXCorpClient(BaseModel):
             item_categories=[CachedItemCategory.model_validate(row) for row in categories_resp.json()["data"]],
             items=[CachedItem.model_validate(row) for row in items_data],
             vehicles=[CachedVehicle.model_validate(row) for row in vehicles_resp.json()["data"]],
+            refinery_yields=[CachedRefineryYield.model_validate(row) for row in refinery_yields_resp.json()["data"]],
         )
 
         return uex_cache

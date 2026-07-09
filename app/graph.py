@@ -15,6 +15,7 @@ from persona import load_persona
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.commodity_tool import CommodityPriceTool
 from tools.uexcorp.item_tool import ItemPriceTool
+from tools.uexcorp.refinery_yield_tool import RefineryYieldTool
 from tools.uexcorp.vehicle_purchase_tool import VehiclePurchaseTool
 from tools.uexcorp.vehicle_rental_tool import VehicleRentalTool
 
@@ -29,8 +30,9 @@ commodity_price_tool = CommodityPriceTool(client=uex_client)
 item_price_tool = ItemPriceTool(client=uex_client)
 vehicle_purchase_tool = VehiclePurchaseTool(client=uex_client)
 vehicle_rental_tool = VehicleRentalTool(client=uex_client)
+refinery_yield_tool = RefineryYieldTool(client=uex_client)
 
-tools = [commodity_price_tool, item_price_tool, vehicle_purchase_tool, vehicle_rental_tool]
+tools = [commodity_price_tool, item_price_tool, vehicle_purchase_tool, vehicle_rental_tool, refinery_yield_tool]
 
 llm = get_chat_llm().bind_tools(tools)
 

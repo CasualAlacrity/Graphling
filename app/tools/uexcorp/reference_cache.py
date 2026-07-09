@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class CachedBase(BaseModel):
@@ -10,6 +10,9 @@ class CachedBase(BaseModel):
 
 class CachedCommodity(CachedBase):
     code: str
+    id_parent: int
+    is_raw: bool
+    is_refined: bool
 
 
 class CachedStarSystem(CachedBase):
@@ -51,6 +54,16 @@ class CachedVehicle(CachedBase):
     pass
 
 
+class CachedRefineryYield(BaseModel):
+    commodity_name: str
+    terminal_name: str
+    star_system_name: str | None
+    orbit_name: str | None
+    moon_name: str | None
+    planet_name: str | None
+    yield_bonus_percent: float = Field(validation_alias="value")
+
+
 class UexReferenceCache(BaseModel):
     fetched_at: datetime
     commodities: list[CachedCommodity]
@@ -61,3 +74,4 @@ class UexReferenceCache(BaseModel):
     item_categories: list[CachedItemCategory]
     items: list[CachedItem]
     vehicles: list[CachedVehicle]
+    refinery_yields: list[CachedRefineryYield]
