@@ -26,6 +26,7 @@ class VehiclePurchaseTool(TradePriceTool):
         "for this tool — don't mention it."
     )
     args_schema: type[BaseModel] = VehiclePurchaseArgs
+    progress_label: str = "UEX to check vehicle purchase prices"
 
     async def _arun(self, vehicle: str, star_system: str | None = None, orbit: str | None = None,
                     terminal: str | None = None, moon: str | None = None, near: str | None = None,

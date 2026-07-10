@@ -30,6 +30,7 @@ class ItemPriceTool(TradePriceTool):
         "option."
     )
     args_schema: type[BaseModel] = ItemArgs
+    progress_label: str = "UEX to check item price"
 
     async def _arun(self, item: str, star_system: str | None = None, orbit: str | None = None,
                     terminal: str | None = None, moon: str | None = None, near: str | None = None,

@@ -2,13 +2,13 @@ import logging
 from operator import attrgetter
 from typing import Any
 
-from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from tools.uexcorp.args import LocationArgs
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.matching import (DEFAULT_NEAR_DISTANCE, filter_by_match, match_by_name_or_code, filter_by_distance,
                                     find_commodity_by_id)
+from tools.uplink_tool import UplinkTool
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class RefineryYieldArgs(LocationArgs):
     )
 
 
-class RefineryYieldTool(BaseTool):
+class RefineryYieldTool(UplinkTool):
     name: str = "refinery_yield_lookup"
     description: str = (
         "Look up current refinery yield bonuses for a Star Citizen raw ore across refinery "
@@ -44,6 +44,7 @@ class RefineryYieldTool(BaseTool):
         "that go through the ore-refining pipeline — not every commodity has a raw/refined form."
     )
     args_schema: type[BaseModel] = RefineryYieldArgs
+    progress_label: str = "UEX to check refinery yield bonuses"
     client: UEXCorpClient
 
     def _run(self, *args: Any, **kwargs: Any) -> Any:

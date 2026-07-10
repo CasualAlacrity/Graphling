@@ -1,11 +1,11 @@
 import logging
 from typing import Any
 
-from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.matching import filter_by_match, match_by_name_or_code, find_commodity_by_id
+from tools.uplink_tool import UplinkTool
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class MiningLocationArgs(BaseModel):
     )
 
 
-class MiningLocationTool(BaseTool):
+class MiningLocationTool(UplinkTool):
     name: str = "mining_location_lookup"
     description: str = (
         "Look up where a Star Citizen raw ore or harvestable material can actually be found/mined "
@@ -61,6 +61,7 @@ class MiningLocationTool(BaseTool):
         "manufactured or refined-only goods won't have results here."
     )
     args_schema: type[BaseModel] = MiningLocationArgs
+    progress_label: str = "UEX to loop up mining locations"
     client: UEXCorpClient
 
     def _run(self, *args: Any, **kwargs: Any) -> Any:

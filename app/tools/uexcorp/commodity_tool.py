@@ -31,6 +31,7 @@ class CommodityPriceTool(TradePriceTool):
         "(e.g. 'what about in a specific system') instead of calling this tool again."
     )
     args_schema: type[BaseModel] = CommodityPriceArgs
+    progress_label: str = "UEX to check commodity price"
 
     async def _arun(self, commodity: str, star_system: str | None = None, orbit: str | None = None,
                     terminal: str | None = None, moon: str | None = None, near: str | None = None,

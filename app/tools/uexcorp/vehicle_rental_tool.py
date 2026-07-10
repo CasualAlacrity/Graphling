@@ -2,12 +2,12 @@ import logging
 from operator import attrgetter
 from typing import Any
 
-from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from tools.uexcorp.args import LocationArgs
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.matching import DEFAULT_NEAR_DISTANCE, filter_by_match, match_by_name_or_code, filter_by_distance
+from tools.uplink_tool import UplinkTool
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class VehicleRentalArgs(LocationArgs):
     )
 
 
-class VehicleRentalTool(BaseTool):
+class VehicleRentalTool(UplinkTool):
     name: str = "vehicle_rental_lookup"
     description: str = (
         "Look up current daily rental rates for a Star Citizen ship or ground vehicle across "
@@ -39,6 +39,7 @@ class VehicleRentalTool(BaseTool):
         "or a specific location instead of the single best option."
     )
     args_schema: type[BaseModel] = VehicleRentalArgs
+    progress_label: str = "UEX to check vehicle rental price"
     client: UEXCorpClient
 
     def _run(self, *args: Any, **kwargs: Any) -> Any:

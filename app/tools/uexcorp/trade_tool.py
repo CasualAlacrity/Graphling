@@ -2,17 +2,16 @@ import logging
 from operator import attrgetter
 from typing import Any, Callable
 
-from langchain_core.tools import BaseTool
-
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.matching import DEFAULT_NEAR_DISTANCE, filter_by_match, match_by_name_or_code, filter_by_distance
 from tools.uexcorp.reference_cache import UexReferenceCache
 from tools.uexcorp.trade_data import UEXTradeData
+from tools.uplink_tool import UplinkTool
 
 logger = logging.getLogger(__name__)
 
 
-class TradePriceTool(BaseTool):
+class TradePriceTool(UplinkTool):
 
     client: UEXCorpClient
 
