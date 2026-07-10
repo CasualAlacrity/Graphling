@@ -25,5 +25,8 @@ build/
 # Chainlit auto-generated locale files
 .chainlit/translations/
 
+# Local persistent Chroma vector store
+app/.chroma/
+
 # OS
 .DS_Store
