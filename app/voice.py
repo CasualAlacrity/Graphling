@@ -2,7 +2,8 @@
 Push-to-talk voice loop for Uplink — runs standalone, alongside (not through)
 the Chainlit app. Hold the PTT key, speak, release; Uplink replies out loud.
 
-Usage: python voice.py   (from the app/ directory, with the venv active)
+Usage: python app/voice.py   (from the repo root, with the venv active)
+On Windows: win-run-voice.bat
 """
 import asyncio
 import uuid
