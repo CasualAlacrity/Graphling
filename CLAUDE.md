@@ -9,20 +9,35 @@ v1 scope is intentionally narrow: one fixed persona, no multi-tenancy. The prior
 demoable application over breadth of features. Depth (a second persona, richer memory behavior)
 is a "later, maybe" — don't build for it preemptively.
 
+**Current active feature: the trade route tracker** (see `docs/trade-route-tracker.md`) — a
+structured ledger of trade runs (buy/sell legs, milestones, profit), not the generic memory system
+described below. That generic system was built, verified working, then deliberately shelved
+(parked on the `pilot-preference-memory` branch) for lacking a concrete reason to need memory —
+it optimized suggestions but never felt like the AI knowing the pilot specifically. Route tracking
+is meant to be the foundation richer memory could build on later, not a replacement for the idea.
+
 ## Stack
 
 - **LangChain** — LLM orchestration, structured output
-- **LangGraph** — the conversational graph: extraction, recall, response nodes; checkpointer for
-  per-thread short-term state
-- **LangSmith** — tracing/observability across the pipeline (extraction call vs. chat call should
-  be visible as separate traced steps)
-- **Pydantic** — schemas for memory entries, structured LLM output
+- **LangGraph** — the conversational graph. Currently a simple `respond ⇄ tools` loop — the
+  extraction/recall nodes mentioned in older notes were part of the now-shelved generic memory
+  system, not built. Planned trade-route AI integration is ordinary tools (the existing
+  `UplinkTool` pattern), not new graph nodes — see `docs/trade-route-tracker.md`.
+- **LangSmith** — tracing/observability across the pipeline
+- **Pydantic** — schemas for structured LLM output and tool args
 - **Chainlit** — chat interface. Chosen over Streamlit/Gradio because it's built for LLM chat
   apps specifically and handles async streaming and LangChain callbacks natively.
-- **PostgreSQL + ChromaDB** — dual-write memory store (structured queries + semantic retrieval).
-  See `lyra-memory-system-architecture.md` (in the user's Documents, not this repo) for the full
-  design this is adapted from — ten memory classifications, weight/decay per classification,
-  pinned/retrieved/scheduled three-layer retrieval, REPLACE-on-correction.
+- **PySide6** — overlay UI for the trade route tracker (manual entry first, AI-assisted later).
+  Chosen over PyQt6 for licensing (LGPL vs. GPL/commercial) and over tkinter for layout/styling
+  power. See `docs/trade-route-tracker.md` for the full reasoning, including why click-through —
+  which would matter for a persistent HUD — turned out not to apply, since it's a toggle-open/
+  close UI (hotkey-driven, like Arkanis's F3).
+- **PostgreSQL + ChromaDB** — shelved along with the generic memory system above. Was a dual-write
+  memory store (structured queries + semantic retrieval); see `lyra-memory-system-architecture.md`
+  (in the user's Documents, not this repo) for the full design it was adapted from. The trade route
+  tracker reuses the Postgres/SQLAlchemy/Alembic infrastructure (parked on
+  `pilot-preference-memory`) but not ChromaDB — route data is structured/relational, not something
+  needing semantic retrieval.
 - **Ollama** — local model support alongside hosted providers (OpenAI/Anthropic), swappable via a
   provider-agnostic `get_llm()`-style helper.
 
@@ -38,9 +53,11 @@ is a "later, maybe" — don't build for it preemptively.
   single implicit user/persona. If multi-persona support gets added later, this is an additive
   migration (add a context FK, backfill a default), not a redesign — no need for a placeholder
   column now.
-- **LangGraph's checkpointer handles short-term/thread state; the Postgres+Chroma system handles
-  long-term memory.** These solve different timescales and both are needed — the checkpointer is
-  not a substitute for the durable memory system.
+- **LangGraph's checkpointer handles short-term/thread state; long-term persistence is a separate
+  concern from it regardless of what backs it.** These solve different timescales — the
+  checkpointer was never meant to substitute for durable storage. The generic memory system that
+  originally backed long-term persistence is shelved (see Purpose); the trade route tracker's
+  Postgres tables are the active long-term persistence for now.
 - **Background jobs (session consolidation, decay, scheduled surfacing) live outside the graph.**
   They're cron-like jobs (e.g. APScheduler) that call into a small chain or the memory store when
   they fire — not per-message graph nodes.
