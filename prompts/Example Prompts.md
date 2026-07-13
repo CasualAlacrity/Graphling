@@ -18,6 +18,14 @@
   orbital sites, and points of interest like asteroid belts).
   * Resolves either the raw/harvestable form or the refined material name
   * Filter by Orbit (planet), Moon, or System
+* Timer / Notification (e.g. AutoLoad cargo waits — start a timer, go do something else, get
+  notified when it's done instead of sitting at the terminal watching it load).
+  * Natural-language duration ("15 minutes", "in 15 minutes")
+  * Needs a proactive-notification path — the tool call returns immediately, but the actual
+    notification fires later, outside the request/response turn that started it. Straightforward
+    in the push-to-talk voice loop (just speak when the timer fires); needs more thought in
+    Chainlit, which doesn't have an obvious way to push a new message into a session from a
+    background task without holding onto that session's context.
 
 # Done
 What's the price of Iron in Stanton? (Commodity)(Station, Orbit, System)
@@ -28,3 +36,8 @@ Where's the cheapest place to rent a 100i near Crusader? (Vehicle Rental)(Distan
 Which Refinery has the best boost for Iron in Stanton? (Refinable material)(Orbit, System)
 Where can I mine Iron in Stanton? (Minable)(Planet, Belt)
 Can I find Copper on Lyria? (Minable, Harvestable)(Planet, Orbit, System)
+
+# To Do
+Start a timer for 15 minutes. (Timer)(Notify — voice required, Chainlit nice-to-have)
+Notify me in 15 minutes. (Timer)(Notify — voice required, Chainlit nice-to-have)
+"They're loading the cargo, it'll take 15 minutes. Let me know when it's done." (Timer)(Notify, spoken proactively when it fires)
