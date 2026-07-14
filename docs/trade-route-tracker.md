@@ -149,7 +149,109 @@ home instead of being a standalone dumb timer.
    tool calls from one utterance (compound "loaded it, what's the ETA
    again?") are already handled by ordinary `bind_tools` behavior — no new
    graph architecture needed, unlike what the earlier memory-system plan
-   assumed.
+   assumed. The **Trade Advisor** (scoring/recommendation, see below) is the
+   substantial piece of this step — not just tools that log what already
+   happened, but ranking what to do next.
+
+## Trade Advisor — scoring & inferred preferences (AI integration phase)
+
+**This is the "AI aspect" of the feature, built once the ledger and manual UI
+are working — not part of the schema or manual-UI phases.** It's a
+recommendation/scoring layer that reads the ledger (once it has real data)
+plus live UEX data; it doesn't change the core run/leg schema. Design capture
+now, implementation later, per the Build plan above.
+
+### Scoring
+
+Rank candidate trades by **profit per hour**, not margin or profit alone —
+margin and distance are inputs to the metric, not separate filters applied
+in sequence:
+
+```
+total_time = load_time + travel_time + unload_time
+score = profit / total_time
+```
+
+- `load_time` / `unload_time` — personal ledger benchmarks, keyed by
+  ship+cargo+method (auto vs. manual). This resolves the earlier open
+  question about benchmark granularity — ship+cargo is the key, not
+  origin-destination.
+- `travel_time` — computed from Gm distance + ship speed/quantum travel, not
+  from the ledger (it's a physics calculation, not a judgment call).
+- Gm radius and autoload-required are **query-time filters on the candidate
+  pool**, not stored preferences — narrow the pool first, then rank by score
+  within it.
+
+### SCU-shortfall handling
+
+When a station can't fill the hold, score all three options and take the
+max — don't default to any one:
+
+1. **Multi-commodity, same stop** — fill the remainder with a second
+   commodity from the same station, same/nearby destination. No added
+   travel time, just an extra load pass.
+2. **Second pickup stop** — detour to a nearby station to top off. Only
+   worth it if the added profit from the extra SCU exceeds the added time
+   cost of the detour (recompute score including the detour leg).
+3. **Partial fill, go anyway** — the baseline. Sometimes correctly wins if
+   nearby options are weak.
+
+Cap detour search to **one additional stop** within the existing Gm radius —
+avoid open-ended multi-hop pathfinding; that's a harder problem to defer,
+not solve here.
+
+Architecturally, this operates on *candidate* routes, not committed ones —
+the same `GameTradeRoute` (suggestion) vs. `TradeRun` (committed) split
+already adopted from Arkanis. The Advisor scores hypothetical legs (including
+a not-yet-committed detour); only a pilot's actual commitment creates ledger
+rows via the tools in the Build plan's AI-integration step.
+
+### What gets stored vs. computed live
+
+**The test:** does deriving it require *interpreting behavior* (a judgment
+call), or just *counting it* (an aggregate query)? Only the former gets
+stored — the latter is a live ledger/UEX query at ask-time, so it can't go
+stale.
+
+**Inferred preferences (interpretation required — store these):**
+- `risk_tolerance{trade_risk, mining_risk}` — derived by weighing route
+  danger against margin historically accepted.
+- `trade_preference{profit, margin}` — derived by comparing chosen routes
+  against alternatives *available at the time* (did they pick
+  lower-volume/higher-margin over higher-volume/lower-margin, when both were
+  options?).
+- `mining_goal{quantity, quality, profit}` — same idea, scoped to mining.
+  Deferred until a mining ledger exists.
+
+**Query-time parameters (NOT stored — computed live):**
+- System/region of operation — `GROUP BY` on the ledger.
+- Loading method tendency (% auto vs. manual) — live aggregate over recent
+  loads.
+- Terminal type tendency (orbit vs. ground) — same pattern. Already free:
+  `CachedTerminal.type` already exists in the UEX reference cache
+  (`app/tools/uexcorp/reference_cache.py`) — a leg only needs to reference
+  the terminal, type comes via join, nothing new to capture.
+- Ship class tendency — most-used hauler(s) from the ledger.
+- Gm radius, autoload-required — supplied per-query (by pilot or agent
+  context), not a standing preference.
+
+**Still open / not yet scoped** (real, but not designed):
+- `legality_tolerance{legal_only, gray_market, contraband}` — a real SC
+  mechanic, distinct from general trade risk.
+- `cargo_fill_preference{max, buffer}` — full-capacity vs. safety-margin
+  loading habit.
+- `escort_preference{solo, group}` — changes what "safe route" even means.
+- `session_time_budget{short_loop, long_haul}` — affects what the advisor
+  should even suggest.
+- `commodity_affinity` — loyalty to specific goods vs. pure profit-chasing;
+  likely inferred from ledger pattern, not set directly.
+
+### Schema note for stored fields
+
+Every stored (inferred) field carries `confidence`, `sample_size`, and
+`last_updated`, and uses a three-tier surfacing rule: **high confidence →
+act silently; low confidence or a contradicting pattern → surface and let
+the pilot confirm/correct.**
 
 ## Tech stack for the overlay UI
 
