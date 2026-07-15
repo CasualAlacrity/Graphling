@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
+from pydantic import ValidationError
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,7 +21,14 @@ async def load_reference_cache(session: AsyncSession) -> UexReferenceCache | Non
         return None
     if datetime.now(timezone.utc) - record.fetched_at > CACHE_TTL:
         return None
-    return UexReferenceCache.model_validate(record.payload)
+    try:
+        return UexReferenceCache.model_validate(record.payload)
+    except ValidationError:
+        # A row written under an older CachedTerminal/CachedCommodity/etc. shape (e.g. a
+        # field added since) can't validate against the current schema. Treat that as a
+        # miss rather than crashing the overlay — the caller will rebuild from UEX and
+        # overwrite this row with a fresh, current-schema payload.
+        return None
 
 
 async def store_reference_cache(session: AsyncSession, cache: UexReferenceCache) -> None:

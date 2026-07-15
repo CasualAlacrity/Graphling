@@ -68,6 +68,9 @@ class CachedTerminal(CachedBase):
     planet_name: str | None
     displayname:str|None
     nickname:str|None
+    space_station_name:str|None
+    outpost_name:str|None
+    city_name:str|None
 
 
 class CachedMoon(CachedBase):
