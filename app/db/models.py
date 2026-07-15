@@ -1,0 +1,68 @@
+import enum
+import uuid
+from datetime import datetime, timezone
+
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+
+class Base(DeclarativeBase):
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
+class LegType(str, enum.Enum):
+    ACQUISITION = "acquisition"
+    SALE = "sale"
+
+
+class CargoTransferType(str, enum.Enum):
+    MANUAL = "manual"
+    AUTOLOAD = "autoload"
+
+
+class TradeRun(Base):
+    __tablename__ = "trade_run"
+
+    ship: Mapped[str | None] = mapped_column(String, nullable=True)
+    finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    legs: Mapped[list["TradeLeg"]] = relationship(
+        "TradeLeg", back_populates="run", cascade="all, delete-orphan"
+    )
+
+
+class TradeLeg(Base):
+    __tablename__ = "trade_leg"
+
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("trade_run.id", ondelete="CASCADE"), nullable=False
+    )
+    leg_type: Mapped[LegType] = mapped_column(Enum(LegType, name="leg_type"), nullable=False)
+
+    terminal_name: Mapped[str] = mapped_column(String, nullable=False)
+    commodity_name: Mapped[str] = mapped_column(String, nullable=False)
+    quantity_scu: Mapped[int] = mapped_column(Integer, nullable=False)
+    price_per_unit: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    cargo_transfer_type: Mapped[CargoTransferType] = mapped_column(
+        Enum(CargoTransferType, name="cargo_transfer_type"), nullable=False
+    )
+    cargo_transfer_fee: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reached_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    transaction_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    transferred_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    run: Mapped["TradeRun"] = relationship("TradeRun", back_populates="legs")

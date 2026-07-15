@@ -26,3 +26,9 @@ soundfile==0.14.0
 openai-whisper==20250625
 pynput==1.8.2
 elevenlabs==2.52.0
+
+# Trade route tracker (Postgres storage)
+sqlalchemy>=2.0
+greenlet>=3.0
+asyncpg>=0.29
+alembic>=1.13
