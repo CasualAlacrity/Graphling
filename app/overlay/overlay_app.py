@@ -52,7 +52,15 @@ uex_client = UEXCorpClient(
     api_key=os.getenv("UEXCORP_API_KEY"),
     bearer_token=os.getenv("UEXCORP_BEARER_TOKEN"),
 )
-uex_cache = asyncio.run(uex_client.get_uex_cache())
+async def _load_uex_cache():
+    cache = await uex_client.get_uex_cache()
+    # get_uex_cache() now reads/writes the reference cache table. This call runs in its
+    # own throwaway asyncio.run() loop, same reasoning as _refresh_filters_async's dispose.
+    await engine.dispose()
+    return cache
+
+
+uex_cache = asyncio.run(_load_uex_cache())
 ship_names = [v.name_full for v in uex_cache.vehicles if v.scu >= 1]
 commodity_names = [c.name for c in uex_cache.commodities if c.is_buyable == 1]
 terminal_names = [t.name for t in uex_cache.terminals if t.type == TerminalType.COMMODITY]
@@ -105,15 +113,32 @@ DESTINATION_INVENTORY_LEVELS = [
     status.name for status in uex_cache.commodity_statuses if status.type == "sell"
 ]
 
+screen_geometry = app.primaryScreen().availableGeometry()
+panel_height = int(screen_geometry.height() * 0.85)
+filter_width = int(screen_geometry.width() * 0.22)
+results_width = int(screen_geometry.width() * 0.30)
+
 filter_widget = QWidget()
 filter_widget.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
-filter_widget.resize(800, 600)
+filter_widget.resize(filter_width, panel_height)
+filter_widget.move(screen_geometry.x(), screen_geometry.y())
 filter_widget.setStyleSheet("background-color: #AAAAAA")
 
 verticalLayout = QVBoxLayout(filter_widget)
 
 filter_header = QLabel(parent=filter_widget, text="Filters:")
 verticalLayout.addWidget(filter_header)
+
+results_widget = QWidget()
+results_widget.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+results_widget.resize(results_width, panel_height)
+results_widget.move(screen_geometry.x() + filter_width + 10, screen_geometry.y())
+results_widget.setStyleSheet("background-color: #AAAAAA")
+
+resultsLayout = QVBoxLayout(results_widget)
+
+results_header = QLabel(parent=results_widget, text="Results:")
+resultsLayout.addWidget(results_header)
 
 # --- Ship & Cargo ---
 ship_cargo_group = QGroupBox(parent=filter_widget, title="Ship and Cargo")
@@ -396,17 +421,17 @@ verticalLayout.addLayout(button_row)
 
 # --- Sort ---
 sort_row = QHBoxLayout()
-sort_score_button = QPushButton(parent=filter_widget, text="Sort: Score")
-sort_profit_button = QPushButton(parent=filter_widget, text="Sort: Profit")
-sort_margin_button = QPushButton(parent=filter_widget, text="Sort: Margin")
+sort_score_button = QPushButton(parent=results_widget, text="Sort: Score")
+sort_profit_button = QPushButton(parent=results_widget, text="Sort: Profit")
+sort_margin_button = QPushButton(parent=results_widget, text="Sort: Margin")
 sort_row.addWidget(sort_score_button)
 sort_row.addWidget(sort_profit_button)
 sort_row.addWidget(sort_margin_button)
 
-verticalLayout.addLayout(sort_row)
+resultsLayout.addLayout(sort_row)
 
-results_list = QListWidget(parent=filter_widget)
-verticalLayout.addWidget(results_list)
+results_list = QListWidget(parent=results_widget)
+resultsLayout.addWidget(results_list)
 
 last_routes = []
 
@@ -495,7 +520,9 @@ threading.Thread(target=lambda: asyncio.run(voice_run()), daemon=True).start()
 
 
 def on_toggle_requested():
-    filter_widget.setVisible(not filter_widget.isVisible())
+    visible = not filter_widget.isVisible()
+    filter_widget.setVisible(visible)
+    results_widget.setVisible(visible)
 
 
 bridge.toggle_requested.connect(on_toggle_requested)

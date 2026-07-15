@@ -1,13 +1,29 @@
 import asyncio
+import time
 from datetime import datetime, timedelta, timezone
 
 import requests
 from langsmith import traceable
 from pydantic import BaseModel, PrivateAttr
 
+from db.session import SessionLocal
 from tools.uexcorp.reference_cache import (UexReferenceCache, CachedCommodity, CachedStarSystem, CachedOrbit,
                                            CachedTerminal, CachedMoon, CachedItemCategory, CachedItem,
                                            CachedVehicle, CachedRefineryYield, CachedPoi, CachedCommodityStatus)
+from tools.uexcorp.reference_cache_store import load_reference_cache, store_reference_cache
+
+RETRY_ATTEMPTS = 3
+RETRY_BACKOFF_SECONDS = 1.0
+
+
+def _get_with_retries(url: str, headers: dict, params: dict | None = None) -> requests.Response:
+    response = requests.get(url, headers=headers, params=params)
+    for attempt in range(1, RETRY_ATTEMPTS):
+        if response.status_code < 500:
+            return response
+        time.sleep(RETRY_BACKOFF_SECONDS * attempt)
+        response = requests.get(url, headers=headers, params=params)
+    return response
 
 
 class UEXCorpClient(BaseModel):
@@ -36,24 +52,34 @@ class UEXCorpClient(BaseModel):
             if uex_cache and self._is_fresh(uex_cache):
                 return uex_cache
 
+            async with SessionLocal() as session:
+                stored_cache = await load_reference_cache(session)
+            if stored_cache is not None:
+                self._uex_cache = stored_cache
+                return stored_cache
+
             uex_cache = await self._build_uex_cache()
             self._uex_cache = uex_cache
+
+            async with SessionLocal() as session:
+                await store_reference_cache(session, uex_cache)
+
             return uex_cache
 
     async def _build_uex_cache(self) -> UexReferenceCache:
         headers = self.get_header()
 
         commodities_resp, star_systems_resp, orbits_resp, terminals_resp, moons_resp, categories_resp, vehicles_resp, refinery_yields_resp, poi_resp, commodity_status_resp = await asyncio.gather(
-            asyncio.to_thread(requests.get, self.API_BASE_URL + 'commodities', headers=headers),
-            asyncio.to_thread(requests.get, self.API_BASE_URL + 'star_systems', headers=headers),
-            asyncio.to_thread(requests.get, self.API_BASE_URL + 'orbits', headers=headers),
-            asyncio.to_thread(requests.get, self.API_BASE_URL + 'terminals', headers=headers),
-            asyncio.to_thread(requests.get, self.API_BASE_URL + 'moons', headers=headers),
-            asyncio.to_thread(requests.get, self.API_BASE_URL + 'categories', headers=headers, params={"type": 'item'}),
-            asyncio.to_thread(requests.get, self.API_BASE_URL + 'vehicles', headers=headers),
-            asyncio.to_thread(requests.get, self.API_BASE_URL + 'refineries_yields', headers=headers),
-            asyncio.to_thread(requests.get, self.API_BASE_URL + 'poi', headers=headers),
-            asyncio.to_thread(requests.get, self.API_BASE_URL + 'commodities_status', headers=headers),
+            asyncio.to_thread(_get_with_retries, self.API_BASE_URL + 'commodities', headers),
+            asyncio.to_thread(_get_with_retries, self.API_BASE_URL + 'star_systems', headers),
+            asyncio.to_thread(_get_with_retries, self.API_BASE_URL + 'orbits', headers),
+            asyncio.to_thread(_get_with_retries, self.API_BASE_URL + 'terminals', headers),
+            asyncio.to_thread(_get_with_retries, self.API_BASE_URL + 'moons', headers),
+            asyncio.to_thread(_get_with_retries, self.API_BASE_URL + 'categories', headers, {"type": 'item'}),
+            asyncio.to_thread(_get_with_retries, self.API_BASE_URL + 'vehicles', headers),
+            asyncio.to_thread(_get_with_retries, self.API_BASE_URL + 'refineries_yields', headers),
+            asyncio.to_thread(_get_with_retries, self.API_BASE_URL + 'poi', headers),
+            asyncio.to_thread(_get_with_retries, self.API_BASE_URL + 'commodities_status', headers),
         )
 
         commodities_resp.raise_for_status()
@@ -70,8 +96,9 @@ class UEXCorpClient(BaseModel):
         item_tasks = []
         for category in categories_resp.json()["data"]:
             if category:
-                task = asyncio.to_thread(requests.get, self.API_BASE_URL + 'items', headers=headers,
-                                         params={"id_category": category["id"]})
+                task = asyncio.to_thread(
+                    _get_with_retries, self.API_BASE_URL + 'items', headers, {"id_category": category["id"]}
+                )
                 item_tasks.append(task)
         item_responses = await asyncio.gather(*item_tasks)
 

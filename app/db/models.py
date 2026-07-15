@@ -81,3 +81,14 @@ class UexPriceCache(Base):
     entity_id: Mapped[int] = mapped_column(Integer, nullable=False)
     rows: Mapped[list] = mapped_column(JSONB, nullable=False)
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class UexReferenceCacheRecord(Base):
+    """Singleton row holding the full UexReferenceCache bundle (commodities, terminals,
+    vehicles, etc). Structural reference data, not per-entity price data — one row is
+    replaced wholesale on every rebuild rather than keyed like uex_price_cache."""
+
+    __tablename__ = "uex_reference_cache"
+
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

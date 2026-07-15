@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class TerminalType(str, enum.Enum):
@@ -94,6 +94,10 @@ class CachedVehicle(CachedBase):
 
 
 class CachedRefineryYield(BaseModel):
+    # Live UEX responses use "value"; round-tripping our own model_dump() output back
+    # through model_validate() (DB-backed cache) uses the field name instead — accept both.
+    model_config = ConfigDict(populate_by_name=True)
+
     commodity_name: str
     terminal_name: str
     star_system_name: str | None
