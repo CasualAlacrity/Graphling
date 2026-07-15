@@ -1,6 +1,17 @@
+import enum
 from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
+
+
+class TerminalType(str, enum.Enum):
+    ITEM = "item"
+    COMMODITY = "commodity"
+    COMMODITY_RAW = "commodity_raw"
+    FUEL = "fuel"
+    REFINERY = "refinery"
+    VEHICLE_RENT = "vehicle_rent"
+    VEHICLE_BUY = "vehicle_buy"
 
 
 class CachedBase(BaseModel):
@@ -32,6 +43,7 @@ class CachedCommodity(CachedBase):
     ids_moons: list[int]
     ids_orbits: list[int]
     ids_poi: list[int]
+    is_buyable:int
 
     @field_validator("ids_star_systems", "ids_planets", "ids_moons", "ids_orbits", "ids_poi", mode="before")
     @classmethod
@@ -49,11 +61,13 @@ class CachedOrbit(CachedBase):
 
 
 class CachedTerminal(CachedBase):
-    type: str
+    type: TerminalType
     star_system_name: str | None
     orbit_name: str | None
     moon_name: str | None
     planet_name: str | None
+    displayname:str|None
+    nickname:str|None
 
 
 class CachedMoon(CachedBase):
@@ -75,7 +89,7 @@ class CachedItemCategory(CachedBase):
 
 
 class CachedVehicle(CachedBase):
-    pass
+    name_full:str
 
 
 class CachedRefineryYield(BaseModel):

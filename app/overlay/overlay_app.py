@@ -15,10 +15,13 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QComboBox,
     QPushButton,
+    QListWidget,
 )
 from pynput import keyboard
 
 from tools.uexcorp.client import UEXCorpClient
+from tools.uexcorp.reference_cache import TerminalType
+from tools.uexcorp.trade_data import UEXTradeData
 from voice import run as voice_run
 
 
@@ -36,9 +39,9 @@ uex_client = UEXCorpClient(
     bearer_token=os.getenv("UEXCORP_BEARER_TOKEN"),
 )
 uex_cache = asyncio.run(uex_client.get_uex_cache())
-ship_names = [v.name for v in uex_cache.vehicles]
-commodity_names = [c.name for c in uex_cache.commodities]
-terminal_names = [t.name for t in uex_cache.terminals]
+ship_names = [v.name_full for v in uex_cache.vehicles]
+commodity_names = [c.name for c in uex_cache.commodities if c.is_buyable == 1]
+terminal_names = [t.name for t in uex_cache.terminals if t.type == TerminalType.COMMODITY]
 
 
 def find_terminal(name):
@@ -48,10 +51,26 @@ def find_terminal(name):
     return None
 
 
+def find_commodity(name):
+    for commodity in uex_cache.commodities:
+        if commodity.name == name:
+            return commodity
+    return None
+
+
+def inventory_code_for(status_name, status_type):
+    if not status_name or status_name == "Select...":
+        return None
+    for status in uex_cache.commodity_statuses:
+        if status.type == status_type and status.name == status_name:
+            return status.code
+    return None
+
+
 def terminal_breadcrumb(terminal):
     if terminal is None:
         return ""
-    parts = [terminal.star_system_name, terminal.orbit_name, terminal.moon_name]
+    parts = [terminal.star_system_name, terminal.orbit_name, terminal.moon_name, terminal.name]
     return ">".join(part for part in parts if part)
 
 
@@ -85,7 +104,9 @@ ship_completer = QCompleter(
     ship_names,
     parent=ship_input,
     caseSensitivity=Qt.CaseInsensitive,
+    filterMode=Qt.MatchFlag.MatchContains,
     maxVisibleItems=10,
+
 )
 ship_input.setCompleter(ship_completer)
 ship_cargo_layout.addWidget(ship_label)
@@ -96,8 +117,14 @@ cargo_input = QSpinBox(parent=ship_cargo_group, minimum=0, maximum=3000, suffix=
 ship_cargo_layout.addWidget(cargo_label)
 ship_cargo_layout.addWidget(cargo_input)
 
-commodity_label = QLabel(parent=ship_cargo_group, text="Commodity")
-commodity_input = QLineEdit(parent=ship_cargo_group, placeholderText="Search commodity...")
+verticalLayout.addWidget(ship_cargo_group)
+
+# --- Commodity ---
+commodity_group = QGroupBox(parent=filter_widget, title="Commodity")
+commodity_layout = QVBoxLayout(commodity_group)
+
+commodity_label = QLabel(parent=commodity_group, text="Commodity")
+commodity_input = QLineEdit(parent=commodity_group, placeholderText="Search commodity...")
 commodity_completer = QCompleter(
     commodity_names,
     parent=commodity_input,
@@ -105,10 +132,10 @@ commodity_completer = QCompleter(
     maxVisibleItems=10,
 )
 commodity_input.setCompleter(commodity_completer)
-ship_cargo_layout.addWidget(commodity_label)
-ship_cargo_layout.addWidget(commodity_input)
+commodity_layout.addWidget(commodity_label)
+commodity_layout.addWidget(commodity_input)
 
-verticalLayout.addWidget(ship_cargo_group)
+verticalLayout.addWidget(commodity_group)
 
 # --- Source ---
 source_group = QGroupBox(parent=filter_widget, title="Source")
@@ -120,6 +147,7 @@ source_terminal_completer = QCompleter(
     terminal_names,
     parent=source_terminal_input,
     caseSensitivity=Qt.CaseInsensitive,
+    filterMode=Qt.MatchFlag.MatchContains,
     maxVisibleItems=10,
 )
 source_terminal_input.setCompleter(source_terminal_completer)
@@ -155,6 +183,7 @@ destination_terminal_completer = QCompleter(
     terminal_names,
     parent=destination_terminal_input,
     caseSensitivity=Qt.CaseInsensitive,
+    filterMode=Qt.MatchFlag.MatchContains,
     maxVisibleItems=10,
 )
 destination_terminal_input.setCompleter(destination_terminal_completer)
@@ -184,12 +213,73 @@ verticalLayout.addWidget(destination_group)
 button_row = QHBoxLayout()
 button_row.addStretch()
 
-cancel_button = QPushButton(parent=filter_widget, text="Cancel")
-apply_button = QPushButton(parent=filter_widget, text="Apply")
-button_row.addWidget(cancel_button)
-button_row.addWidget(apply_button)
+reset_button = QPushButton(parent=filter_widget, text="Reset")
+search_button = QPushButton(parent=filter_widget, text="Search")
+button_row.addWidget(reset_button)
+button_row.addWidget(search_button)
 
 verticalLayout.addLayout(button_row)
+
+results_list = QListWidget(parent=filter_widget)
+verticalLayout.addWidget(results_list)
+
+
+def on_search_clicked():
+    results_list.clear()
+
+    commodity = find_commodity(commodity_input.text())
+    if commodity is None:
+        results_list.addItem("Select a commodity to search.")
+        return
+
+    price_rows = [
+        UEXTradeData.model_validate(row)
+        for row in asyncio.run(uex_client.get_commodity_prices(commodity.id))
+    ]
+
+    source_terminal = find_terminal(source_terminal_input.text())
+    destination_terminal = find_terminal(destination_terminal_input.text())
+    min_source_code = inventory_code_for(min_source_inventory_input.currentText(), "buy")
+    max_destination_code = inventory_code_for(max_destination_inventory_input.currentText(), "sell")
+    cargo_scu = cargo_input.value()
+
+    source_rows = [
+        row for row in price_rows
+        if row.price_you_pay_to_acquire is not None
+        and (source_terminal is None or row.terminal_id == source_terminal.id)
+        and (min_source_code is None or (row.status_buy is not None and row.status_buy >= min_source_code))
+    ]
+    destination_rows = [
+        row for row in price_rows
+        if row.price_you_receive_when_selling is not None
+        and (destination_terminal is None or row.terminal_id == destination_terminal.id)
+        and (max_destination_code is None or (row.status_sell is not None and row.status_sell <= max_destination_code))
+    ]
+
+    routes = []
+    for source_row in source_rows:
+        for destination_row in destination_rows:
+            if source_row.terminal_id == destination_row.terminal_id:
+                continue
+            profit_per_unit = destination_row.price_you_receive_when_selling - source_row.price_you_pay_to_acquire
+            if profit_per_unit <= 0:
+                continue
+            routes.append((profit_per_unit, source_row, destination_row))
+
+    routes.sort(key=lambda route: route[0], reverse=True)
+
+    if not routes:
+        results_list.addItem("No profitable routes found for this commodity.")
+        return
+
+    for profit_per_unit, source_row, destination_row in routes[:20]:
+        line = f"{source_row.terminal_name} -> {destination_row.terminal_name}  |  +{profit_per_unit:.0f} aUEC/unit"
+        if cargo_scu > 0:
+            line += f"  |  +{profit_per_unit * cargo_scu:.0f} aUEC for {cargo_scu} SCU"
+        results_list.addItem(line)
+
+
+search_button.clicked.connect(on_search_clicked)
 
 threading.Thread(target=lambda: asyncio.run(voice_run()), daemon=True).start()
 
