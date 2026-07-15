@@ -7,7 +7,7 @@ from pydantic import BaseModel, PrivateAttr
 
 from tools.uexcorp.reference_cache import (UexReferenceCache, CachedCommodity, CachedStarSystem, CachedOrbit,
                                            CachedTerminal, CachedMoon, CachedItemCategory, CachedItem,
-                                           CachedVehicle, CachedRefineryYield, CachedPoi)
+                                           CachedVehicle, CachedRefineryYield, CachedPoi, CachedCommodityStatus)
 
 
 class UEXCorpClient(BaseModel):
@@ -43,7 +43,7 @@ class UEXCorpClient(BaseModel):
     async def _build_uex_cache(self) -> UexReferenceCache:
         headers = self.get_header()
 
-        commodities_resp, star_systems_resp, orbits_resp, terminals_resp, moons_resp, categories_resp, vehicles_resp, refinery_yields_resp, poi_resp = await asyncio.gather(
+        commodities_resp, star_systems_resp, orbits_resp, terminals_resp, moons_resp, categories_resp, vehicles_resp, refinery_yields_resp, poi_resp, commodity_status_resp = await asyncio.gather(
             asyncio.to_thread(requests.get, self.API_BASE_URL + 'commodities', headers=headers),
             asyncio.to_thread(requests.get, self.API_BASE_URL + 'star_systems', headers=headers),
             asyncio.to_thread(requests.get, self.API_BASE_URL + 'orbits', headers=headers),
@@ -53,6 +53,7 @@ class UEXCorpClient(BaseModel):
             asyncio.to_thread(requests.get, self.API_BASE_URL + 'vehicles', headers=headers),
             asyncio.to_thread(requests.get, self.API_BASE_URL + 'refineries_yields', headers=headers),
             asyncio.to_thread(requests.get, self.API_BASE_URL + 'poi', headers=headers),
+            asyncio.to_thread(requests.get, self.API_BASE_URL + 'commodities_status', headers=headers),
         )
 
         commodities_resp.raise_for_status()
@@ -64,6 +65,7 @@ class UEXCorpClient(BaseModel):
         vehicles_resp.raise_for_status()
         refinery_yields_resp.raise_for_status()
         poi_resp.raise_for_status()
+        commodity_status_resp.raise_for_status()
 
         item_tasks = []
         for category in categories_resp.json()["data"]:
@@ -80,6 +82,15 @@ class UEXCorpClient(BaseModel):
             if category_items:
                 items_data.extend(category_items)
 
+        commodity_status_data = commodity_status_resp.json()["data"]
+        commodity_statuses = [
+            CachedCommodityStatus.model_validate({**row, "type": "buy"})
+            for row in commodity_status_data["buy"]
+        ] + [
+            CachedCommodityStatus.model_validate({**row, "type": "sell"})
+            for row in commodity_status_data["sell"]
+        ]
+
         uex_cache = UexReferenceCache(
             fetched_at=datetime.now(timezone.utc),
             commodities=[CachedCommodity.model_validate(row) for row in commodities_resp.json()["data"]],
@@ -92,6 +103,7 @@ class UEXCorpClient(BaseModel):
             vehicles=[CachedVehicle.model_validate(row) for row in vehicles_resp.json()["data"]],
             refinery_yields=[CachedRefineryYield.model_validate(row) for row in refinery_yields_resp.json()["data"]],
             poi=[CachedPoi.model_validate(row) for row in poi_resp.json()["data"]],
+            commodity_statuses=commodity_statuses,
         )
 
         return uex_cache

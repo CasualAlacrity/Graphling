@@ -96,6 +96,15 @@ class CachedPoi(CachedBase):
     planet_name: str | None
 
 
+class CachedCommodityStatus(BaseModel):
+    type: str  # "buy" or "sell" — which side of a transaction this tier applies to
+    code: int
+    name: str
+    name_short: str
+    percentage_start: int
+    percentage_end: int
+
+
 class UexReferenceCache(BaseModel):
     fetched_at: datetime
     commodities: list[CachedCommodity]
@@ -108,3 +117,4 @@ class UexReferenceCache(BaseModel):
     vehicles: list[CachedVehicle]
     refinery_yields: list[CachedRefineryYield]
     poi: list[CachedPoi]
+    commodity_statuses: list[CachedCommodityStatus]
