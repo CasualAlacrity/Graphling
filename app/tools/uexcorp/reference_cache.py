@@ -89,7 +89,8 @@ class CachedItemCategory(CachedBase):
 
 
 class CachedVehicle(CachedBase):
-    name_full:str
+    name_full: str
+    scu: float
 
 
 class CachedRefineryYield(BaseModel):

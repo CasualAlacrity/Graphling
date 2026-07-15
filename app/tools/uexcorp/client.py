@@ -108,6 +108,33 @@ class UEXCorpClient(BaseModel):
 
         return uex_cache
 
+    @traceable(name="uex_get_commodity_routes")
+    async def get_commodity_routes(
+        self,
+        commodity_id: int | None = None,
+        origin_terminal_id: int | None = None,
+        destination_terminal_id: int | None = None,
+        investment: int | None = None,
+    ) -> list[dict]:
+        params = {}
+        if commodity_id is not None:
+            params["id_commodity"] = commodity_id
+        if origin_terminal_id is not None:
+            params["id_terminal_origin"] = origin_terminal_id
+        if destination_terminal_id is not None:
+            params["id_terminal_destination"] = destination_terminal_id
+        if investment is not None:
+            params["investment"] = investment
+
+        response = await asyncio.to_thread(
+            requests.get,
+            self.API_BASE_URL + 'commodities_routes',
+            params=params,
+            headers=self.get_header(),
+        )
+        response.raise_for_status()
+        return response.json()["data"]
+
     @traceable(name="uex_get_commodity_prices")
     async def get_commodity_prices(self, commodity_id: int) -> list[dict]:
         response = await asyncio.to_thread(

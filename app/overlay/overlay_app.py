@@ -16,12 +16,13 @@ from PySide6.QtWidgets import (
     QComboBox,
     QPushButton,
     QListWidget,
+    QCheckBox,
 )
 from pynput import keyboard
 
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.reference_cache import TerminalType
-from tools.uexcorp.trade_data import UEXTradeData
+from tools.uexcorp.trade_data import UEXTradeRoute
 from voice import run as voice_run
 
 
@@ -55,6 +56,13 @@ def find_commodity(name):
     for commodity in uex_cache.commodities:
         if commodity.name == name:
             return commodity
+    return None
+
+
+def find_vehicle(name):
+    for vehicle in uex_cache.vehicles:
+        if vehicle.name_full == name:
+            return vehicle
     return None
 
 
@@ -112,10 +120,19 @@ ship_input.setCompleter(ship_completer)
 ship_cargo_layout.addWidget(ship_label)
 ship_cargo_layout.addWidget(ship_input)
 
-cargo_label = QLabel(parent=ship_cargo_group, text="Cargo")
-cargo_input = QSpinBox(parent=ship_cargo_group, minimum=0, maximum=3000, suffix=" units")
+cargo_label = QLabel(parent=ship_cargo_group, text="Cargo Volume")
+cargo_input = QSpinBox(parent=ship_cargo_group, minimum=0, maximum=3000, suffix=" SCU")
 ship_cargo_layout.addWidget(cargo_label)
 ship_cargo_layout.addWidget(cargo_input)
+
+
+def on_ship_selected(name):
+    vehicle = find_vehicle(name)
+    if vehicle is not None:
+        cargo_input.setValue(int(vehicle.scu))
+
+
+ship_completer.activated[str].connect(on_ship_selected)
 
 verticalLayout.addWidget(ship_cargo_group)
 
@@ -209,6 +226,16 @@ destination_layout.addWidget(max_destination_inventory_input)
 
 verticalLayout.addWidget(destination_group)
 
+# --- Options ---
+options_row = QHBoxLayout()
+space_only_checkbox = QCheckBox(parent=filter_widget, text="Space only")
+autoload_checkbox = QCheckBox(parent=filter_widget, text="Has autoload")
+options_row.addWidget(space_only_checkbox)
+options_row.addWidget(autoload_checkbox)
+options_row.addStretch()
+
+verticalLayout.addLayout(options_row)
+
 # --- Buttons ---
 button_row = QHBoxLayout()
 button_row.addStretch()
@@ -220,66 +247,102 @@ button_row.addWidget(search_button)
 
 verticalLayout.addLayout(button_row)
 
+# --- Sort ---
+sort_row = QHBoxLayout()
+sort_score_button = QPushButton(parent=filter_widget, text="Sort: Score")
+sort_profit_button = QPushButton(parent=filter_widget, text="Sort: Profit")
+sort_margin_button = QPushButton(parent=filter_widget, text="Sort: Margin")
+sort_row.addWidget(sort_score_button)
+sort_row.addWidget(sort_profit_button)
+sort_row.addWidget(sort_margin_button)
+
+verticalLayout.addLayout(sort_row)
+
 results_list = QListWidget(parent=filter_widget)
 verticalLayout.addWidget(results_list)
 
+last_routes = []
 
-def on_search_clicked():
-    results_list.clear()
 
-    commodity = find_commodity(commodity_input.text())
-    if commodity is None:
-        results_list.addItem("Select a commodity to search.")
-        return
-
-    price_rows = [
-        UEXTradeData.model_validate(row)
-        for row in asyncio.run(uex_client.get_commodity_prices(commodity.id))
-    ]
-
-    source_terminal = find_terminal(source_terminal_input.text())
-    destination_terminal = find_terminal(destination_terminal_input.text())
-    min_source_code = inventory_code_for(min_source_inventory_input.currentText(), "buy")
-    max_destination_code = inventory_code_for(max_destination_inventory_input.currentText(), "sell")
+def estimated_profit_for(route):
     cargo_scu = cargo_input.value()
+    reachable_scu = min(route.scu_origin, route.scu_destination)
+    if cargo_scu > 0:
+        reachable_scu = min(reachable_scu, cargo_scu)
+    return (route.price_destination - route.price_origin) * reachable_scu
 
-    source_rows = [
-        row for row in price_rows
-        if row.price_you_pay_to_acquire is not None
-        and (source_terminal is None or row.terminal_id == source_terminal.id)
-        and (min_source_code is None or (row.status_buy is not None and row.status_buy >= min_source_code))
-    ]
-    destination_rows = [
-        row for row in price_rows
-        if row.price_you_receive_when_selling is not None
-        and (destination_terminal is None or row.terminal_id == destination_terminal.id)
-        and (max_destination_code is None or (row.status_sell is not None and row.status_sell <= max_destination_code))
-    ]
 
-    routes = []
-    for source_row in source_rows:
-        for destination_row in destination_rows:
-            if source_row.terminal_id == destination_row.terminal_id:
-                continue
-            profit_per_unit = destination_row.price_you_receive_when_selling - source_row.price_you_pay_to_acquire
-            if profit_per_unit <= 0:
-                continue
-            routes.append((profit_per_unit, source_row, destination_row))
-
-    routes.sort(key=lambda route: route[0], reverse=True)
-
+def render_routes(routes):
+    results_list.clear()
     if not routes:
-        results_list.addItem("No profitable routes found for this commodity.")
+        results_list.addItem("No routes found for these filters.")
         return
 
-    for profit_per_unit, source_row, destination_row in routes[:20]:
-        line = f"{source_row.terminal_name} -> {destination_row.terminal_name}  |  +{profit_per_unit:.0f} aUEC/unit"
+    for route in routes[:20]:
+        cargo_scu = cargo_input.value()
+        reachable_scu = min(route.scu_origin, route.scu_destination)
         if cargo_scu > 0:
-            line += f"  |  +{profit_per_unit * cargo_scu:.0f} aUEC for {cargo_scu} SCU"
+            reachable_scu = min(reachable_scu, cargo_scu)
+
+        line = (
+            f"{route.commodity_name}: {route.origin_terminal_name} -> {route.destination_terminal_name}"
+            f"  |  {route.distance:.0f} Gm  |  {route.price_margin:.1f}% margin"
+            f"  |  {reachable_scu:.0f} SCU  |  +{estimated_profit_for(route):.0f} aUEC"
+        )
         results_list.addItem(line)
 
 
+def sort_by_score():
+    render_routes(sorted(last_routes, key=lambda route: route.score, reverse=True))
+
+
+def sort_by_profit():
+    render_routes(sorted(last_routes, key=estimated_profit_for, reverse=True))
+
+
+def sort_by_margin():
+    render_routes(sorted(last_routes, key=lambda route: route.price_margin, reverse=True))
+
+
+def on_search_clicked():
+    global last_routes
+
+    commodity = find_commodity(commodity_input.text())
+    source_terminal = find_terminal(source_terminal_input.text())
+    destination_terminal = find_terminal(destination_terminal_input.text())
+
+    if commodity is None and source_terminal is None and destination_terminal is None:
+        results_list.clear()
+        results_list.addItem("Select a commodity, source terminal, or destination terminal to search.")
+        return
+
+    raw_routes = asyncio.run(uex_client.get_commodity_routes(
+        commodity_id=commodity.id if commodity else None,
+        origin_terminal_id=source_terminal.id if source_terminal else None,
+        destination_terminal_id=destination_terminal.id if destination_terminal else None,
+    ))
+    routes = [UEXTradeRoute.model_validate(row) for row in raw_routes]
+
+    min_source_code = inventory_code_for(min_source_inventory_input.currentText(), "buy")
+    max_destination_code = inventory_code_for(max_destination_inventory_input.currentText(), "sell")
+    space_only = space_only_checkbox.isChecked()
+    require_autoload = autoload_checkbox.isChecked()
+
+    last_routes = [
+        route for route in routes
+        if (min_source_code is None or route.status_origin >= min_source_code)
+        and (max_destination_code is None or route.status_destination <= max_destination_code)
+        and (not space_only or (route.is_on_ground_origin == 0 and route.is_on_ground_destination == 0))
+        and (not require_autoload or (route.has_loading_dock_origin == 1 and route.has_loading_dock_destination == 1))
+    ]
+
+    sort_by_score()
+
+
 search_button.clicked.connect(on_search_clicked)
+sort_score_button.clicked.connect(sort_by_score)
+sort_profit_button.clicked.connect(sort_by_profit)
+sort_margin_button.clicked.connect(sort_by_margin)
 
 threading.Thread(target=lambda: asyncio.run(voice_run()), daemon=True).start()
 
