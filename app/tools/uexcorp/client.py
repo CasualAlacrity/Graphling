@@ -146,6 +146,17 @@ class UEXCorpClient(BaseModel):
         response.raise_for_status()
         return response.json()["data"]
 
+    @traceable(name="uex_get_terminal_prices")
+    async def get_terminal_prices(self, terminal_id: int) -> list[dict]:
+        response = await asyncio.to_thread(
+            requests.get,
+            self.API_BASE_URL + 'commodities_prices',
+            params={"id_terminal": terminal_id},
+            headers=self.get_header(),
+        )
+        response.raise_for_status()
+        return response.json()["data"]
+
     @traceable(name="uex_get_item_prices")
     async def get_item_prices(self, item_id: int) -> list[dict]:
         response = await asyncio.to_thread(

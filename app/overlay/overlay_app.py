@@ -2,7 +2,7 @@ import asyncio
 import os
 import threading
 
-from PySide6.QtCore import QObject, Signal, Qt
+from PySide6.QtCore import QEvent, QObject, Signal, Qt
 from PySide6.QtWidgets import (
     QApplication,
     QWidget,
@@ -20,7 +20,9 @@ from PySide6.QtWidgets import (
 )
 from pynput import keyboard
 
+from db.session import SessionLocal, engine
 from tools.uexcorp.client import UEXCorpClient
+from tools.uexcorp.price_cache import get_commodity_price_rows, get_terminal_price_rows
 from tools.uexcorp.reference_cache import TerminalType
 from tools.uexcorp.trade_data import UEXTradeRoute
 from voice import run as voice_run
@@ -28,6 +30,17 @@ from voice import run as voice_run
 
 class HotkeyBridge(QObject):
     toggle_requested = Signal()
+
+
+class CompleterFocusFilter(QObject):
+    """Shows a field's full completer popup on focus, instead of waiting for a keystroke."""
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.Type.FocusIn:
+            completer = watched.completer()
+            if completer is not None:
+                completer.complete()
+        return False
 
 
 bridge = HotkeyBridge()
@@ -40,7 +53,7 @@ uex_client = UEXCorpClient(
     bearer_token=os.getenv("UEXCORP_BEARER_TOKEN"),
 )
 uex_cache = asyncio.run(uex_client.get_uex_cache())
-ship_names = [v.name_full for v in uex_cache.vehicles]
+ship_names = [v.name_full for v in uex_cache.vehicles if v.scu >= 1]
 commodity_names = [c.name for c in uex_cache.commodities if c.is_buyable == 1]
 terminal_names = [t.name for t in uex_cache.terminals if t.type == TerminalType.COMMODITY]
 
@@ -117,6 +130,8 @@ ship_completer = QCompleter(
 
 )
 ship_input.setCompleter(ship_completer)
+ship_input.setClearButtonEnabled(True)
+ship_input.installEventFilter(CompleterFocusFilter(parent=ship_input))
 ship_cargo_layout.addWidget(ship_label)
 ship_cargo_layout.addWidget(ship_input)
 
@@ -149,6 +164,8 @@ commodity_completer = QCompleter(
     maxVisibleItems=10,
 )
 commodity_input.setCompleter(commodity_completer)
+commodity_input.setClearButtonEnabled(True)
+commodity_input.installEventFilter(CompleterFocusFilter(parent=commodity_input))
 commodity_layout.addWidget(commodity_label)
 commodity_layout.addWidget(commodity_input)
 
@@ -168,6 +185,8 @@ source_terminal_completer = QCompleter(
     maxVisibleItems=10,
 )
 source_terminal_input.setCompleter(source_terminal_completer)
+source_terminal_input.setClearButtonEnabled(True)
+source_terminal_input.installEventFilter(CompleterFocusFilter(parent=source_terminal_input))
 source_layout.addWidget(source_terminal_label)
 source_layout.addWidget(source_terminal_input)
 
@@ -180,7 +199,7 @@ def on_source_terminal_selected(name):
 
 
 source_terminal_completer.activated[str].connect(on_source_terminal_selected)
-source_terminal_input.textEdited.connect(lambda _: source_terminal_breadcrumb.clear())
+source_terminal_input.textChanged.connect(lambda _: source_terminal_breadcrumb.clear())
 
 min_source_inventory_label = QLabel(parent=source_group, text="Min Source Inventory")
 min_source_inventory_input = QComboBox(parent=source_group)
@@ -204,6 +223,8 @@ destination_terminal_completer = QCompleter(
     maxVisibleItems=10,
 )
 destination_terminal_input.setCompleter(destination_terminal_completer)
+destination_terminal_input.setClearButtonEnabled(True)
+destination_terminal_input.installEventFilter(CompleterFocusFilter(parent=destination_terminal_input))
 destination_layout.addWidget(destination_terminal_label)
 destination_layout.addWidget(destination_terminal_input)
 
@@ -216,7 +237,7 @@ def on_destination_terminal_selected(name):
 
 
 destination_terminal_completer.activated[str].connect(on_destination_terminal_selected)
-destination_terminal_input.textEdited.connect(lambda _: destination_terminal_breadcrumb.clear())
+destination_terminal_input.textChanged.connect(lambda _: destination_terminal_breadcrumb.clear())
 
 max_destination_inventory_label = QLabel(parent=destination_group, text="Max Destination Inventory")
 max_destination_inventory_input = QComboBox(parent=destination_group)
@@ -225,6 +246,132 @@ destination_layout.addWidget(max_destination_inventory_label)
 destination_layout.addWidget(max_destination_inventory_input)
 
 verticalLayout.addWidget(destination_group)
+
+# --- Smart filtering: each of Commodity/Source/Destination narrows the other
+# two's completer suggestions, based on the last *selected* (not typed) value.
+current_commodity_candidates = list(commodity_names)
+current_source_candidates = list(terminal_names)
+current_destination_candidates = list(terminal_names)
+
+
+def apply_validation_style(field, valid_names):
+    text = field.text()
+    if text and text not in valid_names:
+        field.setStyleSheet("border: 2px solid red")
+    else:
+        field.setStyleSheet("")
+
+
+async def _commodity_ids_at(terminal_id, side):
+    async with SessionLocal() as session:
+        rows = await get_terminal_price_rows(uex_client, session, terminal_id)
+    field_name = "price_buy" if side == "buy" else "price_sell"
+    return {row["id_commodity"] for row in rows if row.get(field_name)}
+
+
+async def _terminal_ids_for(commodity_id, side):
+    async with SessionLocal() as session:
+        rows = await get_commodity_price_rows(uex_client, session, commodity_id)
+    field_name = "price_buy" if side == "buy" else "price_sell"
+    return {row["id_terminal"] for row in rows if row.get(field_name)}
+
+
+async def _refresh_filters_async():
+    commodity = find_commodity(commodity_input.text())
+    source = find_terminal(source_terminal_input.text())
+    destination = find_terminal(destination_terminal_input.text())
+
+    # Commodity candidates: narrowed by whichever of source/destination are set.
+    if source is not None and destination is not None:
+        source_ids, dest_ids = await asyncio.gather(
+            _commodity_ids_at(source.id, "buy"), _commodity_ids_at(destination.id, "sell")
+        )
+        commodity_ids = source_ids & dest_ids
+        commodity_candidates = [c.name for c in uex_cache.commodities if c.id in commodity_ids]
+    elif source is not None:
+        commodity_ids = await _commodity_ids_at(source.id, "buy")
+        commodity_candidates = [c.name for c in uex_cache.commodities if c.id in commodity_ids]
+    elif destination is not None:
+        commodity_ids = await _commodity_ids_at(destination.id, "sell")
+        commodity_candidates = [c.name for c in uex_cache.commodities if c.id in commodity_ids]
+    else:
+        commodity_candidates = list(commodity_names)
+
+    # Source candidates: direct from commodity, or fanned out from destination
+    # (every terminal that sells anything the destination will buy) — fetched
+    # concurrently, since a terminal can carry dozens of commodities.
+    if commodity is not None:
+        terminal_ids = await _terminal_ids_for(commodity.id, "buy")
+        source_candidates = [t.name for t in uex_cache.terminals if t.id in terminal_ids]
+    elif destination is not None:
+        reachable_commodity_ids = await _commodity_ids_at(destination.id, "sell")
+        results = await asyncio.gather(*(_terminal_ids_for(cid, "buy") for cid in reachable_commodity_ids))
+        terminal_ids = set().union(*results)
+        terminal_ids.discard(destination.id)
+        source_candidates = [t.name for t in uex_cache.terminals if t.id in terminal_ids]
+    else:
+        source_candidates = list(terminal_names)
+
+    # Destination candidates: direct from commodity, or fanned out from source
+    # (every terminal that buys anything the source sells), same concurrency.
+    if commodity is not None:
+        terminal_ids = await _terminal_ids_for(commodity.id, "sell")
+        destination_candidates = [t.name for t in uex_cache.terminals if t.id in terminal_ids]
+    elif source is not None:
+        available_commodity_ids = await _commodity_ids_at(source.id, "buy")
+        results = await asyncio.gather(*(_terminal_ids_for(cid, "sell") for cid in available_commodity_ids))
+        terminal_ids = set().union(*results)
+        terminal_ids.discard(source.id)
+        destination_candidates = [t.name for t in uex_cache.terminals if t.id in terminal_ids]
+    else:
+        destination_candidates = list(terminal_names)
+
+    # This coroutine runs inside its own throwaway asyncio.run() loop (Qt's event
+    # loop isn't asyncio), so any pooled connections left open here would be bound
+    # to a loop that's about to close — the next call's fresh loop can't reuse them.
+    # Disposing before returning keeps every call self-contained.
+    await engine.dispose()
+
+    return commodity_candidates, source_candidates, destination_candidates
+
+
+def refresh_filters():
+    global current_commodity_candidates, current_source_candidates, current_destination_candidates
+
+    current_commodity_candidates, current_source_candidates, current_destination_candidates = (
+        asyncio.run(_refresh_filters_async())
+    )
+
+    commodity_completer.model().setStringList(current_commodity_candidates)
+    source_terminal_completer.model().setStringList(current_source_candidates)
+    destination_terminal_completer.model().setStringList(current_destination_candidates)
+
+    apply_validation_style(commodity_input, current_commodity_candidates)
+    apply_validation_style(source_terminal_input, current_source_candidates)
+    apply_validation_style(destination_terminal_input, current_destination_candidates)
+
+
+commodity_completer.activated[str].connect(lambda _: refresh_filters())
+source_terminal_completer.activated[str].connect(lambda _: refresh_filters())
+destination_terminal_completer.activated[str].connect(lambda _: refresh_filters())
+
+def on_field_edited(field, valid_names):
+    # Clearing a field that was driving narrowing (e.g. Source) needs the other
+    # fields' candidate lists relaxed back — only a full refresh does that, so it's
+    # worth the one extra fetch specifically on "cleared to empty," not every keystroke.
+    if field.text() == "":
+        refresh_filters()
+    else:
+        apply_validation_style(field, valid_names)
+
+
+commodity_input.textChanged.connect(lambda _: on_field_edited(commodity_input, current_commodity_candidates))
+source_terminal_input.textChanged.connect(
+    lambda _: on_field_edited(source_terminal_input, current_source_candidates)
+)
+destination_terminal_input.textChanged.connect(
+    lambda _: on_field_edited(destination_terminal_input, current_destination_candidates)
+)
 
 # --- Options ---
 options_row = QHBoxLayout()

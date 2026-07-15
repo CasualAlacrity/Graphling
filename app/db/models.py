@@ -2,8 +2,8 @@ import enum
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -66,3 +66,18 @@ class TradeLeg(Base):
     finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     run: Mapped["TradeRun"] = relationship("TradeRun", back_populates="legs")
+
+
+class UexCacheKind(str, enum.Enum):
+    COMMODITY = "commodity"
+    TERMINAL = "terminal"
+
+
+class UexPriceCache(Base):
+    __tablename__ = "uex_price_cache"
+    __table_args__ = (UniqueConstraint("kind", "entity_id", name="uq_uex_price_cache_kind_entity"),)
+
+    kind: Mapped[UexCacheKind] = mapped_column(Enum(UexCacheKind, name="uex_cache_kind"), nullable=False)
+    entity_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    rows: Mapped[list] = mapped_column(JSONB, nullable=False)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
