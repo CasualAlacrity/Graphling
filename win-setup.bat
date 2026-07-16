@@ -37,10 +37,17 @@ if errorlevel 1 (
     echo yourself before using the trade route tracker or overlay.
 ) else (
     echo Starting Postgres ^(trade route tracker storage^)...
-    docker compose up -d
+    docker compose up -d --wait
     if errorlevel 1 (
         echo.
         echo WARNING: docker compose up failed. Is Docker Desktop running?
+    ) else (
+        echo Applying database migrations...
+        .venv\Scripts\python -m alembic upgrade head
+        if errorlevel 1 (
+            echo.
+            echo WARNING: alembic upgrade failed. Scroll up for the error.
+        )
     )
 )
 
