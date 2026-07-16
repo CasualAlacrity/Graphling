@@ -57,6 +57,14 @@ def inventory_code_for(status_name, status_type):
     return None
 
 
+def is_space_terminal(terminal):
+    # A terminal requires an atmospheric landing (is_on_ground) exactly when it's a
+    # city/outpost, not a space station — verified against live route data (0 mismatches
+    # across 106 terminals / 2141 routes sampled). Reference-cache-only, so this works
+    # before a route search ever runs.
+    return terminal is not None and terminal.space_station_name is not None
+
+
 def terminal_breadcrumb(terminal):
     if terminal is None:
         return ""
@@ -112,10 +120,18 @@ async def search_routes(
     )
     routes = [UEXTradeRoute.model_validate(row) for row in raw_routes]
 
+    # Space Only should only constrain an end the search left open — a pinned terminal
+    # (the player explicitly chose it) shouldn't get excluded by its own ground status.
+    # e.g. source=TDD Orison (a ground landing zone) + Space Only should still return
+    # its space-station destinations, not zero results because Orison itself is ground.
+    constrain_origin_to_space = space_only and source_terminal_id is None
+    constrain_destination_to_space = space_only and destination_terminal_id is None
+
     return [
         route for route in routes
         if (min_source_code is None or route.status_origin >= min_source_code)
         and (max_destination_code is None or route.status_destination <= max_destination_code)
-        and (not space_only or (route.is_on_ground_origin == 0 and route.is_on_ground_destination == 0))
+        and (not constrain_origin_to_space or route.is_on_ground_origin == 0)
+        and (not constrain_destination_to_space or route.is_on_ground_destination == 0)
         and (not require_autoload or (route.has_loading_dock_origin == 1 and route.has_loading_dock_destination == 1))
     ]

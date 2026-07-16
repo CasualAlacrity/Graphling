@@ -24,6 +24,7 @@ from overlay.uex_lookup import (
     find_terminal,
     find_vehicle,
     inventory_code_for,
+    is_space_terminal,
     search_routes,
     ship_names,
     SOURCE_INVENTORY_LEVELS,
@@ -55,6 +56,10 @@ class FilterPanel(QWidget):
         self.current_commodity_candidates = list(commodity_names)
         self.current_source_candidates = list(terminal_names)
         self.current_destination_candidates = list(terminal_names)
+        # Unfiltered-by-space-only versions, used only to tell "not reachable at all"
+        # (red) apart from "reachable but not Space Only" (orange) once narrowed.
+        self.current_source_reachable = list(terminal_names)
+        self.current_destination_reachable = list(terminal_names)
 
         self._build_ui()
         self._wire_signals()
@@ -206,15 +211,22 @@ class FilterPanel(QWidget):
         self.commodity_completer.activated[str].connect(lambda _: self.refresh_filters())
         self.source_terminal_completer.activated[str].connect(lambda _: self.refresh_filters())
         self.destination_terminal_completer.activated[str].connect(lambda _: self.refresh_filters())
+        self.space_only_checkbox.toggled.connect(lambda _: self.refresh_filters())
 
         self.commodity_input.textChanged.connect(
             lambda _: self._on_field_edited(self.commodity_input, self.current_commodity_candidates)
         )
         self.source_terminal_input.textChanged.connect(
-            lambda _: self._on_field_edited(self.source_terminal_input, self.current_source_candidates)
+            lambda _: self._on_field_edited(
+                self.source_terminal_input, self.current_source_candidates, self.current_source_reachable
+            )
         )
         self.destination_terminal_input.textChanged.connect(
-            lambda _: self._on_field_edited(self.destination_terminal_input, self.current_destination_candidates)
+            lambda _: self._on_field_edited(
+                self.destination_terminal_input,
+                self.current_destination_candidates,
+                self.current_destination_reachable,
+            )
         )
 
         self.search_button.clicked.connect(self._on_search_clicked)
@@ -231,12 +243,19 @@ class FilterPanel(QWidget):
         self.destination_terminal_breadcrumb.setText(terminal_breadcrumb(find_terminal(name)))
 
     @staticmethod
-    def _apply_validation_style(field, valid_names):
+    def _apply_validation_style(field, valid_names, reachable_names=None):
         text = field.text()
-        if text and text not in valid_names:
-            field.setStyleSheet("border: 2px solid red")
+
+        if not text or text in valid_names:
+            style, tooltip = "", ""
+        elif reachable_names is not None and text in reachable_names:
+            # A real, reachable terminal — just not one that satisfies Space Only.
+            style, tooltip = "border: 2px solid orange", "This destination isn't Space Only"
         else:
-            field.setStyleSheet("")
+            style, tooltip = "border: 2px solid red", ""
+
+        field.setStyleSheet(style)
+        field.setToolTip(tooltip)
 
     # --- Smart filtering: each of Commodity/Source/Destination narrows the other
     # two's completer suggestions, based on the last *selected* (not typed) value.
@@ -267,29 +286,46 @@ class FilterPanel(QWidget):
         # concurrently, since a terminal can carry dozens of commodities.
         if commodity is not None:
             terminal_ids = await terminal_ids_for(commodity.id, "buy")
-            source_candidates = [t.nickname for t in uex_cache.terminals if t.id in terminal_ids]
+            source_reachable = [t.nickname for t in uex_cache.terminals if t.id in terminal_ids]
         elif destination is not None:
             reachable_commodity_ids = await commodity_ids_at(destination.id, "sell")
             results = await asyncio.gather(*(terminal_ids_for(cid, "buy") for cid in reachable_commodity_ids))
             terminal_ids = set().union(*results)
             terminal_ids.discard(destination.id)
-            source_candidates = [t.nickname for t in uex_cache.terminals if t.id in terminal_ids]
+            source_reachable = [t.nickname for t in uex_cache.terminals if t.id in terminal_ids]
         else:
-            source_candidates = list(terminal_names)
+            source_reachable = list(terminal_names)
 
         # Destination candidates: direct from commodity, or fanned out from source
         # (every terminal that buys anything the source sells), same concurrency.
         if commodity is not None:
             terminal_ids = await terminal_ids_for(commodity.id, "sell")
-            destination_candidates = [t.nickname for t in uex_cache.terminals if t.id in terminal_ids]
+            destination_reachable = [t.nickname for t in uex_cache.terminals if t.id in terminal_ids]
         elif source is not None:
             available_commodity_ids = await commodity_ids_at(source.id, "buy")
             results = await asyncio.gather(*(terminal_ids_for(cid, "sell") for cid in available_commodity_ids))
             terminal_ids = set().union(*results)
             terminal_ids.discard(source.id)
-            destination_candidates = [t.nickname for t in uex_cache.terminals if t.id in terminal_ids]
+            destination_reachable = [t.nickname for t in uex_cache.terminals if t.id in terminal_ids]
         else:
-            destination_candidates = list(terminal_names)
+            destination_reachable = list(terminal_names)
+
+        # Space Only only narrows a field once something actually drives its reachable
+        # set (commodity, or the other terminal) — with nothing set yet there's no
+        # "missing location" to narrow against, so the completer stays unfiltered.
+        space_only = self.space_only_checkbox.isChecked()
+        source_narrowed = commodity is not None or destination is not None
+        destination_narrowed = commodity is not None or source is not None
+
+        if space_only and source_narrowed:
+            source_candidates = [n for n in source_reachable if is_space_terminal(find_terminal(n))]
+        else:
+            source_candidates = source_reachable
+
+        if space_only and destination_narrowed:
+            destination_candidates = [n for n in destination_reachable if is_space_terminal(find_terminal(n))]
+        else:
+            destination_candidates = destination_reachable
 
         # This coroutine runs inside its own throwaway asyncio.run() loop (Qt's event
         # loop isn't asyncio), so any pooled connections left open here would be bound
@@ -297,13 +333,15 @@ class FilterPanel(QWidget):
         # Disposing before returning keeps every call self-contained.
         await engine.dispose()
 
-        return commodity_candidates, source_candidates, destination_candidates
+        return commodity_candidates, source_candidates, destination_candidates, source_reachable, destination_reachable
 
     def refresh_filters(self):
         (
             self.current_commodity_candidates,
             self.current_source_candidates,
             self.current_destination_candidates,
+            self.current_source_reachable,
+            self.current_destination_reachable,
         ) = asyncio.run(self._refresh_filters_async())
 
         self.commodity_completer.model().setStringList(self.current_commodity_candidates)
@@ -311,17 +349,21 @@ class FilterPanel(QWidget):
         self.destination_terminal_completer.model().setStringList(self.current_destination_candidates)
 
         self._apply_validation_style(self.commodity_input, self.current_commodity_candidates)
-        self._apply_validation_style(self.source_terminal_input, self.current_source_candidates)
-        self._apply_validation_style(self.destination_terminal_input, self.current_destination_candidates)
+        self._apply_validation_style(
+            self.source_terminal_input, self.current_source_candidates, self.current_source_reachable
+        )
+        self._apply_validation_style(
+            self.destination_terminal_input, self.current_destination_candidates, self.current_destination_reachable
+        )
 
-    def _on_field_edited(self, field, valid_names):
+    def _on_field_edited(self, field, valid_names, reachable_names=None):
         # Clearing a field that was driving narrowing (e.g. Source) needs the other
         # fields' candidate lists relaxed back — only a full refresh does that, so it's
         # worth the one extra fetch specifically on "cleared to empty," not every keystroke.
         if field.text() == "":
             self.refresh_filters()
         else:
-            self._apply_validation_style(field, valid_names)
+            self._apply_validation_style(field, valid_names, reachable_names)
 
     def _on_search_clicked(self):
         commodity = find_commodity(self.commodity_input.text())
