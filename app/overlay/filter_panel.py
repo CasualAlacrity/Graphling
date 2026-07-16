@@ -16,6 +16,8 @@ from PySide6.QtWidgets import (
 )
 
 from db.session import engine
+from overlay import theme
+from overlay.theme import HudWindow
 from overlay.uex_lookup import (
     commodity_names,
     commodity_ids_at,
@@ -46,12 +48,13 @@ class CompleterFocusFilter(QObject):
         return False
 
 
-class FilterPanel(QWidget):
+class FilterPanel(HudWindow):
     routes_found = Signal(list, int)  # filtered routes, cargo SCU at time of search
     search_rejected = Signal(str)  # no commodity/source/destination selected at all
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setStyleSheet(theme.STYLESHEET)
 
         self.current_commodity_candidates = list(commodity_names)
         self.current_source_candidates = list(terminal_names)
@@ -67,11 +70,11 @@ class FilterPanel(QWidget):
     def _build_ui(self):
         self._main_layout = QVBoxLayout(self)
 
-        filter_header = QLabel(parent=self, text="Filters:")
+        filter_header = QLabel(parent=self, text="▸ FILTERS", objectName="panelHeader")
         self._main_layout.addWidget(filter_header)
 
         # --- Ship & Cargo ---
-        ship_cargo_group = QGroupBox(parent=self, title="Ship and Cargo")
+        ship_cargo_group = QGroupBox(parent=self, title="SHIP AND CARGO")
         ship_cargo_layout = QVBoxLayout(ship_cargo_group)
 
         ship_label = QLabel(parent=ship_cargo_group, text="Ship")
@@ -97,7 +100,7 @@ class FilterPanel(QWidget):
         self._main_layout.addWidget(ship_cargo_group)
 
         # --- Commodity ---
-        commodity_group = QGroupBox(parent=self, title="Commodity")
+        commodity_group = QGroupBox(parent=self, title="COMMODITY")
         commodity_layout = QVBoxLayout(commodity_group)
 
         commodity_label = QLabel(parent=commodity_group, text="Commodity")
@@ -117,7 +120,7 @@ class FilterPanel(QWidget):
         self._main_layout.addWidget(commodity_group)
 
         # --- Source ---
-        source_group = QGroupBox(parent=self, title="Source")
+        source_group = QGroupBox(parent=self, title="SOURCE")
         source_layout = QVBoxLayout(source_group)
 
         source_terminal_label = QLabel(parent=source_group, text="Source Terminal")
@@ -135,7 +138,7 @@ class FilterPanel(QWidget):
         source_layout.addWidget(source_terminal_label)
         source_layout.addWidget(self.source_terminal_input)
 
-        self.source_terminal_breadcrumb = QLabel(parent=source_group, wordWrap=True)
+        self.source_terminal_breadcrumb = QLabel(parent=source_group, wordWrap=True, objectName="breadcrumb")
         source_layout.addWidget(self.source_terminal_breadcrumb)
 
         min_source_inventory_label = QLabel(parent=source_group, text="Min Source Inventory")
@@ -147,7 +150,7 @@ class FilterPanel(QWidget):
         self._main_layout.addWidget(source_group)
 
         # --- Destination ---
-        destination_group = QGroupBox(parent=self, title="Destination")
+        destination_group = QGroupBox(parent=self, title="DESTINATION")
         destination_layout = QVBoxLayout(destination_group)
 
         destination_terminal_label = QLabel(parent=destination_group, text="Destination Terminal")
@@ -167,7 +170,9 @@ class FilterPanel(QWidget):
         destination_layout.addWidget(destination_terminal_label)
         destination_layout.addWidget(self.destination_terminal_input)
 
-        self.destination_terminal_breadcrumb = QLabel(parent=destination_group, wordWrap=True)
+        self.destination_terminal_breadcrumb = QLabel(
+            parent=destination_group, wordWrap=True, objectName="breadcrumb"
+        )
         destination_layout.addWidget(self.destination_terminal_breadcrumb)
 
         max_destination_inventory_label = QLabel(parent=destination_group, text="Max Destination Inventory")
@@ -193,7 +198,7 @@ class FilterPanel(QWidget):
         button_row.addStretch()
 
         self.reset_button = QPushButton(parent=self, text="Reset")
-        self.search_button = QPushButton(parent=self, text="Search")
+        self.search_button = QPushButton(parent=self, text="Search", objectName="primaryButton")
         button_row.addWidget(self.reset_button)
         button_row.addWidget(self.search_button)
 
@@ -250,9 +255,10 @@ class FilterPanel(QWidget):
             style, tooltip = "", ""
         elif reachable_names is not None and text in reachable_names:
             # A real, reachable terminal — just not one that satisfies Space Only.
-            style, tooltip = "border: 2px solid orange", "This destination isn't Space Only"
+            style = f"border: 2px solid {theme.WARNING};"
+            tooltip = "This destination isn't Space Only"
         else:
-            style, tooltip = "border: 2px solid red", ""
+            style, tooltip = f"border: 2px solid {theme.ERROR};", ""
 
         field.setStyleSheet(style)
         field.setToolTip(tooltip)
@@ -314,8 +320,11 @@ class FilterPanel(QWidget):
         # set (commodity, or the other terminal) — with nothing set yet there's no
         # "missing location" to narrow against, so the completer stays unfiltered.
         space_only = self.space_only_checkbox.isChecked()
-        source_narrowed = commodity is not None or destination is not None
-        destination_narrowed = commodity is not None or source is not None
+        # A field that already holds a resolved value is pinned, not still being
+        # searched — narrowing (and thus space-only filtering) only makes sense for
+        # whichever field is still open, same principle as search_routes' pinning.
+        source_narrowed = source is None and (commodity is not None or destination is not None)
+        destination_narrowed = destination is None and (commodity is not None or source is not None)
 
         if space_only and source_narrowed:
             source_candidates = [n for n in source_reachable if is_space_terminal(find_terminal(n))]

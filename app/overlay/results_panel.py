@@ -1,10 +1,14 @@
 from PySide6.QtCore import Slot
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QListWidget
+from PySide6.QtWidgets import QButtonGroup, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QListWidget
+
+from overlay import theme
+from overlay.theme import HudWindow
 
 
-class ResultsPanel(QWidget):
+class ResultsPanel(HudWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setStyleSheet(theme.STYLESHEET)
 
         self.last_routes = []
         self.cargo_scu = 0
@@ -15,16 +19,22 @@ class ResultsPanel(QWidget):
     def _build_ui(self):
         self._main_layout = QVBoxLayout(self)
 
-        results_header = QLabel(parent=self, text="Results:")
+        results_header = QLabel(parent=self, text="▸ RESULTS", objectName="panelHeader")
         self._main_layout.addWidget(results_header)
 
         sort_row = QHBoxLayout()
-        self.sort_score_button = QPushButton(parent=self, text="Sort: Score")
-        self.sort_profit_button = QPushButton(parent=self, text="Sort: Profit")
-        self.sort_margin_button = QPushButton(parent=self, text="Sort: Margin")
-        sort_row.addWidget(self.sort_score_button)
+        # Score is the default sort (applied whenever new routes come in) and isn't
+        # exposed as its own chip — Profit/Margin are the two explicit alternatives.
+        self.sort_profit_button = QPushButton(parent=self, text="PROFIT", objectName="sortChip", checkable=True)
+        self.sort_margin_button = QPushButton(parent=self, text="MARGIN", objectName="sortChip", checkable=True)
         sort_row.addWidget(self.sort_profit_button)
         sort_row.addWidget(self.sort_margin_button)
+        sort_row.addStretch()
+
+        self._sort_chip_group = QButtonGroup(self)
+        self._sort_chip_group.setExclusive(True)
+        self._sort_chip_group.addButton(self.sort_profit_button)
+        self._sort_chip_group.addButton(self.sort_margin_button)
 
         self._main_layout.addLayout(sort_row)
 
@@ -32,7 +42,6 @@ class ResultsPanel(QWidget):
         self._main_layout.addWidget(self.results_list)
 
     def _wire_signals(self):
-        self.sort_score_button.clicked.connect(self.sort_by_score)
         self.sort_profit_button.clicked.connect(self.sort_by_profit)
         self.sort_margin_button.clicked.connect(self.sort_by_margin)
 
@@ -40,6 +49,10 @@ class ResultsPanel(QWidget):
     def set_routes(self, routes, cargo_scu):
         self.last_routes = routes
         self.cargo_scu = cargo_scu
+        self._sort_chip_group.setExclusive(False)
+        self.sort_profit_button.setChecked(False)
+        self.sort_margin_button.setChecked(False)
+        self._sort_chip_group.setExclusive(True)
         self.sort_by_score()
 
     @Slot(str)

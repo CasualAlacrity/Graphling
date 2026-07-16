@@ -31,13 +31,11 @@ filter_panel.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
 # with it, and the two side-by-side windows drift out of alignment.
 filter_panel.setFixedSize(filter_width, panel_height)
 filter_panel.move(screen_geometry.x(), screen_geometry.y())
-filter_panel.setStyleSheet("background-color: #AAAAAA")
 
 results_panel = ResultsPanel()
 results_panel.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
 results_panel.setFixedSize(results_width, panel_height)
 results_panel.move(screen_geometry.x() + filter_width + 10, screen_geometry.y())
-results_panel.setStyleSheet("background-color: #AAAAAA")
 
 filter_panel.routes_found.connect(results_panel.set_routes)
 filter_panel.search_rejected.connect(results_panel.show_message)
