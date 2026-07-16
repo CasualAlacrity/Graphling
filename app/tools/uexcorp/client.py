@@ -14,15 +14,16 @@ from tools.uexcorp.reference_cache_store import load_reference_cache, store_refe
 
 RETRY_ATTEMPTS = 3
 RETRY_BACKOFF_SECONDS = 1.0
+REQUEST_TIMEOUT_SECONDS = 30
 
 
 def _get_with_retries(url: str, headers: dict, params: dict | None = None) -> requests.Response:
-    response = requests.get(url, headers=headers, params=params)
+    response = requests.get(url, headers=headers, params=params, timeout=REQUEST_TIMEOUT_SECONDS)
     for attempt in range(1, RETRY_ATTEMPTS):
         if response.status_code < 500:
             return response
         time.sleep(RETRY_BACKOFF_SECONDS * attempt)
-        response = requests.get(url, headers=headers, params=params)
+        response = requests.get(url, headers=headers, params=params, timeout=REQUEST_TIMEOUT_SECONDS)
     return response
 
 
@@ -55,11 +56,15 @@ class UEXCorpClient(BaseModel):
             async with SessionLocal() as session:
                 stored_cache = await load_reference_cache(session)
             if stored_cache is not None:
+                print("Using cached UEX reference data from Postgres.", flush=True)
                 self._uex_cache = stored_cache
                 return stored_cache
 
+            print("No usable cache found — fetching fresh data from the UEX API "
+                  "(first run can take a minute)...", flush=True)
             uex_cache = await self._build_uex_cache()
             self._uex_cache = uex_cache
+            print("UEX API fetch complete.", flush=True)
 
             async with SessionLocal() as session:
                 await store_reference_cache(session, uex_cache)
@@ -158,6 +163,7 @@ class UEXCorpClient(BaseModel):
             self.API_BASE_URL + 'commodities_routes',
             params=params,
             headers=self.get_header(),
+            timeout=REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
         return response.json()["data"]
@@ -169,6 +175,7 @@ class UEXCorpClient(BaseModel):
             self.API_BASE_URL + 'commodities_prices',
             params={"id_commodity": commodity_id},
             headers=self.get_header(),
+            timeout=REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
         return response.json()["data"]
@@ -180,6 +187,7 @@ class UEXCorpClient(BaseModel):
             self.API_BASE_URL + 'commodities_prices',
             params={"id_terminal": terminal_id},
             headers=self.get_header(),
+            timeout=REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
         return response.json()["data"]
@@ -191,6 +199,7 @@ class UEXCorpClient(BaseModel):
             self.API_BASE_URL + 'items_prices',
             params={"id_item": item_id},
             headers=self.get_header(),
+            timeout=REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
         return response.json()["data"]
@@ -202,6 +211,7 @@ class UEXCorpClient(BaseModel):
             self.API_BASE_URL + 'vehicles_purchases_prices',
             params={"id_vehicle": vehicle_id},
             headers=self.get_header(),
+            timeout=REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
         return response.json()["data"]
@@ -213,6 +223,7 @@ class UEXCorpClient(BaseModel):
             self.API_BASE_URL + 'vehicles_rentals_prices',
             params={"id_vehicle": vehicle_id},
             headers=self.get_header(),
+            timeout=REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
         return response.json()["data"]
@@ -227,6 +238,7 @@ class UEXCorpClient(BaseModel):
                 "id_star_system_origin": origin_star_system_id,
             },
             headers=self.get_header(),
+            timeout=REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
         return response.json()["data"]

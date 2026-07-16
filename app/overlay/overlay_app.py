@@ -5,10 +5,13 @@ from PySide6.QtCore import QObject, Signal, Qt
 from PySide6.QtWidgets import QApplication
 from pynput import keyboard
 
+print("Loading reference data from UEX...", flush=True)
 from overlay import theme
 from overlay.filter_panel import FilterPanel
 from overlay.results_panel import ResultsPanel
 from voice import run as voice_run
+
+print("Reference data loaded. Building overlay windows...", flush=True)
 
 
 class HotkeyBridge(QObject):
@@ -56,6 +59,7 @@ results_panel.move(panel_x, results_top)
 filter_panel.routes_found.connect(results_panel.set_routes)
 filter_panel.search_rejected.connect(results_panel.show_message)
 
+print("Starting voice module...", flush=True)
 threading.Thread(target=lambda: asyncio.run(voice_run()), daemon=True).start()
 
 
@@ -68,4 +72,5 @@ def on_toggle_requested():
 bridge.toggle_requested.connect(on_toggle_requested)
 
 hotkeys.start()
+print("Ready. Press F3 to toggle the overlay.", flush=True)
 app.exec()
