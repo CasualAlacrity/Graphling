@@ -4,9 +4,31 @@ Palette matches the tokens supplied for the overlay's style pass; not an officia
 Cloud Imperium brand kit.
 """
 
+import os
+
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QPainter, QPen
+from PySide6.QtGui import QColor, QFontDatabase, QPainter, QPen
 from PySide6.QtWidgets import QWidget
+
+_FONTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "fonts")
+_FONT_FILES = [
+    "Rajdhani-Regular.ttf",
+    "Rajdhani-Medium.ttf",
+    "Rajdhani-SemiBold.ttf",
+    "Rajdhani-Bold.ttf",
+    "JetBrainsMono[wght].ttf",
+]
+
+
+def load_fonts():
+    """Registers the bundled Rajdhani/JetBrains Mono font files with Qt.
+
+    Must run after QApplication() exists but before any widget using theme.STYLESHEET
+    is constructed. Qt can't fetch web fonts at runtime, so these are vendored
+    (both OFL-licensed) rather than referenced by URL like the CSS prototype did.
+    """
+    for filename in _FONT_FILES:
+        QFontDatabase.addApplicationFont(os.path.join(_FONTS_DIR, filename))
 
 BG = "#0D0F10"
 SURFACE = "#17191B"
@@ -29,8 +51,10 @@ WARNING = "#E8B23A"
 ERROR = "#E5484D"
 INFO = "#4A90D9"
 
-MONO_FONT = '"Menlo", "Consolas", "DejaVu Sans Mono", monospace'
-LABEL_FONT = '"Segoe UI", "Helvetica Neue", Arial, sans-serif'
+# Bundled (see load_fonts()) with system fallbacks in case loading ever fails.
+DISPLAY_FONT = '"Rajdhani", "Helvetica Neue", Arial, sans-serif'
+MONO_FONT = '"JetBrains Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace'
+LABEL_FONT = '"Helvetica Neue", "Segoe UI", Arial, sans-serif'
 
 # QSS has no letter-spacing/text-transform — group titles are written pre-uppercased
 # in the widgets that use them, and monospace carries the "instrument placard" feel
@@ -48,38 +72,33 @@ QLabel {{
     background: transparent;
 }}
 QLabel#panelHeader {{
-    font-family: {MONO_FONT};
-    font-size: 12px;
-    font-weight: bold;
+    font-family: {DISPLAY_FONT};
+    font-size: 14px;
+    font-weight: 600;
     color: {ACCENT};
-    padding: 6px 2px;
+    padding: 3px 2px;
     border-bottom: 1px solid {BORDER};
 }}
-QLabel#breadcrumb {{
-    font-family: {MONO_FONT};
-    font-size: 10px;
-    color: {TEXT_SECONDARY};
+QLabel#fieldLabel {{
+    font-size: 10.5px;
+    min-width: 90px;
+    max-width: 90px;
 }}
 
-QGroupBox {{
+QFrame#sectionRow {{
     background-color: transparent;
     border: none;
     border-bottom: 1px solid {BORDER_SUBTLE};
-    margin-top: 16px;
-    padding-top: 8px;
-    padding-bottom: 8px;
+    padding-bottom: 3px;
+    margin-bottom: 3px;
 }}
-QGroupBox::title {{
-    subcontrol-origin: margin;
-    subcontrol-position: top left;
-    left: 0px;
-    top: 4px;
+QLabel#sectionLabel {{
     color: {TEXT_SECONDARY};
-    font-family: {MONO_FONT};
-    font-size: 10px;
-    font-weight: bold;
-    background-color: {SURFACE};
-    padding: 0 4px 0 0;
+    font-family: {DISPLAY_FONT};
+    font-size: 14px;
+    font-weight: 600;
+    min-width: 128px;
+    max-width: 128px;
 }}
 
 QLineEdit, QComboBox, QSpinBox {{
@@ -88,6 +107,7 @@ QLineEdit, QComboBox, QSpinBox {{
     color: {TEXT_PRIMARY};
     font-family: {MONO_FONT};
     font-size: 12px;
+    min-height: 18px;
     padding: 5px 7px;
 }}
 QLineEdit:focus, QComboBox:focus, QSpinBox:focus {{
@@ -106,8 +126,9 @@ QComboBox QAbstractItemView {{
 
 QCheckBox {{
     color: {TEXT_SECONDARY};
-    font-family: {LABEL_FONT};
-    font-size: 12px;
+    font-family: {DISPLAY_FONT};
+    font-size: 13px;
+    font-weight: 600;
     spacing: 8px;
 }}
 QCheckBox:checked {{
@@ -125,10 +146,10 @@ QCheckBox::indicator:checked {{
 }}
 
 QPushButton {{
-    font-family: {LABEL_FONT};
-    font-size: 12px;
-    font-weight: bold;
-    padding: 7px 16px;
+    font-family: {DISPLAY_FONT};
+    font-size: 14px;
+    font-weight: 600;
+    padding: 4px 16px;
     border: 1px solid {BORDER};
     background-color: transparent;
     color: {TEXT_SECONDARY};

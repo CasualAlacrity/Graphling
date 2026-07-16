@@ -5,8 +5,8 @@ from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
+    QFrame,
     QLabel,
-    QGroupBox,
     QLineEdit,
     QCompleter,
     QSpinBox,
@@ -67,18 +67,49 @@ class FilterPanel(HudWindow):
         self._build_ui()
         self._wire_signals()
 
+    @staticmethod
+    def _field_column(label_text, widget):
+        """A label beside its one widget — one item in a section row's horizontal group
+        of fields. Inline (not stacked above) to keep the whole panel short; terminal
+        breadcrumbs live in the field's tooltip instead of their own line for the same
+        reason."""
+        column = QWidget()
+        layout = QHBoxLayout(column)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(QLabel(parent=column, text=label_text, objectName="fieldLabel"))
+        layout.addWidget(widget, 1)
+        return column
+
+    @staticmethod
+    def _section_row(label_text, *field_columns):
+        """A section label sitting beside a horizontal row of its fields, instead of
+        QGroupBox's title-above-content — matches the wide-panel prototype's layout."""
+        row = QFrame(objectName="sectionRow")
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 1, 0, 1)
+
+        row_layout.addWidget(QLabel(parent=row, text=label_text, objectName="sectionLabel"))
+
+        fields = QWidget(parent=row)
+        fields_layout = QHBoxLayout(fields)
+        fields_layout.setContentsMargins(0, 0, 0, 0)
+        for column in field_columns:
+            column.setParent(fields)
+            fields_layout.addWidget(column)
+        row_layout.addWidget(fields, 1)
+
+        return row
+
     def _build_ui(self):
         self._main_layout = QVBoxLayout(self)
+        self._main_layout.setContentsMargins(12, 5, 12, 6)
+        self._main_layout.setSpacing(2)
 
         filter_header = QLabel(parent=self, text="▸ FILTERS", objectName="panelHeader")
         self._main_layout.addWidget(filter_header)
 
-        # --- Ship & Cargo ---
-        ship_cargo_group = QGroupBox(parent=self, title="SHIP AND CARGO")
-        ship_cargo_layout = QVBoxLayout(ship_cargo_group)
-
-        ship_label = QLabel(parent=ship_cargo_group, text="Ship")
-        self.ship_input = QLineEdit(parent=ship_cargo_group, placeholderText="Enter a ship name")
+        # --- Ship, Cargo & Commodity ---
+        self.ship_input = QLineEdit(placeholderText="Enter a ship name")
         self.ship_completer = QCompleter(
             ship_names,
             parent=self.ship_input,
@@ -89,22 +120,10 @@ class FilterPanel(HudWindow):
         self.ship_input.setCompleter(self.ship_completer)
         self.ship_input.setClearButtonEnabled(True)
         self.ship_input.installEventFilter(CompleterFocusFilter(parent=self.ship_input))
-        ship_cargo_layout.addWidget(ship_label)
-        ship_cargo_layout.addWidget(self.ship_input)
 
-        cargo_label = QLabel(parent=ship_cargo_group, text="Cargo Volume")
-        self.cargo_input = QSpinBox(parent=ship_cargo_group, minimum=0, maximum=3000, suffix=" SCU")
-        ship_cargo_layout.addWidget(cargo_label)
-        ship_cargo_layout.addWidget(self.cargo_input)
+        self.cargo_input = QSpinBox(minimum=0, maximum=3000, suffix=" SCU")
 
-        self._main_layout.addWidget(ship_cargo_group)
-
-        # --- Commodity ---
-        commodity_group = QGroupBox(parent=self, title="COMMODITY")
-        commodity_layout = QVBoxLayout(commodity_group)
-
-        commodity_label = QLabel(parent=commodity_group, text="Commodity")
-        self.commodity_input = QLineEdit(parent=commodity_group, placeholderText="Search commodity...")
+        self.commodity_input = QLineEdit(placeholderText="Search commodity...")
         self.commodity_completer = QCompleter(
             commodity_names,
             parent=self.commodity_input,
@@ -114,17 +133,16 @@ class FilterPanel(HudWindow):
         self.commodity_input.setCompleter(self.commodity_completer)
         self.commodity_input.setClearButtonEnabled(True)
         self.commodity_input.installEventFilter(CompleterFocusFilter(parent=self.commodity_input))
-        commodity_layout.addWidget(commodity_label)
-        commodity_layout.addWidget(self.commodity_input)
 
-        self._main_layout.addWidget(commodity_group)
+        self._main_layout.addWidget(self._section_row(
+            "SHIP AND CARGO",
+            self._field_column("Ship", self.ship_input),
+            self._field_column("Cargo Volume", self.cargo_input),
+            self._field_column("Commodity", self.commodity_input),
+        ))
 
         # --- Source ---
-        source_group = QGroupBox(parent=self, title="SOURCE")
-        source_layout = QVBoxLayout(source_group)
-
-        source_terminal_label = QLabel(parent=source_group, text="Source Terminal")
-        self.source_terminal_input = QLineEdit(parent=source_group, placeholderText="Search terminal...")
+        self.source_terminal_input = QLineEdit(placeholderText="Search terminal...")
         self.source_terminal_completer = QCompleter(
             terminal_names,
             parent=self.source_terminal_input,
@@ -135,26 +153,18 @@ class FilterPanel(HudWindow):
         self.source_terminal_input.setCompleter(self.source_terminal_completer)
         self.source_terminal_input.setClearButtonEnabled(True)
         self.source_terminal_input.installEventFilter(CompleterFocusFilter(parent=self.source_terminal_input))
-        source_layout.addWidget(source_terminal_label)
-        source_layout.addWidget(self.source_terminal_input)
 
-        self.source_terminal_breadcrumb = QLabel(parent=source_group, wordWrap=True, objectName="breadcrumb")
-        source_layout.addWidget(self.source_terminal_breadcrumb)
-
-        min_source_inventory_label = QLabel(parent=source_group, text="Min Source Inventory")
-        self.min_source_inventory_input = QComboBox(parent=source_group)
+        self.min_source_inventory_input = QComboBox()
         self.min_source_inventory_input.addItems(["Select..."] + SOURCE_INVENTORY_LEVELS)
-        source_layout.addWidget(min_source_inventory_label)
-        source_layout.addWidget(self.min_source_inventory_input)
 
-        self._main_layout.addWidget(source_group)
+        self._main_layout.addWidget(self._section_row(
+            "SOURCE",
+            self._field_column("Terminal", self.source_terminal_input),
+            self._field_column("Min Inventory", self.min_source_inventory_input),
+        ))
 
         # --- Destination ---
-        destination_group = QGroupBox(parent=self, title="DESTINATION")
-        destination_layout = QVBoxLayout(destination_group)
-
-        destination_terminal_label = QLabel(parent=destination_group, text="Destination Terminal")
-        self.destination_terminal_input = QLineEdit(parent=destination_group, placeholderText="Search terminal...")
+        self.destination_terminal_input = QLineEdit(placeholderText="Search terminal...")
         self.destination_terminal_completer = QCompleter(
             terminal_names,
             parent=self.destination_terminal_input,
@@ -167,26 +177,20 @@ class FilterPanel(HudWindow):
         self.destination_terminal_input.installEventFilter(
             CompleterFocusFilter(parent=self.destination_terminal_input)
         )
-        destination_layout.addWidget(destination_terminal_label)
-        destination_layout.addWidget(self.destination_terminal_input)
 
-        self.destination_terminal_breadcrumb = QLabel(
-            parent=destination_group, wordWrap=True, objectName="breadcrumb"
-        )
-        destination_layout.addWidget(self.destination_terminal_breadcrumb)
-
-        max_destination_inventory_label = QLabel(parent=destination_group, text="Max Destination Inventory")
-        self.max_destination_inventory_input = QComboBox(parent=destination_group)
+        self.max_destination_inventory_input = QComboBox()
         self.max_destination_inventory_input.addItems(["Select..."] + DESTINATION_INVENTORY_LEVELS)
-        destination_layout.addWidget(max_destination_inventory_label)
-        destination_layout.addWidget(self.max_destination_inventory_input)
 
-        self._main_layout.addWidget(destination_group)
+        self._main_layout.addWidget(self._section_row(
+            "DESTINATION",
+            self._field_column("Terminal", self.destination_terminal_input),
+            self._field_column("Max Inventory", self.max_destination_inventory_input),
+        ))
 
         # --- Options ---
         options_row = QHBoxLayout()
-        self.space_only_checkbox = QCheckBox(parent=self, text="Space only")
-        self.autoload_checkbox = QCheckBox(parent=self, text="Has autoload")
+        self.space_only_checkbox = QCheckBox(parent=self, text="🚀 Space only")
+        self.autoload_checkbox = QCheckBox(parent=self, text="📦 Has autoload")
         options_row.addWidget(self.space_only_checkbox)
         options_row.addWidget(self.autoload_checkbox)
         options_row.addStretch()
@@ -207,12 +211,6 @@ class FilterPanel(HudWindow):
     def _wire_signals(self):
         self.ship_completer.activated[str].connect(self._on_ship_selected)
 
-        self.source_terminal_completer.activated[str].connect(self._on_source_terminal_selected)
-        self.source_terminal_input.textChanged.connect(lambda _: self.source_terminal_breadcrumb.clear())
-
-        self.destination_terminal_completer.activated[str].connect(self._on_destination_terminal_selected)
-        self.destination_terminal_input.textChanged.connect(lambda _: self.destination_terminal_breadcrumb.clear())
-
         self.commodity_completer.activated[str].connect(lambda _: self.refresh_filters())
         self.source_terminal_completer.activated[str].connect(lambda _: self.refresh_filters())
         self.destination_terminal_completer.activated[str].connect(lambda _: self.refresh_filters())
@@ -223,7 +221,10 @@ class FilterPanel(HudWindow):
         )
         self.source_terminal_input.textChanged.connect(
             lambda _: self._on_field_edited(
-                self.source_terminal_input, self.current_source_candidates, self.current_source_reachable
+                self.source_terminal_input,
+                self.current_source_candidates,
+                self.current_source_reachable,
+                self._terminal_breadcrumb_for,
             )
         )
         self.destination_terminal_input.textChanged.connect(
@@ -231,6 +232,7 @@ class FilterPanel(HudWindow):
                 self.destination_terminal_input,
                 self.current_destination_candidates,
                 self.current_destination_reachable,
+                self._terminal_breadcrumb_for,
             )
         )
 
@@ -241,22 +243,23 @@ class FilterPanel(HudWindow):
         if vehicle is not None:
             self.cargo_input.setValue(int(vehicle.scu))
 
-    def _on_source_terminal_selected(self, name):
-        self.source_terminal_breadcrumb.setText(terminal_breadcrumb(find_terminal(name)))
-
-    def _on_destination_terminal_selected(self, name):
-        self.destination_terminal_breadcrumb.setText(terminal_breadcrumb(find_terminal(name)))
-
     @staticmethod
-    def _apply_validation_style(field, valid_names, reachable_names=None):
+    def _apply_validation_style(field, valid_names, reachable_names=None, breadcrumb_for=None):
         text = field.text()
 
-        if not text or text in valid_names:
+        if not text:
             style, tooltip = "", ""
+        elif text in valid_names:
+            # A resolved selection — the terminal breadcrumb (if any) lives in the
+            # tooltip instead of its own line, to keep the panel short.
+            style = ""
+            tooltip = breadcrumb_for(text) if breadcrumb_for else ""
         elif reachable_names is not None and text in reachable_names:
             # A real, reachable terminal — just not one that satisfies Space Only.
             style = f"border: 2px solid {theme.WARNING};"
-            tooltip = "This destination isn't Space Only"
+            warning = "This destination isn't Space Only"
+            breadcrumb = breadcrumb_for(text) if breadcrumb_for else ""
+            tooltip = f"{breadcrumb}\n{warning}" if breadcrumb else warning
         else:
             style, tooltip = f"border: 2px solid {theme.ERROR};", ""
 
@@ -359,20 +362,30 @@ class FilterPanel(HudWindow):
 
         self._apply_validation_style(self.commodity_input, self.current_commodity_candidates)
         self._apply_validation_style(
-            self.source_terminal_input, self.current_source_candidates, self.current_source_reachable
+            self.source_terminal_input,
+            self.current_source_candidates,
+            self.current_source_reachable,
+            self._terminal_breadcrumb_for,
         )
         self._apply_validation_style(
-            self.destination_terminal_input, self.current_destination_candidates, self.current_destination_reachable
+            self.destination_terminal_input,
+            self.current_destination_candidates,
+            self.current_destination_reachable,
+            self._terminal_breadcrumb_for,
         )
 
-    def _on_field_edited(self, field, valid_names, reachable_names=None):
+    @staticmethod
+    def _terminal_breadcrumb_for(name):
+        return terminal_breadcrumb(find_terminal(name))
+
+    def _on_field_edited(self, field, valid_names, reachable_names=None, breadcrumb_for=None):
         # Clearing a field that was driving narrowing (e.g. Source) needs the other
         # fields' candidate lists relaxed back — only a full refresh does that, so it's
         # worth the one extra fetch specifically on "cleared to empty," not every keystroke.
         if field.text() == "":
             self.refresh_filters()
         else:
-            self._apply_validation_style(field, valid_names, reachable_names)
+            self._apply_validation_style(field, valid_names, reachable_names, breadcrumb_for)
 
     def _on_search_clicked(self):
         commodity = find_commodity(self.commodity_input.text())

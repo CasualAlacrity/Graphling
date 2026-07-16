@@ -5,6 +5,7 @@ from PySide6.QtCore import QObject, Signal, Qt
 from PySide6.QtWidgets import QApplication
 from pynput import keyboard
 
+from overlay import theme
 from overlay.filter_panel import FilterPanel
 from overlay.results_panel import ResultsPanel
 from voice import run as voice_run
@@ -18,24 +19,39 @@ bridge = HotkeyBridge()
 hotkeys = keyboard.GlobalHotKeys({'<f3>': lambda: bridge.toggle_requested.emit()})
 
 app = QApplication()
+# Native macOS ("Aqua") widget rendering doesn't fully respect QSS box-model overrides
+# (border/padding) on things like QLineEdit — Fusion is Qt's own cross-platform style,
+# drawn entirely by Qt, so stylesheets apply predictably instead of fighting native chrome.
+app.setStyle("Fusion")
+theme.load_fonts()
 
 screen_geometry = app.primaryScreen().availableGeometry()
-panel_height = int(screen_geometry.height() * 0.85)
-filter_width = int(screen_geometry.width() * 0.22)
-results_width = int(screen_geometry.width() * 0.30)
+panel_width = int(screen_geometry.width() * 0.6)
+top_margin = 48
+bottom_margin = 32
+gap_between_panels = 14
 
 filter_panel = FilterPanel()
 filter_panel.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
 # Fixed, not just an initial resize() — otherwise a child widget whose content grows
-# (e.g. a breadcrumb label picking up a long terminal name) drags the window along
-# with it, and the two side-by-side windows drift out of alignment.
-filter_panel.setFixedSize(filter_width, panel_height)
-filter_panel.move(screen_geometry.x(), screen_geometry.y())
+# (e.g. a breadcrumb label picking up a long terminal name) drags the window without
+# the results panel following, drifting the two out of alignment. Width is set first
+# so the height computed from it (via the now-horizontal field rows) is accurate.
+filter_panel.setFixedWidth(panel_width)
+filter_panel.adjustSize()
+filter_panel.setFixedHeight(filter_panel.height())
 
+panel_x = screen_geometry.x() + (screen_geometry.width() - panel_width) // 2
+filter_panel.move(panel_x, screen_geometry.y() + top_margin)
+
+# Filter is now a wide, short bar near the top rather than a tall sidebar, so Results
+# sits below it (same width) filling the rest of the screen, instead of beside it.
 results_panel = ResultsPanel()
 results_panel.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
-results_panel.setFixedSize(results_width, panel_height)
-results_panel.move(screen_geometry.x() + filter_width + 10, screen_geometry.y())
+results_top = filter_panel.y() + filter_panel.height() + gap_between_panels
+results_height = screen_geometry.y() + screen_geometry.height() - results_top - bottom_margin
+results_panel.setFixedSize(panel_width, results_height)
+results_panel.move(panel_x, results_top)
 
 filter_panel.routes_found.connect(results_panel.set_routes)
 filter_panel.search_rejected.connect(results_panel.show_message)
