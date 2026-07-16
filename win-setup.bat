@@ -29,6 +29,21 @@ if errorlevel 1 (
     exit /b 1
 )
 
+where docker >nul 2>nul
+if errorlevel 1 (
+    echo.
+    echo WARNING: Docker not found on PATH. Install Docker Desktop, then run
+    echo   docker compose up -d
+    echo yourself before using the trade route tracker or overlay.
+) else (
+    echo Starting Postgres ^(trade route tracker storage^)...
+    docker compose up -d
+    if errorlevel 1 (
+        echo.
+        echo WARNING: docker compose up failed. Is Docker Desktop running?
+    )
+)
+
 echo.
 echo Setup complete.
 echo Make sure a .env file with your API keys exists in this folder before running.
