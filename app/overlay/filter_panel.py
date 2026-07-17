@@ -1,5 +1,6 @@
 import asyncio
 
+import requests
 from qasync import asyncSlot
 from PySide6.QtCore import QEvent, QObject, Signal, Qt
 from PySide6.QtWidgets import (
@@ -405,8 +406,12 @@ class FilterPanel(HudWindow):
         source_terminal = find_terminal(self.source_terminal_input.text())
         destination_terminal = find_terminal(self.destination_terminal_input.text())
 
-        if commodity is None and source_terminal is None and destination_terminal is None:
-            self.search_rejected.emit("Select a commodity, source terminal, or destination terminal to search.")
+        if commodity is None and source_terminal is None:
+            # UEX's own API requires a commodity or a source terminal (verified live —
+            # a destination-only query 400s with "missing_one_required_inputs"), so a
+            # destination alone isn't a valid search even though it's a reasonable
+            # thing for a player to fill in first.
+            self.search_rejected.emit("Select a commodity or a source terminal — a destination alone isn't enough.")
             return
 
         min_source_code = inventory_code_for(self.min_source_inventory_input.currentText(), "buy")
@@ -426,6 +431,9 @@ class FilterPanel(HudWindow):
                 space_only=space_only,
                 require_autoload=require_autoload,
             )
+        except requests.exceptions.RequestException as exc:
+            self.search_rejected.emit(f"Search failed — {exc}")
+            return
         finally:
             self.search_button.setEnabled(True)
             self.search_button.setText("Search")
