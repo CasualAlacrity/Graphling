@@ -406,12 +406,12 @@ class FilterPanel(HudWindow):
         source_terminal = find_terminal(self.source_terminal_input.text())
         destination_terminal = find_terminal(self.destination_terminal_input.text())
 
-        if commodity is None and source_terminal is None:
-            # UEX's own API requires a commodity or a source terminal (verified live —
-            # a destination-only query 400s with "missing_one_required_inputs"), so a
-            # destination alone isn't a valid search even though it's a reasonable
-            # thing for a player to fill in first.
-            self.search_rejected.emit("Select a commodity or a source terminal — a destination alone isn't enough.")
+        if commodity is None and source_terminal is None and destination_terminal is None:
+            # UEX's own API requires a commodity or a source terminal for a direct query
+            # (verified live — destination alone 400s), but search_routes() now works
+            # around that with a cached per-commodity fan-out, so destination-only is a
+            # valid search from here — only reject when nothing at all is set.
+            self.search_rejected.emit("Select a commodity, source terminal, or destination terminal to search.")
             return
 
         min_source_code = inventory_code_for(self.min_source_inventory_input.currentText(), "buy")

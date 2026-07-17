@@ -71,6 +71,7 @@ class TradeLeg(Base):
 class UexCacheKind(str, enum.Enum):
     COMMODITY = "commodity"
     TERMINAL = "terminal"
+    ROUTE = "route"
 
 
 class UexPriceCache(Base):

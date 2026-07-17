@@ -63,3 +63,19 @@ async def get_terminal_price_rows(
     rows = await client.get_terminal_prices(terminal_id)
     await _store_rows(session, UexCacheKind.TERMINAL, terminal_id, rows)
     return rows
+
+
+async def get_commodity_route_rows(
+    client: UEXCorpClient, session: AsyncSession, commodity_id: int
+) -> list[dict]:
+    # Every route for this commodity, unfiltered by origin/destination — the caller
+    # filters locally. Lets a source-only or destination-only search reuse the same
+    # cached fetch a commodity-specified search would have made, instead of needing
+    # its own separate live call per search.
+    cached = await _get_cached_rows(session, UexCacheKind.ROUTE, commodity_id)
+    if cached is not None:
+        return cached
+
+    rows = await client.get_commodity_routes(commodity_id=commodity_id)
+    await _store_rows(session, UexCacheKind.ROUTE, commodity_id, rows)
+    return rows

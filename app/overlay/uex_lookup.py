@@ -4,7 +4,7 @@ import os
 from db.session import SessionLocal, engine
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.matching import find_commodity_by_id as _find_commodity_by_id
-from tools.uexcorp.price_cache import get_commodity_price_rows, get_terminal_price_rows
+from tools.uexcorp.price_cache import get_commodity_price_rows, get_commodity_route_rows, get_terminal_price_rows
 from tools.uexcorp.reference_cache import TerminalType
 from tools.uexcorp.trade_data import UEXTradeRoute
 
@@ -23,7 +23,7 @@ async def _load_uex_cache():
 
 
 uex_cache = asyncio.run(_load_uex_cache())
-ship_names = [v.name_full for v in uex_cache.vehicles if v.scu >= 1]
+ship_names = [v.name_full for v in uex_cache.vehicles if v.scu >= 1 and v.is_concept == 0]
 commodity_names = [c.name for c in uex_cache.commodities if c.is_buyable == 1]
 terminal_names = [t.nickname for t in uex_cache.terminals if t.type == TerminalType.COMMODITY]
 
@@ -158,6 +158,29 @@ async def terminal_ids_for(commodity_id, side):
     return {row["id_terminal"] for row in rows if row.get(field_name)}
 
 
+# UEX's commodities_routes endpoint requires id_commodity or id_terminal_origin
+# (verified live — destination alone 400s with "missing_one_required_inputs"). A
+# destination-only search fans out across every commodity sold there instead — bounded
+# to this many concurrent live fetches so one search can't burst-hammer the API; each
+# fetch is cached afterward (get_commodity_route_rows), so repeat/overlapping searches
+# get progressively cheaper instead of re-paying the same cost every time. Same
+# reasoning as Arkanis's own background sync (they batch 10 at a time); this is a bit
+# more conservative since it runs reactively per user action, not as a one-off job.
+ROUTE_FANOUT_CONCURRENCY = 5
+
+
+async def _fanout_route_rows(commodity_ids) -> list[dict]:
+    semaphore = asyncio.Semaphore(ROUTE_FANOUT_CONCURRENCY)
+
+    async def fetch(commodity_id):
+        async with semaphore:
+            async with SessionLocal() as session:
+                return await get_commodity_route_rows(uex_client, session, commodity_id)
+
+    results = await asyncio.gather(*(fetch(commodity_id) for commodity_id in commodity_ids))
+    return [row for rows in results for row in rows]
+
+
 async def search_routes(
     commodity_id,
     source_terminal_id,
@@ -167,11 +190,28 @@ async def search_routes(
     space_only,
     require_autoload,
 ) -> list[UEXTradeRoute]:
-    raw_routes = await uex_client.get_commodity_routes(
-        commodity_id=commodity_id,
-        origin_terminal_id=source_terminal_id,
-        destination_terminal_id=destination_terminal_id,
-    )
+    if commodity_id is not None:
+        # The full route set for a commodity is cached as one unit regardless of origin/
+        # destination — reused here instead of asking UEX to filter server-side, so a
+        # repeat search that only changes source/destination (very common while narrowing
+        # filters) is a cache hit instead of a fresh live call.
+        async with SessionLocal() as session:
+            raw_routes = await get_commodity_route_rows(uex_client, session, commodity_id)
+        if source_terminal_id is not None:
+            raw_routes = [row for row in raw_routes if row.get("id_terminal_origin") == source_terminal_id]
+        if destination_terminal_id is not None:
+            raw_routes = [row for row in raw_routes if row.get("id_terminal_destination") == destination_terminal_id]
+    elif source_terminal_id is not None:
+        commodity_ids = await commodity_ids_at(source_terminal_id, "buy")
+        raw_routes = await _fanout_route_rows(commodity_ids)
+        raw_routes = [row for row in raw_routes if row.get("id_terminal_origin") == source_terminal_id]
+    elif destination_terminal_id is not None:
+        commodity_ids = await commodity_ids_at(destination_terminal_id, "sell")
+        raw_routes = await _fanout_route_rows(commodity_ids)
+        raw_routes = [row for row in raw_routes if row.get("id_terminal_destination") == destination_terminal_id]
+    else:
+        raw_routes = []
+
     routes = [UEXTradeRoute.model_validate(row) for row in raw_routes]
 
     # Space Only should only constrain an end the search left open — a pinned terminal
