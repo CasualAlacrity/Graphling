@@ -17,5 +17,5 @@ if not exist .env (
 )
 
 echo Starting Uplink voice loop...  (Ctrl+C to stop)
-.venv\Scripts\python app\voice.py
+.venv\Scripts\uplink-voice
 pause

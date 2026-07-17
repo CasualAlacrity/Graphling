@@ -25,25 +25,19 @@ class UEXTradeRoute(BaseModel):
     origin_terminal_id: int = Field(validation_alias="id_terminal_origin")
     origin_terminal_name: str
     origin_star_system_name: str | None
-    origin_orbit_name: str | None
     origin_planet_name: str | None
     destination_terminal_id: int = Field(validation_alias="id_terminal_destination")
     destination_terminal_name: str
     destination_star_system_name: str | None
-    destination_orbit_name: str | None
     destination_planet_name: str | None
     price_origin: float
     price_destination: float
     price_margin: float
-    price_roi: float
     scu_origin: float
     scu_destination: float
     status_origin: int
     status_destination: int
-    investment: float
-    profit: float
     distance: float
-    score: int
     is_on_ground_origin: int
     is_on_ground_destination: int
     has_loading_dock_origin: int

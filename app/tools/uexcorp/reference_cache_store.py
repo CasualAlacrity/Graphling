@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from pydantic import ValidationError
 from sqlalchemy import delete, select
@@ -19,7 +19,7 @@ async def load_reference_cache(session: AsyncSession) -> UexReferenceCache | Non
     record = result.scalars().first()
     if record is None:
         return None
-    if datetime.now(timezone.utc) - record.fetched_at > CACHE_TTL:
+    if datetime.now(UTC) - record.fetched_at > CACHE_TTL:
         return None
     try:
         return UexReferenceCache.model_validate(record.payload)

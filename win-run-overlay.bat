@@ -17,6 +17,5 @@ if not exist .env (
 )
 
 echo Starting Uplink overlay...  (Ctrl+C to stop)
-set PYTHONPATH=app
-.venv\Scripts\python app\overlay\overlay_app.py
+.venv\Scripts\uplink-overlay
 pause

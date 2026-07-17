@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "uplink"
+version = "0.1.0"
+description = "Uplink — an AI companion and trade route tracker for Star Citizen, built as a LangChain/LangGraph/Chainlit learning project."
+requires-python = ">=3.11"
+dynamic = ["dependencies"]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.6"]
+
+[project.scripts]
+uplink-overlay = "overlay.overlay_app:main"
+uplink-voice = "voice:main"
+
+# Packages/modules live directly under app/ (e.g. "overlay.filter_panel", "db.session")
+# with no "app." prefix — every import in the codebase is already written that way, so
+# app/ is the package root rather than a package itself.
+[tool.setuptools]
+package-dir = { "" = "app" }
+py-modules = ["main", "graph", "llm", "persona"]
+
+[tool.setuptools.packages.find]
+where = ["app"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["app"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

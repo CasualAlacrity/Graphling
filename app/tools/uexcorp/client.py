@@ -1,15 +1,26 @@
 import asyncio
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import requests
 from langsmith import traceable
 from pydantic import BaseModel, PrivateAttr
 
 from db.session import SessionLocal
-from tools.uexcorp.reference_cache import (UexReferenceCache, CachedCommodity, CachedStarSystem, CachedOrbit,
-                                           CachedTerminal, CachedMoon, CachedItemCategory, CachedItem,
-                                           CachedVehicle, CachedRefineryYield, CachedPoi, CachedCommodityStatus)
+from tools.uexcorp.reference_cache import (
+    CachedCommodity,
+    CachedCommodityStatus,
+    CachedItem,
+    CachedItemCategory,
+    CachedMoon,
+    CachedOrbit,
+    CachedPoi,
+    CachedRefineryYield,
+    CachedStarSystem,
+    CachedTerminal,
+    CachedVehicle,
+    UexReferenceCache,
+)
 from tools.uexcorp.reference_cache_store import load_reference_cache, store_reference_cache
 
 RETRY_ATTEMPTS = 3
@@ -35,7 +46,7 @@ class UEXCorpClient(BaseModel):
     _cache_lock: asyncio.Lock = PrivateAttr(default_factory=asyncio.Lock)
 
     def _is_fresh(self, uex_cache: UexReferenceCache) -> bool:
-        return (datetime.now(timezone.utc) - uex_cache.fetched_at) < timedelta(hours=24)
+        return (datetime.now(UTC) - uex_cache.fetched_at) < timedelta(hours=24)
 
     @traceable(name="uex_get_reference_cache")
     async def get_uex_cache(self) -> UexReferenceCache:
@@ -74,7 +85,10 @@ class UEXCorpClient(BaseModel):
     async def _build_uex_cache(self) -> UexReferenceCache:
         headers = self.get_header()
 
-        commodities_resp, star_systems_resp, orbits_resp, terminals_resp, moons_resp, categories_resp, vehicles_resp, refinery_yields_resp, poi_resp, commodity_status_resp = await asyncio.gather(
+        (
+            commodities_resp, star_systems_resp, orbits_resp, terminals_resp, moons_resp,
+            categories_resp, vehicles_resp, refinery_yields_resp, poi_resp, commodity_status_resp,
+        ) = await asyncio.gather(
             asyncio.to_thread(_get_with_retries, self.API_BASE_URL + 'commodities', headers),
             asyncio.to_thread(_get_with_retries, self.API_BASE_URL + 'star_systems', headers),
             asyncio.to_thread(_get_with_retries, self.API_BASE_URL + 'orbits', headers),
@@ -124,7 +138,7 @@ class UEXCorpClient(BaseModel):
         ]
 
         uex_cache = UexReferenceCache(
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             commodities=[CachedCommodity.model_validate(row) for row in commodities_resp.json()["data"]],
             star_systems=[CachedStarSystem.model_validate(row) for row in star_systems_resp.json()["data"]],
             orbits=[CachedOrbit.model_validate(row) for row in orbits_resp.json()["data"]],

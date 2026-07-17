@@ -1,40 +1,34 @@
 import asyncio
 
 import requests
-from qasync import asyncSlot
-from PySide6.QtCore import QEvent, QObject, Signal, Qt
+from PySide6.QtCore import QEvent, QObject, Qt, Signal
 from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
+    QCheckBox,
+    QComboBox,
+    QCompleter,
     QFrame,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
-    QCompleter,
-    QSpinBox,
-    QComboBox,
     QPushButton,
-    QCheckBox,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
 )
+from qasync import asyncSlot
 
-from overlay import theme
+from overlay import theme, uex_lookup
 from overlay.theme import HudWindow
 from overlay.uex_lookup import (
-    commodity_names,
     commodity_ids_at,
-    DESTINATION_INVENTORY_LEVELS,
     find_commodity,
     find_terminal,
     find_vehicle,
     inventory_code_for,
     is_space_terminal,
     search_routes,
-    ship_names,
-    SOURCE_INVENTORY_LEVELS,
     terminal_breadcrumb,
     terminal_ids_for,
-    terminal_names,
-    uex_cache,
 )
 
 
@@ -57,13 +51,13 @@ class FilterPanel(HudWindow):
         super().__init__(parent)
         self.setStyleSheet(theme.STYLESHEET)
 
-        self.current_commodity_candidates = list(commodity_names)
-        self.current_source_candidates = list(terminal_names)
-        self.current_destination_candidates = list(terminal_names)
+        self.current_commodity_candidates = list(uex_lookup.commodity_names)
+        self.current_source_candidates = list(uex_lookup.terminal_names)
+        self.current_destination_candidates = list(uex_lookup.terminal_names)
         # Unfiltered-by-space-only versions, used only to tell "not reachable at all"
         # (red) apart from "reachable but not Space Only" (orange) once narrowed.
-        self.current_source_reachable = list(terminal_names)
-        self.current_destination_reachable = list(terminal_names)
+        self.current_source_reachable = list(uex_lookup.terminal_names)
+        self.current_destination_reachable = list(uex_lookup.terminal_names)
         # Only one filter refresh should ever be in flight — a newer trigger (another
         # completer selection, a checkbox toggle) cancels whatever's still running
         # instead of letting two overlapping fetches race to overwrite the candidates.
@@ -116,7 +110,7 @@ class FilterPanel(HudWindow):
         # --- Ship, Cargo & Commodity ---
         self.ship_input = QLineEdit(placeholderText="Enter a ship name")
         self.ship_completer = QCompleter(
-            ship_names,
+            uex_lookup.ship_names,
             parent=self.ship_input,
             caseSensitivity=Qt.CaseInsensitive,
             filterMode=Qt.MatchFlag.MatchContains,
@@ -130,7 +124,7 @@ class FilterPanel(HudWindow):
 
         self.commodity_input = QLineEdit(placeholderText="Search commodity...")
         self.commodity_completer = QCompleter(
-            commodity_names,
+            uex_lookup.commodity_names,
             parent=self.commodity_input,
             caseSensitivity=Qt.CaseInsensitive,
             maxVisibleItems=10,
@@ -149,7 +143,7 @@ class FilterPanel(HudWindow):
         # --- Source ---
         self.source_terminal_input = QLineEdit(placeholderText="Search terminal...")
         self.source_terminal_completer = QCompleter(
-            terminal_names,
+            uex_lookup.terminal_names,
             parent=self.source_terminal_input,
             caseSensitivity=Qt.CaseInsensitive,
             filterMode=Qt.MatchFlag.MatchContains,
@@ -160,7 +154,7 @@ class FilterPanel(HudWindow):
         self.source_terminal_input.installEventFilter(CompleterFocusFilter(parent=self.source_terminal_input))
 
         self.min_source_inventory_input = QComboBox()
-        self.min_source_inventory_input.addItems(["Select..."] + SOURCE_INVENTORY_LEVELS)
+        self.min_source_inventory_input.addItems(["Select..."] + uex_lookup.SOURCE_INVENTORY_LEVELS)
 
         self._main_layout.addWidget(self._section_row(
             "SOURCE",
@@ -171,7 +165,7 @@ class FilterPanel(HudWindow):
         # --- Destination ---
         self.destination_terminal_input = QLineEdit(placeholderText="Search terminal...")
         self.destination_terminal_completer = QCompleter(
-            terminal_names,
+            uex_lookup.terminal_names,
             parent=self.destination_terminal_input,
             caseSensitivity=Qt.CaseInsensitive,
             filterMode=Qt.MatchFlag.MatchContains,
@@ -184,7 +178,7 @@ class FilterPanel(HudWindow):
         )
 
         self.max_destination_inventory_input = QComboBox()
-        self.max_destination_inventory_input.addItems(["Select..."] + DESTINATION_INVENTORY_LEVELS)
+        self.max_destination_inventory_input.addItems(["Select..."] + uex_lookup.DESTINATION_INVENTORY_LEVELS)
 
         self._main_layout.addWidget(self._section_row(
             "DESTINATION",
@@ -285,44 +279,44 @@ class FilterPanel(HudWindow):
                 commodity_ids_at(source.id, "buy"), commodity_ids_at(destination.id, "sell")
             )
             commodity_ids = source_ids & dest_ids
-            commodity_candidates = [c.name for c in uex_cache.commodities if c.id in commodity_ids]
+            commodity_candidates = [c.name for c in uex_lookup.uex_cache.commodities if c.id in commodity_ids]
         elif source is not None:
             commodity_ids = await commodity_ids_at(source.id, "buy")
-            commodity_candidates = [c.name for c in uex_cache.commodities if c.id in commodity_ids]
+            commodity_candidates = [c.name for c in uex_lookup.uex_cache.commodities if c.id in commodity_ids]
         elif destination is not None:
             commodity_ids = await commodity_ids_at(destination.id, "sell")
-            commodity_candidates = [c.name for c in uex_cache.commodities if c.id in commodity_ids]
+            commodity_candidates = [c.name for c in uex_lookup.uex_cache.commodities if c.id in commodity_ids]
         else:
-            commodity_candidates = list(commodity_names)
+            commodity_candidates = list(uex_lookup.commodity_names)
 
         # Source candidates: direct from commodity, or fanned out from destination
         # (every terminal that sells anything the destination will buy) — fetched
         # concurrently, since a terminal can carry dozens of commodities.
         if commodity is not None:
             terminal_ids = await terminal_ids_for(commodity.id, "buy")
-            source_reachable = [t.nickname for t in uex_cache.terminals if t.id in terminal_ids]
+            source_reachable = [t.nickname for t in uex_lookup.uex_cache.terminals if t.id in terminal_ids]
         elif destination is not None:
             reachable_commodity_ids = await commodity_ids_at(destination.id, "sell")
             results = await asyncio.gather(*(terminal_ids_for(cid, "buy") for cid in reachable_commodity_ids))
             terminal_ids = set().union(*results)
             terminal_ids.discard(destination.id)
-            source_reachable = [t.nickname for t in uex_cache.terminals if t.id in terminal_ids]
+            source_reachable = [t.nickname for t in uex_lookup.uex_cache.terminals if t.id in terminal_ids]
         else:
-            source_reachable = list(terminal_names)
+            source_reachable = list(uex_lookup.terminal_names)
 
         # Destination candidates: direct from commodity, or fanned out from source
         # (every terminal that buys anything the source sells), same concurrency.
         if commodity is not None:
             terminal_ids = await terminal_ids_for(commodity.id, "sell")
-            destination_reachable = [t.nickname for t in uex_cache.terminals if t.id in terminal_ids]
+            destination_reachable = [t.nickname for t in uex_lookup.uex_cache.terminals if t.id in terminal_ids]
         elif source is not None:
             available_commodity_ids = await commodity_ids_at(source.id, "buy")
             results = await asyncio.gather(*(terminal_ids_for(cid, "sell") for cid in available_commodity_ids))
             terminal_ids = set().union(*results)
             terminal_ids.discard(source.id)
-            destination_reachable = [t.nickname for t in uex_cache.terminals if t.id in terminal_ids]
+            destination_reachable = [t.nickname for t in uex_lookup.uex_cache.terminals if t.id in terminal_ids]
         else:
-            destination_reachable = list(terminal_names)
+            destination_reachable = list(uex_lookup.terminal_names)
 
         # Space Only only narrows a field once something actually drives its reachable
         # set (commodity, or the other terminal) — with nothing set yet there's no

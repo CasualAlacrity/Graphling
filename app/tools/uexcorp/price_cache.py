@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -21,7 +21,7 @@ async def _get_cached_rows(session: AsyncSession, kind: UexCacheKind, entity_id:
     cache_row = result.scalar_one_or_none()
     if cache_row is None:
         return None
-    if datetime.now(timezone.utc) - cache_row.fetched_at > CACHE_TTL:
+    if datetime.now(UTC) - cache_row.fetched_at > CACHE_TTL:
         return None
     return cache_row.rows
 
@@ -31,7 +31,7 @@ async def _store_rows(session: AsyncSession, kind: UexCacheKind, entity_id: int,
         kind=kind,
         entity_id=entity_id,
         rows=rows,
-        fetched_at=datetime.now(timezone.utc),
+        fetched_at=datetime.now(UTC),
     )
     stmt = stmt.on_conflict_do_update(
         index_elements=["kind", "entity_id"],

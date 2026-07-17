@@ -1,13 +1,9 @@
-import logging
 from typing import Any
 
 from pydantic import BaseModel, Field
 
-from tools.uexcorp.client import UEXCorpClient
-from tools.uexcorp.matching import filter_by_match, match_by_name_or_code, find_commodity_by_id
+from tools.uexcorp.matching import filter_by_match, find_commodity_by_id, match_by_name_or_code
 from tools.uplink_tool import UplinkTool
-
-logger = logging.getLogger(__name__)
 
 
 def _has_location_data(commodity) -> bool:
@@ -61,65 +57,65 @@ class MiningLocationTool(UplinkTool):
         "manufactured or refined-only goods won't have results here."
     )
     args_schema: type[BaseModel] = MiningLocationArgs
-    progress_label: str = "UEX to loop up mining locations"
-    client: UEXCorpClient
-
-    def _run(self, *args: Any, **kwargs: Any) -> Any:
-        raise NotImplementedError("MiningLocationTool only supports async execution — use _arun.")
+    progress_label: str = "UEX to look up mining locations"
 
     async def _arun(self, commodity: str, star_system: str | None = None, orbit: str | None = None,
                     moon: str | None = None) -> dict[str, Any] | str:
-        try:
-            cache = await self.client.get_uex_cache()
+        return await self._safe_run(self._lookup(commodity, star_system, orbit, moon))
 
-            matched_commodity = match_by_name_or_code(commodity, cache.commodities)
-            if matched_commodity is None:
-                return f"No commodity matching '{commodity}' was found."
+    async def _lookup(self, commodity, star_system, orbit, moon) -> dict[str, Any] | str:
+        cache = await self.client.get_uex_cache()
 
-            locatable = _resolve_locatable_commodity(matched_commodity, cache)
-            if locatable is None:
-                return (f"{matched_commodity.name} isn't a raw ore or harvestable material, so it "
-                        f"doesn't have spawn locations.")
+        matched_commodity = match_by_name_or_code(commodity, cache.commodities)
+        if matched_commodity is None:
+            return f"No commodity matching '{commodity}' was found."
 
-            planets = []
-            for o in cache.orbits:
-                if o.id in locatable.ids_planets:
-                    planets.append(o)
+        locatable = _resolve_locatable_commodity(matched_commodity, cache)
+        if locatable is None:
+            return (f"{matched_commodity.name} isn't a raw ore or harvestable material, so it "
+                    f"doesn't have spawn locations.")
 
-            orbital_locations = []
-            for o in cache.orbits:
-                if o.id in locatable.ids_orbits:
-                    orbital_locations.append(o)
+        planets = []
+        for o in cache.orbits:
+            if o.id in locatable.ids_planets:
+                planets.append(o)
 
-            moons = []
-            for m in cache.moons:
-                if m.id in locatable.ids_moons:
-                    moons.append(m)
+        orbital_locations = []
+        for o in cache.orbits:
+            if o.id in locatable.ids_orbits:
+                orbital_locations.append(o)
 
-            points_of_interest = []
-            for p in cache.poi:
-                if p.id in locatable.ids_poi:
-                    points_of_interest.append(p)
+        moons = []
+        for m in cache.moons:
+            if m.id in locatable.ids_moons:
+                moons.append(m)
 
-            planets = filter_by_match(planets, star_system, cache.star_systems, "star_system_name")
-            planets = filter_by_match(planets, orbit, cache.orbits, "name")
+        points_of_interest = []
+        for p in cache.poi:
+            if p.id in locatable.ids_poi:
+                points_of_interest.append(p)
 
-            orbital_locations = filter_by_match(orbital_locations, star_system, cache.star_systems, "star_system_name")
+        # Not delegated to filter_by_location: no terminal or near/distance axis here, and each
+        # of the four lists filters on a different attr name — genuinely a different shape, not
+        # the same duplicated block as the price/rental/yield tools.
+        planets = filter_by_match(planets, star_system, cache.star_systems, "star_system_name")
+        planets = filter_by_match(planets, orbit, cache.orbits, "name")
 
-            moons = filter_by_match(moons, star_system, cache.star_systems, "star_system_name")
-            moons = filter_by_match(moons, orbit, cache.orbits, "orbit_name")
-            moons = filter_by_match(moons, moon, cache.moons, "name")
+        orbital_locations = filter_by_match(orbital_locations, star_system, cache.star_systems, "star_system_name")
 
-            points_of_interest = filter_by_match(points_of_interest, star_system, cache.star_systems, "star_system_name")
-            points_of_interest = filter_by_match(points_of_interest, orbit, cache.orbits, "orbit_name")
-            points_of_interest = filter_by_match(points_of_interest, moon, cache.moons, "moon_name")
+        moons = filter_by_match(moons, star_system, cache.star_systems, "star_system_name")
+        moons = filter_by_match(moons, orbit, cache.orbits, "orbit_name")
+        moons = filter_by_match(moons, moon, cache.moons, "name")
 
-            return {
-                "planets": [p.model_dump(exclude_none=True) for p in planets],
-                "orbital_locations": [o.model_dump(exclude_none=True) for o in orbital_locations],
-                "moons": [m.model_dump(exclude_none=True) for m in moons],
-                "points_of_interest": [p.model_dump(exclude_none=True) for p in points_of_interest],
-            }
-        except Exception:
-            logger.exception("mining_location_lookup failed")
-            return "The UEX pricing API is temporarily unavailable. Tell the user their request couldn't be completed and suggest trying again shortly."
+        points_of_interest = filter_by_match(
+            points_of_interest, star_system, cache.star_systems, "star_system_name",
+        )
+        points_of_interest = filter_by_match(points_of_interest, orbit, cache.orbits, "orbit_name")
+        points_of_interest = filter_by_match(points_of_interest, moon, cache.moons, "moon_name")
+
+        return {
+            "planets": [p.model_dump(exclude_none=True) for p in planets],
+            "orbital_locations": [o.model_dump(exclude_none=True) for o in orbital_locations],
+            "moons": [m.model_dump(exclude_none=True) for m in moons],
+            "points_of_interest": [p.model_dump(exclude_none=True) for p in points_of_interest],
+        }

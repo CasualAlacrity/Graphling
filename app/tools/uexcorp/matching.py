@@ -58,6 +58,25 @@ def find_commodity_by_id(cache, commodity_id):
     return None
 
 
+async def filter_by_location(rows, cache, client, star_system=None, orbit=None, terminal=None, moon=None,
+                              near=None, max_distance=None):
+    """The star_system/orbit/terminal/moon + optional near/distance filter sequence shared by
+    every UEX price/rental/yield tool. Terminal filtering and the near/distance concept don't
+    apply to everything (e.g. mining locations, which filter four different result lists with
+    no terminal or distance axis) — those stay hand-rolled rather than being forced through here.
+    """
+    rows = filter_by_match(rows, star_system, cache.star_systems, "star_system_name")
+    rows = filter_by_match(rows, orbit, cache.orbits, "orbit_name")
+    rows = filter_by_match(rows, terminal, cache.terminals, "terminal_name")
+    rows = filter_by_match(rows, moon, cache.moons, "moon_name")
+
+    if near:
+        effective_max_distance = max_distance if max_distance is not None else DEFAULT_NEAR_DISTANCE
+        rows = await filter_by_distance(rows, near, effective_max_distance, cache, client)
+
+    return rows
+
+
 async def filter_by_distance(rows, near, max_distance, cache, client):
     origin = match_by_name_or_code(near, cache.orbits)
     if origin:

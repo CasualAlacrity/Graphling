@@ -13,6 +13,18 @@ uex_client = UEXCorpClient(
     bearer_token=os.getenv("UEXCORP_BEARER_TOKEN"),
 )
 
+# Populated by init() — every function below that touches these assumes init() has
+# already run. Left as plain module attributes (not a class) so `uex_lookup.X` access
+# from other modules keeps working unchanged; the point of this split is only to make
+# importing this module free of DB/network side effects, not to change its shape.
+uex_cache = None
+ship_names = []
+commodity_names = []
+terminal_names = []
+SOURCE_INVENTORY_LEVELS = []
+DESTINATION_INVENTORY_LEVELS = []
+_star_system_codes = {}
+
 
 async def _load_uex_cache():
     cache = await uex_client.get_uex_cache()
@@ -22,12 +34,25 @@ async def _load_uex_cache():
     return cache
 
 
-uex_cache = asyncio.run(_load_uex_cache())
-ship_names = [v.name_full for v in uex_cache.vehicles if v.scu >= 1 and v.is_concept == 0]
-commodity_names = [c.name for c in uex_cache.commodities if c.is_buyable == 1]
-terminal_names = [t.nickname for t in uex_cache.terminals if t.type == TerminalType.COMMODITY]
+def init():
+    """Loads the UEX reference cache and derives every lookup table this module
+    exposes. Must be called once, before anything else here is used — kept explicit
+    rather than a module-level side effect so importing uex_lookup (directly, or via
+    filter_panel/results_panel) is cheap and doesn't require Postgres/UEX to be
+    reachable, which matters for tests and for tooling that only needs the pure
+    functions below."""
+    global uex_cache, ship_names, commodity_names, terminal_names
+    global SOURCE_INVENTORY_LEVELS, DESTINATION_INVENTORY_LEVELS, _star_system_codes
 
-_star_system_codes = {system.name: system.code for system in uex_cache.star_systems}
+    uex_cache = asyncio.run(_load_uex_cache())
+    ship_names = [v.name_full for v in uex_cache.vehicles if v.scu >= 1 and v.is_concept == 0]
+    commodity_names = [c.name for c in uex_cache.commodities if c.is_buyable == 1]
+    terminal_names = [t.nickname for t in uex_cache.terminals if t.type == TerminalType.COMMODITY]
+    # "buy" = stock available to purchase at a terminal; "sell" = how saturated a
+    # terminal's demand already is. Same tiers, different top label.
+    SOURCE_INVENTORY_LEVELS = [status.name for status in uex_cache.commodity_statuses if status.type == "buy"]
+    DESTINATION_INVENTORY_LEVELS = [status.name for status in uex_cache.commodity_statuses if status.type == "sell"]
+    _star_system_codes = {system.name: system.code for system in uex_cache.star_systems}
 
 
 def route_breadcrumb(system_name, planet_name, terminal_id, fallback_terminal_name):
@@ -106,17 +131,6 @@ def terminal_breadcrumb(terminal):
         terminal.city_name,
     ]
     return ">".join(part for part in parts if part)
-
-
-# "buy" = stock available to purchase at a terminal; "sell" = how saturated a
-# terminal's demand already is. Same tiers, different top label.
-SOURCE_INVENTORY_LEVELS = [
-    status.name for status in uex_cache.commodity_statuses if status.type == "buy"
-]
-
-DESTINATION_INVENTORY_LEVELS = [
-    status.name for status in uex_cache.commodity_statuses if status.type == "sell"
-]
 
 
 async def commodity_volatility(commodity_id):

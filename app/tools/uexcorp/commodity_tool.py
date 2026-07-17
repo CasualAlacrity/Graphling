@@ -1,12 +1,9 @@
-import logging
 from typing import Any
 
 from pydantic import BaseModel, Field
 
-from tools.uexcorp.trade_tool import TradePriceTool
 from tools.uexcorp.args import LocationArgs
-
-logger = logging.getLogger(__name__)
+from tools.uexcorp.trade_tool import TradePriceTool
 
 
 class CommodityPriceArgs(LocationArgs):
@@ -36,8 +33,8 @@ class CommodityPriceTool(TradePriceTool):
     async def _arun(self, commodity: str, star_system: str | None = None, orbit: str | None = None,
                     terminal: str | None = None, moon: str | None = None, near: str | None = None,
                     max_distance: float | None = None) -> dict[str, Any] | str:
-        return await self._lookup(
+        return await self._safe_run(self._lookup(
             commodity, lambda cache: cache.commodities, self.client.get_commodity_prices, "commodity",
             star_system=star_system, orbit=orbit, terminal=terminal, moon=moon,
             near=near, max_distance=max_distance,
-        )
+        ))

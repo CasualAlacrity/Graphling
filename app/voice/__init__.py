@@ -2,7 +2,7 @@
 Push-to-talk voice loop for Uplink — runs standalone, alongside (not through)
 the Chainlit app. Hold the PTT key, speak, release; Uplink replies out loud.
 
-Usage: python app/voice.py   (from the repo root, with the venv active)
+Usage: uplink-voice   (after `pip install -e .`)
 On Windows: win-run-voice.bat
 """
 import asyncio
@@ -11,10 +11,10 @@ import uuid
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 
-from audio_output import play_audio
 from graph import State, graph
-from tts import synthesize
-from voice_input import listen_once, load_whisper
+from voice.audio_output import play_audio
+from voice.tts import synthesize
+from voice.voice_input import listen_once, load_whisper
 
 load_dotenv()
 
@@ -49,8 +49,12 @@ async def run() -> None:
         play_audio(audio)
 
 
-if __name__ == "__main__":
+def main() -> None:
     try:
         asyncio.run(run())
     except KeyboardInterrupt:
         print("\n[Uplink] Shutting down.")
+
+
+if __name__ == "__main__":
+    main()

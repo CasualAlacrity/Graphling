@@ -21,7 +21,10 @@ if not exist .venv\Scripts\python.exe (
 
 echo Installing dependencies ^(this can take a few minutes the first time^)...
 .venv\Scripts\python -m pip install --upgrade pip
-.venv\Scripts\python -m pip install -r requirements.txt
+REM Editable install of the project itself (pyproject.toml), which also pulls in
+REM everything from requirements.txt and registers the uplink-overlay/uplink-voice
+REM commands used by the run scripts below.
+.venv\Scripts\python -m pip install -e .
 if errorlevel 1 (
     echo.
     echo ERROR: dependency install failed. Scroll up for the offending package.

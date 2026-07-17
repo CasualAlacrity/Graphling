@@ -1,6 +1,5 @@
 import asyncio
 
-from qasync import asyncSlot
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
@@ -13,6 +12,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from qasync import asyncSlot
 
 from overlay import theme
 from overlay.theme import HudWindow
@@ -220,7 +220,7 @@ class ResultsPanel(HudWindow):
             return False
 
         results = await asyncio.gather(*(commodity_volatility(cid) for cid in missing))
-        for commodity_id, result in zip(missing, results):
+        for commodity_id, result in zip(missing, results, strict=True):
             self._volatility_by_commodity[commodity_id] = result
         return True
 
@@ -274,7 +274,9 @@ class ResultsPanel(HudWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        profit_label = QLabel(parent=block, text=f"+{self.estimated_profit_for(route):,.0f} aUEC", objectName="routeProfit")
+        profit_label = QLabel(
+            parent=block, text=f"+{self.estimated_profit_for(route):,.0f} aUEC", objectName="routeProfit",
+        )
         profit_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         margin_label = QLabel(parent=block, text=f"({route.price_margin:.1f}%)", objectName="routeMargin")
         margin_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)

@@ -1,6 +1,6 @@
 import enum
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -16,16 +16,16 @@ class Base(DeclarativeBase):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
 
 
-class LegType(str, enum.Enum):
+class LegType(enum.StrEnum):
     ACQUISITION = "acquisition"
     SALE = "sale"
 
 
-class CargoTransferType(str, enum.Enum):
+class CargoTransferType(enum.StrEnum):
     MANUAL = "manual"
     AUTOLOAD = "autoload"
 
@@ -68,7 +68,7 @@ class TradeLeg(Base):
     run: Mapped["TradeRun"] = relationship("TradeRun", back_populates="legs")
 
 
-class UexCacheKind(str, enum.Enum):
+class UexCacheKind(enum.StrEnum):
     COMMODITY = "commodity"
     TERMINAL = "terminal"
     ROUTE = "route"

@@ -4,21 +4,20 @@ import sys
 from logging.config import fileConfig
 from pathlib import Path
 
+from alembic import context
 from dotenv import load_dotenv
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
-
-from alembic import context
 
 # app/ isn't a package (matches the rest of the codebase's bare-import
 # convention, e.g. main.py's `from graph import ...`) — add it to sys.path
 # directly instead of importing via an `app.` prefix.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-load_dotenv()
-
 from db.models import Base
+
+load_dotenv()
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
