@@ -20,6 +20,7 @@ class UEXTradeData(BaseModel):
 
 
 class UEXTradeRoute(BaseModel):
+    commodity_id: int = Field(validation_alias="id_commodity")
     commodity_name: str
     origin_terminal_id: int = Field(validation_alias="id_terminal_origin")
     origin_terminal_name: str

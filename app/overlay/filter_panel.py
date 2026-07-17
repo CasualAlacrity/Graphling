@@ -1,5 +1,6 @@
 import asyncio
 
+from qasync import asyncSlot
 from PySide6.QtCore import QEvent, QObject, Signal, Qt
 from PySide6.QtWidgets import (
     QWidget,
@@ -15,7 +16,6 @@ from PySide6.QtWidgets import (
     QCheckBox,
 )
 
-from db.session import engine
 from overlay import theme
 from overlay.theme import HudWindow
 from overlay.uex_lookup import (
@@ -63,6 +63,10 @@ class FilterPanel(HudWindow):
         # (red) apart from "reachable but not Space Only" (orange) once narrowed.
         self.current_source_reachable = list(terminal_names)
         self.current_destination_reachable = list(terminal_names)
+        # Only one filter refresh should ever be in flight — a newer trigger (another
+        # completer selection, a checkbox toggle) cancels whatever's still running
+        # instead of letting two overlapping fetches race to overwrite the candidates.
+        self._refresh_task = None
 
         self._build_ui()
         self._wire_signals()
@@ -339,22 +343,30 @@ class FilterPanel(HudWindow):
         else:
             destination_candidates = destination_reachable
 
-        # This coroutine runs inside its own throwaway asyncio.run() loop (Qt's event
-        # loop isn't asyncio), so any pooled connections left open here would be bound
-        # to a loop that's about to close — the next call's fresh loop can't reuse them.
-        # Disposing before returning keeps every call self-contained.
-        await engine.dispose()
-
         return commodity_candidates, source_candidates, destination_candidates, source_reachable, destination_reachable
 
-    def refresh_filters(self):
-        (
-            self.current_commodity_candidates,
-            self.current_source_candidates,
-            self.current_destination_candidates,
-            self.current_source_reachable,
-            self.current_destination_reachable,
-        ) = asyncio.run(self._refresh_filters_async())
+    @asyncSlot()
+    async def refresh_filters(self):
+        if self._refresh_task is not None:
+            self._refresh_task.cancel()
+
+        task = asyncio.ensure_future(self._refresh_filters_async())
+        self._refresh_task = task
+        try:
+            (
+                self.current_commodity_candidates,
+                self.current_source_candidates,
+                self.current_destination_candidates,
+                self.current_source_reachable,
+                self.current_destination_reachable,
+            ) = await task
+        except asyncio.CancelledError:
+            # A newer selection superseded this one — its own refresh_filters call
+            # will apply the up-to-date candidates, nothing to do here.
+            return
+        finally:
+            if self._refresh_task is task:
+                self._refresh_task = None
 
         self.commodity_completer.model().setStringList(self.current_commodity_candidates)
         self.source_terminal_completer.model().setStringList(self.current_source_candidates)
@@ -387,7 +399,8 @@ class FilterPanel(HudWindow):
         else:
             self._apply_validation_style(field, valid_names, reachable_names, breadcrumb_for)
 
-    def _on_search_clicked(self):
+    @asyncSlot()
+    async def _on_search_clicked(self):
         commodity = find_commodity(self.commodity_input.text())
         source_terminal = find_terminal(self.source_terminal_input.text())
         destination_terminal = find_terminal(self.destination_terminal_input.text())
@@ -401,14 +414,20 @@ class FilterPanel(HudWindow):
         space_only = self.space_only_checkbox.isChecked()
         require_autoload = self.autoload_checkbox.isChecked()
 
-        routes = asyncio.run(search_routes(
-            commodity_id=commodity.id if commodity else None,
-            source_terminal_id=source_terminal.id if source_terminal else None,
-            destination_terminal_id=destination_terminal.id if destination_terminal else None,
-            min_source_code=min_source_code,
-            max_destination_code=max_destination_code,
-            space_only=space_only,
-            require_autoload=require_autoload,
-        ))
+        self.search_button.setEnabled(False)
+        self.search_button.setText("SEARCHING…")
+        try:
+            routes = await search_routes(
+                commodity_id=commodity.id if commodity else None,
+                source_terminal_id=source_terminal.id if source_terminal else None,
+                destination_terminal_id=destination_terminal.id if destination_terminal else None,
+                min_source_code=min_source_code,
+                max_destination_code=max_destination_code,
+                space_only=space_only,
+                require_autoload=require_autoload,
+            )
+        finally:
+            self.search_button.setEnabled(True)
+            self.search_button.setText("Search")
 
         self.routes_found.emit(routes, self.cargo_input.value())

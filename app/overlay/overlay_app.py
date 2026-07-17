@@ -1,6 +1,7 @@
 import asyncio
 import threading
 
+import qasync
 from PySide6.QtCore import QObject, Signal, Qt
 from PySide6.QtWidgets import QApplication
 from pynput import keyboard
@@ -27,6 +28,13 @@ app = QApplication()
 # drawn entirely by Qt, so stylesheets apply predictably instead of fighting native chrome.
 app.setStyle("Fusion")
 theme.load_fonts()
+
+# Ties an asyncio event loop to Qt's own, so the filter/search coroutines (previously
+# asyncio.run() per call — a whole loop spun up and torn down synchronously on the GUI
+# thread, freezing the window for the call's duration) can now run as real, non-blocking
+# tasks instead. Must be set before any @asyncSlot-decorated method can be invoked.
+event_loop = qasync.QEventLoop(app)
+asyncio.set_event_loop(event_loop)
 
 screen_geometry = app.primaryScreen().availableGeometry()
 panel_width = int(screen_geometry.width() * 0.6)
@@ -73,4 +81,5 @@ bridge.toggle_requested.connect(on_toggle_requested)
 
 hotkeys.start()
 print("Ready. Press F3 to toggle the overlay.", flush=True)
-app.exec()
+with event_loop:
+    event_loop.run_forever()

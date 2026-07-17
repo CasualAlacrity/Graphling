@@ -3,6 +3,7 @@ import os
 
 from db.session import SessionLocal, engine
 from tools.uexcorp.client import UEXCorpClient
+from tools.uexcorp.matching import find_commodity_by_id as _find_commodity_by_id
 from tools.uexcorp.price_cache import get_commodity_price_rows, get_terminal_price_rows
 from tools.uexcorp.reference_cache import TerminalType
 from tools.uexcorp.trade_data import UEXTradeRoute
@@ -26,10 +27,38 @@ ship_names = [v.name_full for v in uex_cache.vehicles if v.scu >= 1]
 commodity_names = [c.name for c in uex_cache.commodities if c.is_buyable == 1]
 terminal_names = [t.nickname for t in uex_cache.terminals if t.type == TerminalType.COMMODITY]
 
+_star_system_codes = {system.name: system.code for system in uex_cache.star_systems}
+
+
+def route_breadcrumb(system_name, planet_name, terminal_id, fallback_terminal_name):
+    # Only the system gets abbreviated to its official UEX code (e.g. "Stanton" -> "ST")
+    # — planet stays full. Terminal uses its reference-cache nickname (short, human —
+    # "Everus Harbor") rather than the routes endpoint's own terminal_name, which is the
+    # full official name ("Admin - Everus Harbor") and far too long for a list row.
+    terminal = find_terminal_by_id(terminal_id)
+    terminal_name = terminal.nickname if terminal else fallback_terminal_name
+    parts = [_star_system_codes.get(system_name, system_name), planet_name, terminal_name]
+    return "/".join(part for part in parts if part)
+
+
+def commodity_code_for(commodity_id, fallback_name):
+    # The routes endpoint doesn't include a commodity code (confirmed live — only
+    # commodity_name/commodity_slug), so this needs the reference-cache commodity,
+    # unlike terminal_code which the routes endpoint does provide directly.
+    commodity = _find_commodity_by_id(uex_cache, commodity_id)
+    return commodity.code if commodity else fallback_name
+
 
 def find_terminal(name):
     for terminal in uex_cache.terminals:
         if terminal.nickname == name:
+            return terminal
+    return None
+
+
+def find_terminal_by_id(terminal_id):
+    for terminal in uex_cache.terminals:
+        if terminal.id == terminal_id:
             return terminal
     return None
 
@@ -88,6 +117,31 @@ SOURCE_INVENTORY_LEVELS = [
 DESTINATION_INVENTORY_LEVELS = [
     status.name for status in uex_cache.commodity_statuses if status.type == "sell"
 ]
+
+
+async def commodity_volatility(commodity_id):
+    # One call covers every terminal that trades this commodity (origin and destination
+    # both, for every route sharing this commodity) — cached for 30min in the same
+    # UexPriceCache table commodity_ids_at/terminal_ids_for already use, so this doesn't
+    # add new fetch cost beyond what filtering already pays.
+    async with SessionLocal() as session:
+        rows = await get_commodity_price_rows(uex_client, session, commodity_id)
+
+    volatility_by_terminal = {}
+    for row in rows:
+        price_buy = row.get("price_buy")
+        volatility_price_buy = row.get("volatility_price_buy")
+        price_sell = row.get("price_sell")
+        volatility_price_sell = row.get("volatility_price_sell")
+        # UEX returns 0 (not null) for volatility_price_* when a terminal/commodity pair
+        # doesn't have enough price history yet to compute one — a real, common case
+        # (61% of active listings sampled), not a genuine zero-volatility reading. Treat
+        # it as missing data, same as a truly absent value, rather than "perfectly stable".
+        volatility_by_terminal[row["id_terminal"]] = {
+            "buy_cv": volatility_price_buy / price_buy if price_buy and volatility_price_buy else None,
+            "sell_cv": volatility_price_sell / price_sell if price_sell and volatility_price_sell else None,
+        }
+    return volatility_by_terminal
 
 
 async def commodity_ids_at(terminal_id, side):

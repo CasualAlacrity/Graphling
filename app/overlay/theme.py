@@ -172,19 +172,26 @@ QPushButton#primaryButton:pressed {{
     border-color: {ACCENT_ACTIVE};
 }}
 
-QPushButton#sortChip {{
+QLabel#sortToggleLabel {{
     font-family: {MONO_FONT};
     font-size: 10px;
     font-weight: bold;
-    padding: 5px 12px;
-    border: 1px solid {BORDER};
-    background-color: {SURFACE_ALT};
-    color: {TEXT_SECONDARY};
+    color: {TEXT_DISABLED};
 }}
-QPushButton#sortChip:checked {{
-    background-color: {ACCENT};
-    border-color: {ACCENT};
-    color: {BG};
+QLabel#sortToggleLabel[active="true"] {{
+    color: {TEXT_PRIMARY};
+}}
+
+QFrame#resultsHeaderRow {{
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid {BORDER};
+}}
+QLabel#resultsColumnHeader {{
+    color: {TEXT_DISABLED};
+    font-family: {MONO_FONT};
+    font-size: 10px;
+    font-weight: 600;
 }}
 
 QListWidget {{
@@ -196,12 +203,83 @@ QListWidget {{
     outline: none;
 }}
 QListWidget::item {{
-    padding: 6px 8px;
+    padding: 0px;
     border-bottom: 1px solid {BORDER_SUBTLE};
+}}
+QListWidget::item:hover {{
+    background-color: {SURFACE};
+    border-left: 3px solid {ACCENT};
 }}
 QListWidget::item:selected {{
     background-color: {ACCENT_MUTED};
     color: {TEXT_PRIMARY};
+}}
+
+QFrame#routeRow {{
+    background: transparent;
+    border: none;
+}}
+QLabel#routeCommodity {{
+    color: {TEXT_PRIMARY};
+    font-family: {DISPLAY_FONT};
+    font-size: 13px;
+    font-weight: 600;
+}}
+QLabel#routeScu {{
+    color: {TEXT_PRIMARY};
+    font-family: {MONO_FONT};
+    font-size: 13px;
+    font-weight: 600;
+}}
+QLabel#routeTerminalName {{
+    color: {TEXT_PRIMARY};
+    font-family: {DISPLAY_FONT};
+    font-size: 12px;
+    font-weight: 600;
+}}
+QLabel#routeTerminalPrice {{
+    color: {TEXT_SECONDARY};
+    font-family: {MONO_FONT};
+    font-size: 10.5px;
+}}
+QLabel#routeArrow {{
+    color: {TEXT_DISABLED};
+    font-size: 14px;
+}}
+QLabel#routeDistance {{
+    color: {TEXT_DISABLED};
+    font-family: {MONO_FONT};
+    font-size: 9.5px;
+}}
+QLabel#routeProfit {{
+    color: {TEXT_PRIMARY};
+    font-family: {MONO_FONT};
+    font-size: 13px;
+    font-weight: 700;
+}}
+QLabel#routeMargin {{
+    color: {TEXT_SECONDARY};
+    font-family: {MONO_FONT};
+    font-size: 10.5px;
+}}
+QPushButton#addRouteButton {{
+    border-radius: 12px;
+    border: 1px solid {BORDER};
+    background: transparent;
+    color: {TEXT_SECONDARY};
+    font-family: {DISPLAY_FONT};
+    font-size: 14px;
+    font-weight: 700;
+    padding: 0px;
+}}
+QPushButton#addRouteButton:hover {{
+    background-color: {ACCENT};
+    border-color: {ACCENT};
+    color: {BG};
+}}
+QPushButton#addRouteButton:pressed {{
+    background-color: {ACCENT_ACTIVE};
+    border-color: {ACCENT_ACTIVE};
 }}
 """
 
