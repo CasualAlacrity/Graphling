@@ -116,9 +116,9 @@ QFrame#sectionRow {{
     margin-bottom: 3px;
 }}
 QLabel#sectionLabel {{
-    color: {TEXT_SECONDARY};
+    color: {ACCENT};
     font-family: {DISPLAY_FONT};
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 600;
     min-width: 128px;
     max-width: 128px;
@@ -206,12 +206,12 @@ QLabel#sortToggleLabel[active="true"] {{
 }}
 
 QFrame#resultsHeaderRow {{
-    background: transparent;
+    background-color: {SURFACE_ALT};
     border: none;
     border-bottom: 1px solid {BORDER};
 }}
 QLabel#resultsColumnHeader {{
-    color: {TEXT_DISABLED};
+    color: {TEXT_SECONDARY};
     font-family: {MONO_FONT};
     font-size: 10px;
     font-weight: 600;
@@ -357,6 +357,8 @@ QLabel#runShip {{
     font-family: {DISPLAY_FONT};
     font-size: 13px;
     font-weight: 600;
+    border-left: 2px solid {ACCENT};
+    padding-left: 8px;
 }}
 QLabel#runAge {{
     color: {TEXT_DISABLED};
@@ -453,6 +455,8 @@ QLabel#ledgerDayTitle {{
     font-family: {DISPLAY_FONT};
     font-size: 13px;
     font-weight: 600;
+    border-left: 2px solid {ACCENT};
+    padding-left: 8px;
 }}
 QFrame#ledgerRunRow {{
     background: transparent;
