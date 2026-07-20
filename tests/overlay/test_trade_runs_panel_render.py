@@ -7,8 +7,14 @@ import pytest
 from doubles import make_trade_leg, make_trade_run
 from PySide6.QtWidgets import QLabel, QPushButton
 
-from db.models import LegType
-from overlay.trade_run_widgets import BuyCargoWidget, ConfirmLoadedWidget, SellCargoWidget, TravelWidget
+from db.models import CargoTransferType, LegType
+from overlay.trade_run_widgets import (
+    BuyCargoWidget,
+    ConfirmLoadedWidget,
+    ConfirmUnloadedWidget,
+    SellCargoWidget,
+    TravelWidget,
+)
 
 
 @pytest.fixture
@@ -64,9 +70,30 @@ def test_fresh_sale_leg_shows_travel_widget(trade_runs_panel):
     assert card.findChild(TravelWidget) is not None
 
 
-def test_departed_sale_leg_shows_sell_cargo_widget(trade_runs_panel):
+def test_departed_autoload_sale_leg_shows_sell_cargo_widget(trade_runs_panel):
+    # Autoload skips the unload step entirely — straight to Sell after arriving.
     now = datetime.now(UTC)
-    leg = make_trade_leg(LegType.SALE, started_at=now, reached_at=now)
+    leg = make_trade_leg(LegType.SALE, CargoTransferType.AUTOLOAD, started_at=now, reached_at=now)
+    run = make_trade_run(legs=[leg])
+    card = trade_runs_panel._build_run_card(run, 0)
+    assert card.findChild(SellCargoWidget) is not None
+
+
+def test_departed_manual_sale_leg_shows_confirm_unloaded_widget(trade_runs_panel):
+    # Manual unload is a real, separate, timed step before the sale can be recorded.
+    now = datetime.now(UTC)
+    leg = make_trade_leg(LegType.SALE, CargoTransferType.MANUAL, started_at=now, reached_at=now)
+    run = make_trade_run(legs=[leg])
+    card = trade_runs_panel._build_run_card(run, 0)
+    assert card.findChild(ConfirmUnloadedWidget) is not None
+    assert card.findChild(SellCargoWidget) is None
+
+
+def test_unloaded_manual_sale_leg_shows_sell_cargo_widget(trade_runs_panel):
+    now = datetime.now(UTC)
+    leg = make_trade_leg(
+        LegType.SALE, CargoTransferType.MANUAL, started_at=now, reached_at=now, transferred_at=now,
+    )
     run = make_trade_run(legs=[leg])
     card = trade_runs_panel._build_run_card(run, 0)
     assert card.findChild(SellCargoWidget) is not None
@@ -126,6 +153,35 @@ def test_mark_done_click_passes_the_real_leg_id(trade_runs_panel):
     card.findChild(QPushButton, "markDoneButton").click()
 
     assert captured == [leg.id]
+
+
+def test_breadcrumb_shows_travel_plus_acquisition_steps(trade_runs_panel):
+    from overlay.trade_run_widgets import _TravelNode
+
+    run = make_trade_run(legs=[make_trade_leg(LegType.ACQUISITION)])
+    card = trade_runs_panel._build_run_card(run, 0)
+
+    assert card.findChild(_TravelNode) is not None
+    labels = [label.text() for label in card.findChildren(QLabel, "breadcrumbLabel")]
+    assert labels == ["Travel", "Buy cargo", "Confirm loaded", "Finalize"]
+
+
+def test_breadcrumb_shows_unload_step_for_manual_sale(trade_runs_panel):
+    now = datetime.now(UTC)
+    leg = make_trade_leg(LegType.SALE, CargoTransferType.MANUAL, started_at=now, reached_at=now)
+    run = make_trade_run(legs=[leg])
+    card = trade_runs_panel._build_run_card(run, 0)
+
+    labels = [label.text() for label in card.findChildren(QLabel, "breadcrumbLabel")]
+    assert labels == ["Travel", "Confirm unloaded", "Sell cargo", "Finalize"]
+
+
+def test_breadcrumb_skips_unload_step_for_autoload_sale(trade_runs_panel):
+    run = make_trade_run(legs=[make_trade_leg(LegType.SALE, CargoTransferType.AUTOLOAD)])
+    card = trade_runs_panel._build_run_card(run, 0)
+
+    labels = [label.text() for label in card.findChildren(QLabel, "breadcrumbLabel")]
+    assert labels == ["Travel", "Sell cargo", "Finalize"]
 
 
 def test_only_the_current_leg_gets_a_live_dialog(trade_runs_panel):

@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from PySide6.QtCore import Qt, Signal, Slot
+from PySide6.QtCore import QSize, Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -19,8 +19,10 @@ from overlay.theme import HudWindow
 from overlay.trade_run_widgets import (
     BuyCargoWidget,
     ConfirmLoadedWidget,
+    ConfirmUnloadedWidget,
     SellCargoWidget,
     TravelWidget,
+    build_leg_breadcrumb,
     build_recap_grid,
 )
 
@@ -356,7 +358,10 @@ class TradeRunsPanel(HudWindow):
         self._run_header_labels[run.id] = (investment_label, profit_label)
 
         if _can_abandon(run):
-            abandon_button = QPushButton(parent=row, text="Abandon", objectName="abandonRunButton")
+            abandon_button = QPushButton(parent=row, objectName="abandonRunButton")
+            abandon_button.setIcon(theme.load_icon("trash-can", theme.ERROR))
+            abandon_button.setIconSize(QSize(14, 14))
+            abandon_button.setToolTip("Abandon run")
             abandon_button.clicked.connect(lambda checked=False, rid=run.id: self._on_abandon(rid))
             layout.addWidget(abandon_button)
 
@@ -385,6 +390,7 @@ class TradeRunsPanel(HudWindow):
         body_layout.setContentsMargins(28, 4, 4, 8)
 
         if is_current:
+            body_layout.addWidget(build_leg_breadcrumb(leg))
             body_layout.addWidget(self._build_leg_dialog(run, leg))
         else:
             body_layout.addWidget(build_recap_grid(leg))
@@ -453,6 +459,9 @@ class TradeRunsPanel(HudWindow):
                 on_change=lambda draft, lid=leg.id, rid=run.id: self._on_draft_changed(lid, rid, draft),
                 on_submit=lambda *values, lid=leg.id: self._on_record_sale(lid, *values),
             )
+
+        if field == "transferred_at" and leg.leg_type == LegType.SALE:
+            return ConfirmUnloadedWidget(leg, lambda checked=False, lid=leg.id: self._on_advance(lid))
 
         if field == "transferred_at":
             return ConfirmLoadedWidget(leg, lambda checked=False, lid=leg.id: self._on_advance(lid))

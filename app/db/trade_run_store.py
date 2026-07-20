@@ -8,13 +8,14 @@ from db.models import CargoTransferType, LegType, TradeLeg, TradeRun
 from db.session import SessionLocal
 from tools.uexcorp.trade_data import UEXTradeRoute
 
-# One shared sequence for both leg types. record_sale (the only writer of a SALE leg's
-# transaction_completed_at) always stamps transferred_at in the same call — unloading has no
-# real time cost in-game right now — so a SALE leg's transferred_at is never independently
-# null once transaction_completed_at is set, and next_unset_field naturally skips straight
-# from reached_at to finalized_at for it. ACQUISITION legs genuinely do stop at transferred_at
-# (Confirm Loaded) since loading is real separate time/action.
-_SEQUENCE = ["started_at", "reached_at", "transaction_completed_at", "transferred_at", "finalized_at"]
+# ACQUISITION always stops independently at transferred_at (Confirm Loaded) — loading is
+# real separate time regardless of transfer type. SALE only does the same for MANUAL:
+# unloading cargo by hand genuinely takes time before the sale can be recorded at the
+# kiosk. AUTOLOAD unloading has no real time cost — record_sale stamps transferred_at in
+# the same call as the sale, so it's never independently reachable for that case.
+_ACQUISITION_SEQUENCE = ["started_at", "reached_at", "transaction_completed_at", "transferred_at", "finalized_at"]
+_SALE_MANUAL_SEQUENCE = ["started_at", "reached_at", "transferred_at", "transaction_completed_at", "finalized_at"]
+_SALE_AUTOLOAD_SEQUENCE = ["started_at", "reached_at", "transaction_completed_at", "finalized_at"]
 
 _STEP_TITLES = {
     LegType.ACQUISITION: {
@@ -22,17 +23,28 @@ _STEP_TITLES = {
         "reached_at": "Mark arrived",
         "transaction_completed_at": "Buy cargo",
         "transferred_at": "Confirm loaded",
+        "finalized_at": "Finalize",
     },
     LegType.SALE: {
         "started_at": "Depart for sale",
         "reached_at": "Mark arrived",
+        "transferred_at": "Confirm unloaded",
         "transaction_completed_at": "Sell cargo",
+        "finalized_at": "Finalize",
     },
 }
 
 
+def _milestone_sequence(leg: TradeLeg) -> list[str]:
+    if leg.leg_type == LegType.ACQUISITION:
+        return _ACQUISITION_SEQUENCE
+    if leg.cargo_transfer_type == CargoTransferType.MANUAL:
+        return _SALE_MANUAL_SEQUENCE
+    return _SALE_AUTOLOAD_SEQUENCE
+
+
 def next_unset_field(leg: TradeLeg) -> str | None:
-    return next((field for field in _SEQUENCE if getattr(leg, field) is None), None)
+    return next((field for field in _milestone_sequence(leg) if getattr(leg, field) is None), None)
 
 
 def current_step_title(leg: TradeLeg) -> str:
@@ -42,6 +54,16 @@ def current_step_title(leg: TradeLeg) -> str:
     if field == "finalized_at":
         return "Mark leg finalized"
     return _STEP_TITLES[leg.leg_type][field]
+
+
+def breadcrumb_steps(leg: TradeLeg) -> list[tuple[str, str]]:
+    """(field, label) pairs for the leg's remaining milestones, skipping started_at/
+    reached_at — the UI collapses those two into a single combined Travel node."""
+    return [
+        (field, _STEP_TITLES[leg.leg_type][field])
+        for field in _milestone_sequence(leg)
+        if field not in ("started_at", "reached_at")
+    ]
 
 
 def run_investment(run: TradeRun) -> int:
@@ -201,11 +223,13 @@ async def record_sale(
         if leg.transaction_completed_at is not None:
             raise ValueError(f"Trade leg {leg_id} has already recorded a sale")
 
-        # Unloading has no real time cost in-game right now, so the sale covers the transfer
-        # too — there's no separate sale-side "confirm unloaded" step at all.
+        # Manual sale legs already have transferred_at stamped by this point (the
+        # dedicated Confirm Unloaded step, advance_leg) — don't clobber that real
+        # timestamp. Autoload legs never got an independent unload step, so this call
+        # is the only place transferred_at happens; stamp it here alongside the sale.
         _apply_transaction(
             leg, quantity_scu, price_per_unit, cargo_transfer_type, cargo_transfer_fee,
-            also_stamp_transferred=True,
+            also_stamp_transferred=leg.transferred_at is None,
         )
         await session.commit()
         return leg

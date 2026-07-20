@@ -1,6 +1,8 @@
-from PySide6.QtCore import QLocale, QTimer
+from PySide6.QtCore import QLocale, Qt, QTimer
+from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QApplication,
+    QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -10,8 +12,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from db import trade_run_store
 from db.models import CargoTransferType
-from overlay import uex_lookup
+from overlay import theme, uex_lookup
 from overlay.results_panel import SortToggle
 
 # aUEC has no fractional units, so every quantity/price field here is an integer —
@@ -248,7 +251,8 @@ class SellCargoWidget(_TransactionWidget):
 
 class ConfirmLoadedWidget(QWidget):
     """Buy-side only — quantity/type/fee were already captured in Buy Cargo, this just
-    confirms the physical load finished. No equivalent widget exists for the sale side."""
+    confirms the physical load finished. ConfirmUnloadedWidget below is its sale-side
+    mirror, for the manual-unload case only."""
 
     def __init__(self, leg, on_confirm, parent=None):
         super().__init__(parent)
@@ -264,6 +268,29 @@ class ConfirmLoadedWidget(QWidget):
         layout.addWidget(QLabel(parent=self, text=recap_text, objectName="legDetail"))
 
         confirm_button = QPushButton(parent=self, text="Cargo's Loaded", objectName="confirmButton")
+        confirm_button.clicked.connect(on_confirm)
+        layout.addWidget(confirm_button)
+
+
+class ConfirmUnloadedWidget(QWidget):
+    """Sale-side, manual-unload only — autoload sale legs skip this entirely since
+    record_sale stamps the transfer instantly alongside the sale itself. Captures how
+    long manual unloading actually took (this step's timestamp minus arrival), not just
+    that it happened."""
+
+    def __init__(self, leg, on_confirm, parent=None):
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 8, 0, 0)
+        layout.setSpacing(8)
+
+        layout.addWidget(QLabel(parent=self, text="Confirm unloaded", objectName="dialogTitle"))
+        layout.addWidget(QLabel(
+            parent=self, text="Manually unload the cargo, then confirm before selling.",
+            objectName="legDetail",
+        ))
+
+        confirm_button = QPushButton(parent=self, text="Cargo's Unloaded", objectName="confirmButton")
         confirm_button.clicked.connect(on_confirm)
         layout.addWidget(confirm_button)
 
@@ -310,3 +337,108 @@ def build_recap_grid(leg):
         layout.addWidget(cell, row, column)
 
     return widget
+
+
+_BREADCRUMB_DOT_SIZE = 22
+_BREADCRUMB_NODE_WIDTH = 78
+_BREADCRUMB_RAIL_WIDTH = 28
+
+
+class _TravelNode(QWidget):
+    """The combined Depart+Arrive breadcrumb step. Custom-painted rather than QSS-styled
+    since it needs a radial fill (grey outline -> left-filled orange wedge while in
+    transit -> solid green with a check once arrived), which QSS can't express."""
+
+    def __init__(self, started, reached, parent=None):
+        super().__init__(parent)
+        self._started = started
+        self._reached = reached
+        self.setFixedSize(_BREADCRUMB_DOT_SIZE, _BREADCRUMB_DOT_SIZE)
+
+    def paintEvent(self, _event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        rect = self.rect().adjusted(1, 1, -1, -1)
+
+        if self._reached:
+            painter.setPen(QPen(QColor(theme.SUCCESS), 2))
+            painter.setBrush(QColor(theme.SUCCESS))
+            painter.drawEllipse(rect)
+            painter.setPen(QPen(QColor(theme.BG), 1.6))
+            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, "\N{CHECK MARK}")
+        elif self._started:
+            painter.setPen(QPen(QColor(theme.ACCENT), 2))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(rect)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(theme.ACCENT))
+            # Qt angles are 1/16ths of a degree, 0 at 3 o'clock, counterclockwise-positive
+            # (opposite winding from CSS conic-gradient) — 90*16 (12 o'clock) swept 180*16
+            # counterclockwise covers the left half (12 -> 9 -> 6 o'clock).
+            painter.drawPie(rect, 90 * 16, 180 * 16)
+        else:
+            painter.setPen(QPen(QColor(theme.BORDER), 2))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(rect)
+        painter.end()
+
+
+def _breadcrumb_step_dot(number, done, current):
+    dot = QLabel(text="\N{CHECK MARK}" if done else str(number), objectName="breadcrumbDot")
+    dot.setFixedSize(_BREADCRUMB_DOT_SIZE, _BREADCRUMB_DOT_SIZE)
+    dot.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    dot.setProperty("done", done)
+    dot.setProperty("current", current)
+    return dot
+
+
+def _breadcrumb_rail(done):
+    rail = QFrame(objectName="breadcrumbRail")
+    rail.setFixedSize(_BREADCRUMB_RAIL_WIDTH, 2)
+    rail.setProperty("done", done)
+    return rail
+
+
+def _breadcrumb_node(dot_widget, label_text, current):
+    column = QWidget()
+    column.setFixedWidth(_BREADCRUMB_NODE_WIDTH)
+    layout = QVBoxLayout(column)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(6)
+    layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+    layout.addWidget(dot_widget, 0, Qt.AlignmentFlag.AlignHCenter)
+    label = QLabel(parent=column, text=label_text, objectName="breadcrumbLabel")
+    label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    label.setProperty("current", current)
+    layout.addWidget(label)
+    return column
+
+
+def build_leg_breadcrumb(leg):
+    """The Arkanis-style step tracker for a leg's current milestone. Depart/Arrive
+    collapse into one Travel node; the rest come straight from
+    trade_run_store.breadcrumb_steps, so the step count/labels always match whatever
+    next_unset_field is actually walking (Acquisition, Sale/Manual, Sale/Autoload)."""
+    row = QWidget()
+    layout = QHBoxLayout(row)
+    layout.setContentsMargins(0, 2, 0, 12)
+    layout.setSpacing(0)
+
+    current_field = trade_run_store.next_unset_field(leg)
+    travel_done = leg.started_at is not None and leg.reached_at is not None
+    travel_current = current_field in ("started_at", "reached_at")
+
+    travel_dot = _TravelNode(leg.started_at is not None, leg.reached_at is not None)
+    layout.addWidget(_breadcrumb_node(travel_dot, "Travel", travel_current))
+
+    left_done = travel_done
+    for index, (field, label) in enumerate(trade_run_store.breadcrumb_steps(leg)):
+        layout.addWidget(_breadcrumb_rail(done=left_done))
+        done = getattr(leg, field) is not None
+        current = field == current_field
+        dot = _breadcrumb_step_dot(index + 2, done, current)  # Travel is step 1
+        layout.addWidget(_breadcrumb_node(dot, label, current))
+        left_done = done
+
+    layout.addStretch()
+    return row

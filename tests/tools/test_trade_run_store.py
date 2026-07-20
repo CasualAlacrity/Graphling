@@ -58,12 +58,30 @@ def test_current_step_title_walks_acquisition_sequence():
     assert trade_run_store.current_step_title(leg) == "Leg finalized"
 
 
-@pytest.mark.parametrize("cargo_transfer_type", [CargoTransferType.MANUAL, CargoTransferType.AUTOLOAD])
-def test_current_step_title_walks_sale_sequence(cargo_transfer_type):
-    # transaction_completed_at and transferred_at are always set together for a SALE leg
-    # (record_sale's job) regardless of transfer type — there's no independent
-    # confirm-transfer step on the sale side anymore, so both types walk identically.
-    leg = _make_leg(LegType.SALE, cargo_transfer_type)
+def test_current_step_title_walks_sale_manual_sequence():
+    # Manual unload genuinely takes time — real, physical, before the sale can be
+    # recorded at the kiosk — so it gets its own step between arrival and the sale,
+    # unlike autoload below.
+    leg = _make_leg(LegType.SALE, CargoTransferType.MANUAL)
+
+    assert trade_run_store.current_step_title(leg) == "Depart for sale"
+    leg.started_at = datetime.now(UTC)
+    assert trade_run_store.current_step_title(leg) == "Mark arrived"
+    leg.reached_at = datetime.now(UTC)
+    assert trade_run_store.current_step_title(leg) == "Confirm unloaded"
+    leg.transferred_at = datetime.now(UTC)
+    assert trade_run_store.current_step_title(leg) == "Sell cargo"
+    leg.transaction_completed_at = datetime.now(UTC)
+    assert trade_run_store.current_step_title(leg) == "Mark leg finalized"
+    leg.finalized_at = datetime.now(UTC)
+    assert trade_run_store.current_step_title(leg) == "Leg finalized"
+
+
+def test_current_step_title_walks_sale_autoload_sequence():
+    # Autoload's unload is instant (just pay the fee) — record_sale stamps
+    # transaction_completed_at and transferred_at together, so there's no independent
+    # confirm-unloaded step to walk through here.
+    leg = _make_leg(LegType.SALE, CargoTransferType.AUTOLOAD)
 
     assert trade_run_store.current_step_title(leg) == "Depart for sale"
     leg.started_at = datetime.now(UTC)
@@ -78,11 +96,12 @@ def test_current_step_title_walks_sale_sequence(cargo_transfer_type):
     assert trade_run_store.current_step_title(leg) == "Leg finalized"
 
 
-def test_sale_next_unset_field_skips_transferred_at_once_transacted():
+def test_sale_autoload_next_unset_field_skips_transferred_at_once_transacted():
     # This is where the Arkanis-style ordering bug used to live (manual-vs-autoload
-    # swapping which of transaction_completed_at/transferred_at came first). Now there's
-    # only one sequence, and once record_sale sets both together, the position in
-    # between is never independently reachable — this asserts that skip actually happens.
+    # swapping which of transaction_completed_at/transferred_at came first). Autoload's
+    # sequence has no transferred_at position at all — record_sale sets it together with
+    # transaction_completed_at, so the position in between is never independently
+    # reachable — this asserts that skip actually happens.
     leg = _make_leg(
         LegType.SALE, CargoTransferType.AUTOLOAD, started_at=datetime.now(UTC), reached_at=datetime.now(UTC)
     )
@@ -92,6 +111,44 @@ def test_sale_next_unset_field_skips_transferred_at_once_transacted():
     leg.transaction_completed_at = now
     leg.transferred_at = now
     assert trade_run_store.next_unset_field(leg) == "finalized_at"
+
+
+def test_sale_manual_next_unset_field_reaches_transferred_before_transaction():
+    # The new behavior this whole change is about: manual unload is a real, independent,
+    # timestamped step that happens before the sale, not bundled with it.
+    leg = _make_leg(
+        LegType.SALE, CargoTransferType.MANUAL, started_at=datetime.now(UTC), reached_at=datetime.now(UTC)
+    )
+    assert trade_run_store.next_unset_field(leg) == "transferred_at"
+
+    leg.transferred_at = datetime.now(UTC)
+    assert trade_run_store.next_unset_field(leg) == "transaction_completed_at"
+
+
+def test_breadcrumb_steps_acquisition_skips_travel_fields():
+    leg = _make_leg(LegType.ACQUISITION)
+    assert trade_run_store.breadcrumb_steps(leg) == [
+        ("transaction_completed_at", "Buy cargo"),
+        ("transferred_at", "Confirm loaded"),
+        ("finalized_at", "Finalize"),
+    ]
+
+
+def test_breadcrumb_steps_sale_manual_includes_unload():
+    leg = _make_leg(LegType.SALE, CargoTransferType.MANUAL)
+    assert trade_run_store.breadcrumb_steps(leg) == [
+        ("transferred_at", "Confirm unloaded"),
+        ("transaction_completed_at", "Sell cargo"),
+        ("finalized_at", "Finalize"),
+    ]
+
+
+def test_breadcrumb_steps_sale_autoload_skips_unload():
+    leg = _make_leg(LegType.SALE, CargoTransferType.AUTOLOAD)
+    assert trade_run_store.breadcrumb_steps(leg) == [
+        ("transaction_completed_at", "Sell cargo"),
+        ("finalized_at", "Finalize"),
+    ]
 
 
 def test_run_investment_sums_acquisition_legs_regardless_of_transaction_state():
@@ -265,6 +322,9 @@ async def test_record_purchase_raises_if_already_recorded(monkeypatch):
 
 
 async def test_record_sale_writes_fields_and_stamps_both_timestamps(monkeypatch):
+    # transferred_at wasn't set going in (no prior Confirm Unloaded step happened) —
+    # record_sale falls back to stamping it here too, same as the always-together
+    # autoload case.
     leg = _make_leg(LegType.SALE)
     session = _FakeSession(get_value=leg)
     monkeypatch.setattr(trade_run_store, "SessionLocal", lambda: session)
@@ -274,8 +334,22 @@ async def test_record_sale_writes_fields_and_stamps_both_timestamps(monkeypatch)
     assert result.quantity_scu == 30
     assert result.price_per_unit == 20
     assert result.transaction_completed_at is not None
-    assert result.transferred_at is not None  # the sale covers the transfer too
+    assert result.transferred_at is not None
     assert session.committed
+
+
+async def test_record_sale_preserves_existing_transferred_at(monkeypatch):
+    # Manual leg that already went through Confirm Unloaded (advance_leg) — record_sale
+    # must not clobber that real timestamp with a new one.
+    unloaded_at = datetime.now(UTC)
+    leg = _make_leg(LegType.SALE, CargoTransferType.MANUAL, transferred_at=unloaded_at)
+    session = _FakeSession(get_value=leg)
+    monkeypatch.setattr(trade_run_store, "SessionLocal", lambda: session)
+
+    result = await trade_run_store.record_sale(leg.id, 30, 20, CargoTransferType.MANUAL, 0)
+
+    assert result.transaction_completed_at is not None
+    assert result.transferred_at == unloaded_at
 
 
 async def test_record_sale_raises_on_acquisition_leg(monkeypatch):

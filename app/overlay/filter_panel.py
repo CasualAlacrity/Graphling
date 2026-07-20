@@ -1,9 +1,8 @@
 import asyncio
 
 import requests
-from PySide6.QtCore import QEvent, QObject, Qt, Signal
+from PySide6.QtCore import QEvent, QObject, QSize, Qt, Signal
 from PySide6.QtWidgets import (
-    QCheckBox,
     QComboBox,
     QCompleter,
     QFrame,
@@ -188,13 +187,27 @@ class FilterPanel(HudWindow):
 
         # --- Options ---
         options_row = QHBoxLayout()
-        self.space_only_checkbox = QCheckBox(parent=self, text="🚀 Space only")
-        self.autoload_checkbox = QCheckBox(parent=self, text="📦 Has autoload")
+        self.space_only_checkbox = QPushButton(parent=self, objectName="filterIconToggle")
+        self.space_only_checkbox.setCheckable(True)
+        self.space_only_checkbox.setIcon(theme.load_icon("plane-up", theme.TEXT_DISABLED))
+        self.space_only_checkbox.setIconSize(QSize(16, 16))
+        self.space_only_checkbox.setToolTip("Space stations only")
+
+        self.autoload_checkbox = QPushButton(parent=self, objectName="filterIconToggle")
+        self.autoload_checkbox.setCheckable(True)
+        self.autoload_checkbox.setIcon(theme.load_icon("cart-flatbed", theme.TEXT_DISABLED))
+        self.autoload_checkbox.setIconSize(QSize(16, 16))
+        self.autoload_checkbox.setToolTip("Autoload-capable terminals only")
+
+        self.options_caption = QLabel(parent=self, objectName="filterOptionsCaption")
+
         options_row.addWidget(self.space_only_checkbox)
         options_row.addWidget(self.autoload_checkbox)
+        options_row.addWidget(self.options_caption)
         options_row.addStretch()
 
         self._main_layout.addLayout(options_row)
+        self._update_options_caption()
 
         # --- Buttons ---
         button_row = QHBoxLayout()
@@ -213,7 +226,13 @@ class FilterPanel(HudWindow):
         self.commodity_completer.activated[str].connect(lambda _: self.refresh_filters())
         self.source_terminal_completer.activated[str].connect(lambda _: self.refresh_filters())
         self.destination_terminal_completer.activated[str].connect(lambda _: self.refresh_filters())
+        self.space_only_checkbox.toggled.connect(
+            lambda checked: self._on_toggle_changed(self.space_only_checkbox, "plane-up", checked)
+        )
         self.space_only_checkbox.toggled.connect(lambda _: self.refresh_filters())
+        self.autoload_checkbox.toggled.connect(
+            lambda checked: self._on_toggle_changed(self.autoload_checkbox, "cart-flatbed", checked)
+        )
 
         self.commodity_input.textChanged.connect(
             lambda _: self._on_field_edited(self.commodity_input, self.current_commodity_candidates)
@@ -236,6 +255,20 @@ class FilterPanel(HudWindow):
         )
 
         self.search_button.clicked.connect(self._on_search_clicked)
+
+    def _on_toggle_changed(self, button, icon_name, checked):
+        # QSS can't retint a QIcon the way it recolors text, so the accent/disabled swap
+        # has to happen here rather than via a :checked selector.
+        color = theme.ACCENT if checked else theme.TEXT_DISABLED
+        button.setIcon(theme.load_icon(icon_name, color))
+        self._update_options_caption()
+
+    def _update_options_caption(self):
+        space_only = self.space_only_checkbox.isChecked()
+        autoload_only = self.autoload_checkbox.isChecked()
+        terminal_clause = "Space stations only" if space_only else "Any terminal"
+        loading_clause = "autoload-capable only" if autoload_only else "any loading type"
+        self.options_caption.setText(f"{terminal_clause}, {loading_clause}")
 
     def _on_ship_selected(self, name):
         vehicle = find_vehicle(name)

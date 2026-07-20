@@ -7,10 +7,12 @@ Cloud Imperium brand kit.
 import os
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QFontDatabase, QPainter, QPen
+from PySide6.QtGui import QColor, QFontDatabase, QIcon, QPainter, QPen, QPixmap
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QWidget
 
 _FONTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "fonts")
+_ICONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icons")
 _FONT_FILES = [
     "Rajdhani-Regular.ttf",
     "Rajdhani-Medium.ttf",
@@ -29,6 +31,25 @@ def load_fonts():
     """
     for filename in _FONT_FILES:
         QFontDatabase.addApplicationFont(os.path.join(_FONTS_DIR, filename))
+
+
+def load_icon(name, color, size=20):
+    """Renders a bundled SVG icon (assets/icons/<name>.svg, using `currentColor` for
+    its fill) into a QIcon tinted with the given hex color. Self-authored icons, not
+    a redistributed set — Qt's QSS `color` property doesn't tint icons the way it
+    does text, so the color has to be baked into the rendered pixmap itself."""
+    svg_path = os.path.join(_ICONS_DIR, f"{name}.svg")
+    with open(svg_path, encoding="utf-8") as svg_file:
+        svg_text = svg_file.read().replace("currentColor", color)
+
+    renderer = QSvgRenderer(svg_text.encode("utf-8"))
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    renderer.render(painter)
+    painter.end()
+    return QIcon(pixmap)
 
 BG = "#0D0F10"
 SURFACE = "#17191B"
@@ -49,6 +70,7 @@ FOCUS_RING = "#FF9142"
 SUCCESS = "#4CAF6D"
 WARNING = "#E8B23A"
 ERROR = "#E5484D"
+ERROR_MUTED = "rgba(229, 72, 77, 40)"
 INFO = "#4A90D9"
 
 # Bundled (see load_fonts()) with system fallbacks in case loading ever fails.
@@ -147,25 +169,27 @@ QComboBox QAbstractItemView {{
     selection-color: {BG};
 }}
 
-QCheckBox {{
-    color: {TEXT_SECONDARY};
-    font-family: {DISPLAY_FONT};
-    font-size: 13px;
-    font-weight: 600;
-    spacing: 8px;
-}}
-QCheckBox:checked {{
-    color: {TEXT_PRIMARY};
-}}
-QCheckBox::indicator {{
-    width: 13px;
-    height: 13px;
+QPushButton#filterIconToggle {{
     border: 1px solid {BORDER};
-    background-color: {SURFACE_ALT};
+    background: transparent;
+    padding: 0px;
+    min-width: 30px;
+    max-width: 30px;
+    min-height: 30px;
+    max-height: 30px;
 }}
-QCheckBox::indicator:checked {{
-    background-color: {ACCENT};
-    border: 1px solid {ACCENT};
+QPushButton#filterIconToggle:hover {{
+    border-color: {FOCUS_RING};
+}}
+QPushButton#filterIconToggle:checked {{
+    border-color: {ACCENT};
+    background-color: {ACCENT_MUTED};
+}}
+QLabel#filterOptionsCaption {{
+    color: {TEXT_DISABLED};
+    font-family: {MONO_FONT};
+    font-size: 10.5px;
+    padding-left: 4px;
 }}
 
 QPushButton {{
@@ -392,14 +416,17 @@ QLabel#legDetail {{
     font-size: 10.5px;
 }}
 QPushButton#markDoneButton {{
-    border: 1px solid {ACCENT};
-    color: {ACCENT};
-    font-size: 11px;
-    padding: 3px 10px;
+    background-color: {SUCCESS};
+    border: 1px solid {SUCCESS};
+    color: {BG};
+    font-family: {DISPLAY_FONT};
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px;
 }}
 QPushButton#markDoneButton:hover {{
-    background-color: {ACCENT};
-    color: {BG};
+    background-color: {ACCENT_HOVER};
+    border-color: {ACCENT_HOVER};
 }}
 QPushButton#finalizeRunButton {{
     background-color: {SUCCESS};
@@ -413,13 +440,16 @@ QPushButton#finalizeRunButton:disabled {{
 }}
 QPushButton#abandonRunButton {{
     border: 1px solid {ERROR};
-    color: {ERROR};
-    font-size: 11px;
-    padding: 2px 8px;
+    background: transparent;
+    padding: 0px;
+    min-width: 24px;
+    max-width: 24px;
+    min-height: 24px;
+    max-height: 24px;
 }}
 QPushButton#abandonRunButton:hover {{
-    background-color: {ERROR};
-    color: {BG};
+    background-color: {ERROR_MUTED};
+    border-color: {ERROR};
 }}
 QLabel#ledgerCommodityBadge {{
     color: {TEXT_PRIMARY};
@@ -598,6 +628,42 @@ QLabel#recapValue {{
     color: {TEXT_SECONDARY};
     font-family: {MONO_FONT};
     font-size: 11px;
+}}
+
+QLabel#breadcrumbDot {{
+    border-radius: 11px;
+    border: 2px solid {BORDER};
+    background: transparent;
+    color: {TEXT_DISABLED};
+    font-family: {MONO_FONT};
+    font-size: 10px;
+    font-weight: 700;
+}}
+QLabel#breadcrumbDot[done="true"] {{
+    border-color: {SUCCESS};
+    background-color: {SUCCESS};
+    color: {BG};
+}}
+QLabel#breadcrumbDot[current="true"] {{
+    border-color: {ACCENT};
+    background-color: {ACCENT};
+    color: {BG};
+}}
+QLabel#breadcrumbLabel {{
+    color: {TEXT_DISABLED};
+    font-family: {DISPLAY_FONT};
+    font-size: 10.5px;
+    font-weight: 600;
+}}
+QLabel#breadcrumbLabel[current="true"] {{
+    color: {ACCENT};
+}}
+QFrame#breadcrumbRail {{
+    background-color: {BORDER};
+    border: none;
+}}
+QFrame#breadcrumbRail[done="true"] {{
+    background-color: {SUCCESS};
 }}
 """
 
