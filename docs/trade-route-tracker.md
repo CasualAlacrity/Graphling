@@ -82,25 +82,20 @@ stateDiagram-v2
 
 ### Sale (sell) leg
 
-Branches by transfer method — this is real, not incidental. Manual physically
-requires unloading before the terminal will transact; autoload sells first and
-the transfer catches up after:
+**Revised (2026-07-19):** originally designed as branching by transfer method
+(manual unloads before selling, autoload sells before the transfer catches
+up) — implementation surfaced that this branch was never a real state-path
+distinction once there's no separate time cost for unloading (see below), so
+it collapsed to one path. The Sell dialog captures quantity/price/transfer
+type/fee and stamps the sale *and* the transfer together in one action; the
+toggle only changes whether a fee field appears, not which states exist:
 
 ```mermaid
 stateDiagram-v2
     [*] --> Traveling
     Traveling --> Arrived
-
-    state method <<choice>>
-    Arrived --> method
-
-    method --> Unloading: Manual
-    Unloading --> Selling: unload confirmed
+    Arrived --> Selling: sell transaction (manual: no fee, autoload: fee bundled in)
     Selling --> Finalized
-
-    method --> Selling2: Autoload
-    Selling2 --> WaitingForUnload: sell transaction (fee bundled in)
-    WaitingForUnload --> Finalized
 
     Finalized --> [*]
 ```
@@ -109,7 +104,9 @@ stateDiagram-v2
 cost in-game, unlike loading — only a fee matters for the final report. So the
 timer feature applies to the *buy* side only, not sell. This is the actual
 origin scenario for the timer feature (AutoLoad hauler wait), now with a real
-home instead of being a standalone dumb timer.
+home instead of being a standalone dumb timer. This is also *why* the branch
+above collapsed — with no time cost either way, there was never a real
+second state to reach, just a fee to record.
 
 ## Implementation principles (not schema, but must not be skipped)
 

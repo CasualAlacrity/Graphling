@@ -60,9 +60,32 @@ LABEL_FONT = '"Helvetica Neue", "Segoe UI", Arial, sans-serif'
 # in the widgets that use them, and monospace carries the "instrument placard" feel
 # QSS itself can't produce.
 STYLESHEET = f"""
-FilterPanel, ResultsPanel {{
+FilterPanel, ResultsPanel, TradeRunsPanel, TradeLedgerPanel, OverlayCanvas {{
     background-color: {SURFACE};
     border: 1px solid {BORDER};
+}}
+
+QTabWidget::pane {{
+    border: none;
+}}
+QTabBar::tab {{
+    background-color: {SURFACE_ALT};
+    color: {TEXT_SECONDARY};
+    font-family: {DISPLAY_FONT};
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid {BORDER};
+    border-bottom: none;
+    padding: 6px 18px;
+    margin-right: 2px;
+}}
+QTabBar::tab:hover {{
+    color: {TEXT_PRIMARY};
+}}
+QTabBar::tab:selected {{
+    background-color: {SURFACE};
+    color: {ACCENT};
+    border-color: {ACCENT};
 }}
 
 QLabel {{
@@ -281,6 +304,297 @@ QPushButton#addRouteButton:pressed {{
     background-color: {ACCENT_ACTIVE};
     border-color: {ACCENT_ACTIVE};
 }}
+
+QScrollArea#cardScrollArea {{
+    background-color: {SURFACE_ALT};
+    border: 1px solid {BORDER_SUBTLE};
+}}
+QScrollArea#cardScrollArea > QWidget > QWidget {{
+    background-color: transparent;
+}}
+QWidget#cardScrollContent {{
+    background-color: transparent;
+}}
+QLabel#emptyStateLabel {{
+    color: {TEXT_SECONDARY};
+    font-family: {DISPLAY_FONT};
+    font-size: 14px;
+    font-weight: 600;
+}}
+QLabel#emptyStateSubtitle {{
+    color: {TEXT_DISABLED};
+    font-family: {MONO_FONT};
+    font-size: 10.5px;
+}}
+QScrollArea#cardScrollArea QScrollBar:vertical {{
+    background: transparent;
+    width: 10px;
+    margin: 0px;
+}}
+QScrollArea#cardScrollArea QScrollBar::handle:vertical {{
+    background: {BORDER};
+    min-height: 24px;
+}}
+QScrollArea#cardScrollArea QScrollBar::handle:vertical:hover {{
+    background: {ACCENT};
+}}
+QScrollArea#cardScrollArea QScrollBar::add-line:vertical,
+QScrollArea#cardScrollArea QScrollBar::sub-line:vertical {{
+    height: 0px;
+}}
+QScrollArea#cardScrollArea QScrollBar::add-page:vertical,
+QScrollArea#cardScrollArea QScrollBar::sub-page:vertical {{
+    background: transparent;
+}}
+
+QFrame#tradeRunCard {{
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid {BORDER_SUBTLE};
+}}
+QLabel#runShip {{
+    color: {TEXT_PRIMARY};
+    font-family: {DISPLAY_FONT};
+    font-size: 13px;
+    font-weight: 600;
+}}
+QLabel#runAge {{
+    color: {TEXT_DISABLED};
+    font-family: {MONO_FONT};
+    font-size: 10px;
+}}
+QLabel#legBadge {{
+    font-family: {DISPLAY_FONT};
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border: 1px solid {BORDER};
+}}
+QLabel#legBadge[legType="acquisition"] {{
+    color: {INFO};
+    border-color: {INFO};
+}}
+QLabel#legBadge[legType="sale"] {{
+    color: {SUCCESS};
+    border-color: {SUCCESS};
+}}
+QLabel#legTerminal {{
+    color: {TEXT_PRIMARY};
+    font-family: {DISPLAY_FONT};
+    font-size: 12px;
+    font-weight: 600;
+}}
+QLabel#legDetail {{
+    color: {TEXT_SECONDARY};
+    font-family: {MONO_FONT};
+    font-size: 10.5px;
+}}
+QPushButton#markDoneButton {{
+    border: 1px solid {ACCENT};
+    color: {ACCENT};
+    font-size: 11px;
+    padding: 3px 10px;
+}}
+QPushButton#markDoneButton:hover {{
+    background-color: {ACCENT};
+    color: {BG};
+}}
+QPushButton#finalizeRunButton {{
+    background-color: {SUCCESS};
+    border: 1px solid {SUCCESS};
+    color: {BG};
+}}
+QPushButton#finalizeRunButton:disabled {{
+    background-color: transparent;
+    border: 1px solid {BORDER};
+    color: {TEXT_DISABLED};
+}}
+QPushButton#abandonRunButton {{
+    border: 1px solid {ERROR};
+    color: {ERROR};
+    font-size: 11px;
+    padding: 2px 8px;
+}}
+QPushButton#abandonRunButton:hover {{
+    background-color: {ERROR};
+    color: {BG};
+}}
+QLabel#ledgerCommodityBadge {{
+    color: {TEXT_PRIMARY};
+    font-family: {DISPLAY_FONT};
+    font-size: 12px;
+    font-weight: 600;
+}}
+QLabel#ledgerRoute {{
+    color: {TEXT_SECONDARY};
+    font-family: {MONO_FONT};
+    font-size: 10.5px;
+}}
+QLabel#ledgerProfit {{
+    color: {TEXT_PRIMARY};
+    font-family: {MONO_FONT};
+    font-size: 13px;
+    font-weight: 700;
+}}
+QLabel#ledgerProfit[profitable="true"] {{
+    color: {SUCCESS};
+}}
+QLabel#ledgerProfit[profitable="false"] {{
+    color: {ERROR};
+}}
+
+QFrame#ledgerDayGroup {{
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid {BORDER_SUBTLE};
+}}
+QLabel#ledgerDayTitle {{
+    color: {TEXT_PRIMARY};
+    font-family: {DISPLAY_FONT};
+    font-size: 13px;
+    font-weight: 600;
+}}
+QFrame#ledgerRunRow {{
+    background: transparent;
+    border: none;
+}}
+QFrame#ledgerRunRow:hover {{
+    background-color: {SURFACE};
+}}
+QFrame#ledgerDayTotalRow {{
+    background-color: {SURFACE_ALT};
+    border: none;
+    border-top: 1px solid {BORDER_SUBTLE};
+}}
+QLabel#ledgerDayTotalLabel {{
+    color: {TEXT_DISABLED};
+    font-family: {MONO_FONT};
+    font-size: 10px;
+}}
+
+QPushButton#chevronButton {{
+    background: transparent;
+    border: none;
+    color: {TEXT_SECONDARY};
+    font-size: 14px;
+    font-weight: 700;
+    padding: 0px 4px;
+}}
+QPushButton#chevronButton:hover {{
+    color: {ACCENT};
+}}
+QPushButton#chevronButton[small="true"] {{
+    color: {TEXT_DISABLED};
+    font-size: 10px;
+    font-weight: 400;
+}}
+QPushButton#chevronButton[small="true"]:hover {{
+    color: {ACCENT};
+}}
+
+QWidget#legSummaryRow {{
+    background: transparent;
+}}
+QWidget#legSummaryRow:hover {{
+    background-color: {SURFACE_ALT};
+}}
+QLabel#legStatus {{
+    font-family: {MONO_FONT};
+    font-size: 10px;
+    padding: 2px 7px;
+    border: 1px solid {BORDER};
+    color: {TEXT_DISABLED};
+}}
+QLabel#legStatus[status="success"] {{
+    color: {SUCCESS};
+    border-color: {SUCCESS};
+}}
+QLabel#legStatus[status="current"] {{
+    color: {ACCENT};
+    border-color: {ACCENT};
+}}
+
+QWidget#legExpandedArea {{
+    border-left: 1px solid {BORDER_SUBTLE};
+}}
+
+QLabel#runMoneyLabel {{
+    color: {TEXT_DISABLED};
+    font-family: {MONO_FONT};
+    font-size: 9.5px;
+}}
+QLabel#runMoneyValue {{
+    color: {TEXT_PRIMARY};
+    font-family: {MONO_FONT};
+    font-size: 13px;
+    font-weight: 700;
+}}
+QLabel#runMoneyValue[profitable="true"] {{
+    color: {SUCCESS};
+}}
+QLabel#runMoneyValue[profitable="false"] {{
+    color: {ERROR};
+}}
+
+QLabel#dialogTitle {{
+    color: {ACCENT};
+    font-family: {DISPLAY_FONT};
+    font-size: 14px;
+    font-weight: 600;
+}}
+QLabel#dialogFieldLabel {{
+    color: {TEXT_SECONDARY};
+    font-family: {LABEL_FONT};
+    font-size: 10px;
+    font-weight: 600;
+}}
+QLabel#dialogTotal {{
+    color: {TEXT_PRIMARY};
+    font-family: {MONO_FONT};
+    font-size: 13px;
+    font-weight: 700;
+}}
+QPushButton#confirmButton {{
+    background-color: {SUCCESS};
+    border: 1px solid {SUCCESS};
+    color: {BG};
+    font-family: {DISPLAY_FONT};
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px;
+}}
+QPushButton#confirmButton[warning="true"] {{
+    background-color: {WARNING};
+    border-color: {WARNING};
+}}
+QPushButton#copyButton {{
+    background: transparent;
+    border: 1px solid {BORDER};
+    color: {TEXT_SECONDARY};
+    font-family: {DISPLAY_FONT};
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 10px;
+}}
+QPushButton#copyButton:hover {{
+    border-color: {FOCUS_RING};
+    color: {TEXT_PRIMARY};
+}}
+QPushButton#copyButton[copied="true"] {{
+    border-color: {SUCCESS};
+    color: {SUCCESS};
+}}
+
+QLabel#recapLabel {{
+    color: {TEXT_DISABLED};
+    font-family: {MONO_FONT};
+    font-size: 9.5px;
+}}
+QLabel#recapValue {{
+    color: {TEXT_SECONDARY};
+    font-family: {MONO_FONT};
+    font-size: 11px;
+}}
 """
 
 _BRACKET_LENGTH = 14
@@ -293,6 +607,9 @@ class HudWindow(QWidget):
 
     QSS alone can't draw the bracket accents (no ::before/::after) — this adds them
     via a small paintEvent override instead of hand-rolling the whole panel chrome.
+    Brackets only draw while this widget actually IS the top-level window (isWindow());
+    once reparented into a layout (e.g. as a tab page inside OverlayCanvas) they'd
+    otherwise stack a frame-within-a-frame on top of the parent's own brackets.
     """
 
     def __init__(self, parent=None):
@@ -301,6 +618,9 @@ class HudWindow(QWidget):
 
     def paintEvent(self, event):
         super().paintEvent(event)
+
+        if not self.isWindow():
+            return
 
         painter = QPainter(self)
         pen = QPen(QColor(ACCENT))

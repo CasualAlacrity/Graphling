@@ -49,6 +49,11 @@ class TradeLeg(Base):
     )
     leg_type: Mapped[LegType] = mapped_column(Enum(LegType, name="leg_type"), nullable=False)
 
+    # Matches the UEX reference-cache terminal id (JSONB blob, not a normalized table — same
+    # pattern UexPriceCache.entity_id already uses), not a foreign key. Lets the UI look up
+    # live terminal details (city/outpost/station name) that aren't worth duplicating onto
+    # this row permanently.
+    terminal_id: Mapped[int] = mapped_column(Integer, nullable=False)
     terminal_name: Mapped[str] = mapped_column(String, nullable=False)
     commodity_name: Mapped[str] = mapped_column(String, nullable=False)
     quantity_scu: Mapped[int] = mapped_column(Integer, nullable=False)

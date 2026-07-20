@@ -15,11 +15,13 @@ def main():
     uex_lookup.init()
     print("Reference data loaded. Building overlay windows...", flush=True)
 
-    # Imported after uex_lookup.init() rather than at module top — both panels read
+    # Imported after uex_lookup.init() rather than at module top — panels read
     # uex_lookup's lookup tables (ship_names, commodity_names, ...) at construction
     # time, so they need init() to have already populated them.
     from overlay.filter_panel import FilterPanel
+    from overlay.overlay_canvas import OverlayCanvas
     from overlay.results_panel import ResultsPanel
+    from overlay.trade_runs_panel import TradeLedgerPanel, TradeRunsPanel
 
     class HotkeyBridge(QObject):
         toggle_requested = Signal()
@@ -43,38 +45,30 @@ def main():
     event_loop = qasync.QEventLoop(app)
     asyncio.set_event_loop(event_loop)
 
+    # filter_panel/results_panel/trade_runs_panel/trade_ledger_panel are built with no
+    # window flags at all — they're plain child widgets now, parented under the
+    # canvas's tabs by OverlayCanvas itself. All geometry (size, position, frameless/
+    # always-on-top) lives on the canvas, the one actual top-level window; each panel's
+    # own width/height is just whatever its tab's layout gives it.
+    filter_panel = FilterPanel()
+    results_panel = ResultsPanel()
+    trade_runs_panel = TradeRunsPanel()
+    trade_ledger_panel = TradeLedgerPanel()
+
+    filter_panel.routes_found.connect(results_panel.set_routes)
+    filter_panel.search_rejected.connect(results_panel.show_message)
+
+    canvas = OverlayCanvas(filter_panel, results_panel, trade_runs_panel, trade_ledger_panel)
+    canvas.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+
     screen_geometry = app.primaryScreen().availableGeometry()
     panel_width = int(screen_geometry.width() * 0.6)
     top_margin = 48
     bottom_margin = 32
-    gap_between_panels = 14
-
-    filter_panel = FilterPanel()
-    filter_panel.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
-    # Fixed, not just an initial resize() — otherwise a child widget whose content
-    # grows (e.g. a breadcrumb label picking up a long terminal name) drags the
-    # window without the results panel following, drifting the two out of alignment.
-    # Width is set first so the height computed from it (via the now-horizontal
-    # field rows) is accurate.
-    filter_panel.setFixedWidth(panel_width)
-    filter_panel.adjustSize()
-    filter_panel.setFixedHeight(filter_panel.height())
-
-    panel_x = screen_geometry.x() + (screen_geometry.width() - panel_width) // 2
-    filter_panel.move(panel_x, screen_geometry.y() + top_margin)
-
-    # Filter is now a wide, short bar near the top rather than a tall sidebar, so
-    # Results sits below it (same width) filling the rest of the screen, instead of
-    # beside it.
-    results_panel = ResultsPanel()
-    results_panel.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
-    results_top = filter_panel.y() + filter_panel.height() + gap_between_panels
-    results_height = screen_geometry.y() + screen_geometry.height() - results_top - bottom_margin
-    results_panel.setFixedSize(panel_width, results_height)
-    results_panel.move(panel_x, results_top)
-
-    filter_panel.routes_found.connect(results_panel.set_routes)
-    filter_panel.search_rejected.connect(results_panel.show_message)
+    canvas_height = screen_geometry.height() - top_margin - bottom_margin
+    canvas.setFixedSize(panel_width, canvas_height)
+    canvas_x = screen_geometry.x() + (screen_geometry.width() - panel_width) // 2
+    canvas.move(canvas_x, screen_geometry.y() + top_margin)
 
     # Voice pulls in the full LangGraph/LLM/TTS stack (graph.py -> llm.py, ElevenLabs,
     # Whisper), which the trade overlay itself doesn't need. On by default to match
@@ -85,12 +79,7 @@ def main():
         from voice import run as voice_run
         threading.Thread(target=lambda: asyncio.run(voice_run()), daemon=True).start()
 
-    def on_toggle_requested():
-        visible = not filter_panel.isVisible()
-        filter_panel.setVisible(visible)
-        results_panel.setVisible(visible)
-
-    bridge.toggle_requested.connect(on_toggle_requested)
+    bridge.toggle_requested.connect(lambda: canvas.setVisible(not canvas.isVisible()))
 
     hotkeys.start()
     print("Ready. Press F3 to toggle the overlay.", flush=True)

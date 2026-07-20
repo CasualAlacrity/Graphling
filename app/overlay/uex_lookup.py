@@ -66,12 +66,36 @@ def route_breadcrumb(system_name, planet_name, terminal_id, fallback_terminal_na
     return "/".join(part for part in parts if part)
 
 
+def terminal_place_name(terminal):
+    # The Travel dialog needs the place a terminal actually sits at (what you'd type into
+    # Mobiglass nav — "Orison"), not the terminal's own name ("Orison TDD"). Falls back to
+    # the terminal's nickname for the rare terminal with none of the three set (e.g. a
+    # free-floating station) rather than showing nothing.
+    if terminal is None:
+        return None
+    if terminal.city_name:
+        return terminal.city_name, "City"
+    if terminal.outpost_name:
+        return terminal.outpost_name, "Outpost"
+    if terminal.space_station_name:
+        return terminal.space_station_name, "Station"
+    return (terminal.nickname, "Terminal") if terminal.nickname else None
+
+
 def commodity_code_for(commodity_id, fallback_name):
     # The routes endpoint doesn't include a commodity code (confirmed live — only
     # commodity_name/commodity_slug), so this needs the reference-cache commodity,
     # unlike terminal_code which the routes endpoint does provide directly.
     commodity = _find_commodity_by_id(uex_cache, commodity_id)
     return commodity.code if commodity else fallback_name
+
+
+def commodity_code_for_name(commodity_name):
+    # Ledger rows only ever stored the commodity's display name (TradeLeg has no
+    # commodity_id column, unlike UEXTradeRoute) — this is commodity_code_for's
+    # counterpart for that case, same reference-cache lookup keyed by name instead.
+    commodity = find_commodity(commodity_name)
+    return commodity.code if commodity else commodity_name
 
 
 def find_terminal(name):
@@ -219,6 +243,12 @@ async def search_routes(
         commodity_ids = await commodity_ids_at(source_terminal_id, "buy")
         raw_routes = await _fanout_route_rows(commodity_ids)
         raw_routes = [row for row in raw_routes if row.get("id_terminal_origin") == source_terminal_id]
+        # source+destination-with-no-commodity lands here (source is checked first) —
+        # without this, destination_terminal_id was silently ignored whenever a source
+        # was also set, returning every destination reachable from that source instead
+        # of just the one the pilot picked.
+        if destination_terminal_id is not None:
+            raw_routes = [row for row in raw_routes if row.get("id_terminal_destination") == destination_terminal_id]
     elif destination_terminal_id is not None:
         commodity_ids = await commodity_ids_at(destination_terminal_id, "sell")
         raw_routes = await _fanout_route_rows(commodity_ids)

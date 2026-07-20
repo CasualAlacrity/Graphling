@@ -159,6 +159,9 @@ class ResultsPanel(HudWindow):
         self._main_layout.addWidget(self._build_header_row())
 
         self.results_list = QListWidget(parent=self)
+        # Vertical scrolling is expected here (result counts vary) — horizontal never
+        # is; disabled outright rather than trusting the default "as needed" policy.
+        self.results_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._main_layout.addWidget(self.results_list)
 
     def _wire_signals(self):
@@ -262,7 +265,7 @@ class ResultsPanel(HudWindow):
         # its UEX code, planet and terminal left full (matches how the game names them).
         text_layout.addWidget(QLabel(parent=text, text=breadcrumb, objectName="routeTerminalName"))
         text_layout.addWidget(
-            QLabel(parent=text, text=f"{side} {price_per_scu:,.2f} aUEC", objectName="routeTerminalPrice")
+            QLabel(parent=text, text=f"{side} {price_per_scu:,.0f} aUEC", objectName="routeTerminalPrice")
         )
         layout.addWidget(text)
 
