@@ -82,31 +82,41 @@ stateDiagram-v2
 
 ### Sale (sell) leg
 
-**Revised (2026-07-19):** originally designed as branching by transfer method
-(manual unloads before selling, autoload sells before the transfer catches
-up) — implementation surfaced that this branch was never a real state-path
-distinction once there's no separate time cost for unloading (see below), so
-it collapsed to one path. The Sell dialog captures quantity/price/transfer
-type/fee and stamps the sale *and* the transfer together in one action; the
-toggle only changes whether a fee field appears, not which states exist:
+**Revised again (2026-07-20):** the 2026-07-19 collapse below was wrong — it
+assumed unloading never has a real time cost, generalizing from autoload
+alone. Manual unload genuinely does: the pilot has to physically move cargo
+out before the kiosk will register the sale, the same real-world-time
+category as Acquisition's Loaded step. Autoload still has no separate time
+cost (transfer completes instantly, quoted fee only), so it keeps the
+collapsed path. Two branches by transfer method, not one:
 
 ```mermaid
 stateDiagram-v2
     [*] --> Traveling
     Traveling --> Arrived
-    Arrived --> Selling: sell transaction (manual: no fee, autoload: fee bundled in)
-    Selling --> Finalized
 
+    state transfer_type <<choice>>
+    Arrived --> transfer_type
+
+    transfer_type --> Unloaded: manual (self-reported — real time cost, Arrived to Unloaded)
+    Unloaded --> Sold: sell transaction (no fee)
+
+    transfer_type --> Sold: autoload (sell transaction + transfer bundled — quoted fee, no separate time cost)
+
+    Sold --> Finalized
     Finalized --> [*]
 ```
 
 **Confirmed with the user (2026-07-14):** unloading has no meaningful time
-cost in-game, unlike loading — only a fee matters for the final report. So the
-timer feature applies to the *buy* side only, not sell. This is the actual
-origin scenario for the timer feature (AutoLoad hauler wait), now with a real
-home instead of being a standalone dumb timer. This is also *why* the branch
-above collapsed — with no time cost either way, there was never a real
-second state to reach, just a fee to record.
+cost for autoload — only a fee matters for the final report there. The timer
+feature (AutoLoad hauler wait) applies to Acquisition's Loaded step and
+Sale's manual Unloaded step; autoload's sale-side transfer stays a pure fee,
+no timer. `transferred_at - reached_at` on a manual sale leg is real,
+queryable unload-duration data (`app/db/trade_run_store.py`'s
+`_SALE_MANUAL_SEQUENCE`/`_SALE_AUTOLOAD_SEQUENCE`) — useful later for the
+Trade Advisor's `load_time`/`unload_time` benchmarks (see below), e.g.
+suggesting autoload pickup + manual unload to minimize total run time when
+that combination scores higher.
 
 ## Implementation principles (not schema, but must not be skipped)
 
