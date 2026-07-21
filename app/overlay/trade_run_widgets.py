@@ -98,6 +98,7 @@ class _TransactionWidget(QWidget):
     QUANTITY_LABEL = ""
     PRICE_LABEL = ""
     FEE_LABEL = ""
+    ACTION_VERB = ""
 
     def __init__(self, leg, on_change, on_submit, run=None, parent=None):
         super().__init__(parent)
@@ -109,12 +110,24 @@ class _TransactionWidget(QWidget):
         self._wire_signals()
         self._recompute_total()
 
+    def _action_line_text(self):
+        # Restates the planned action as a plain sentence — orientation for a pilot who
+        # opened this dialog a while after picking the leg and needs a reminder of what
+        # they're actually here to do, without parsing the field labels below.
+        return (
+            f"{self.ACTION_VERB} {self._leg.quantity_scu} SCU of "
+            f"{self._leg.commodity_name} at {self._leg.terminal_name}"
+        )
+
     def _build_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 8, 0, 0)
         layout.setSpacing(8)
 
         layout.addWidget(QLabel(parent=self, text=self.DIALOG_TITLE, objectName="dialogTitle"))
+        action_line = QLabel(parent=self, text=self._action_line_text(), objectName="dialogActionLine")
+        action_line.setWordWrap(True)
+        layout.addWidget(action_line)
 
         field_row = QHBoxLayout()
         self.quantity_input = _integer_spinbox(0, 100_000, " SCU")
@@ -222,6 +235,7 @@ class BuyCargoWidget(_TransactionWidget):
     QUANTITY_LABEL = "Quantity purchased"
     PRICE_LABEL = "Price paid"
     FEE_LABEL = "Autoload fee"
+    ACTION_VERB = "Purchase"
 
     def _build_ui(self):
         super()._build_ui()
@@ -252,6 +266,7 @@ class SellCargoWidget(_TransactionWidget):
     QUANTITY_LABEL = "Quantity sold"
     PRICE_LABEL = "Price received"
     FEE_LABEL = "Unload fee"
+    ACTION_VERB = "Sell"
 
     def _build_ui(self):
         super()._build_ui()

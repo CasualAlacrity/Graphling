@@ -77,6 +77,27 @@ def test_reparented_panels_are_no_longer_top_level_windows(wired_canvas):
 
     assert canvas.filter_panel.isWindow() is False
     assert canvas.results_panel.isWindow() is False
+
+
+def test_in_progress_tab_shows_no_count_when_empty(wired_canvas):
+    canvas, _store_state, _call_log = wired_canvas
+    index = canvas.tabs.indexOf(canvas.trade_runs_panel)
+    assert canvas.tabs.tabText(index) == "In Progress"
+
+
+def test_in_progress_tab_shows_run_count_badge(qasync_loop, wired_canvas):
+    canvas, store_state, _call_log = wired_canvas
+    from doubles import make_trade_run
+    store_state["in_progress"].append(make_trade_run())
+    store_state["in_progress"].append(make_trade_run())
+
+    async def scenario():
+        await canvas.trade_runs_panel.refresh()
+
+    qasync_loop.run_until_complete(scenario())
+
+    index = canvas.tabs.indexOf(canvas.trade_runs_panel)
+    assert canvas.tabs.tabText(index) == "In Progress (2)"
     assert canvas.trade_runs_panel.isWindow() is False
     assert canvas.trade_ledger_panel.isWindow() is False
 

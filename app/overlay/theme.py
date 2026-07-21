@@ -665,6 +665,30 @@ QFrame#breadcrumbRail {{
 QFrame#breadcrumbRail[done="true"] {{
     background-color: {SUCCESS};
 }}
+
+QLabel#panelHelpText {{
+    color: {TEXT_DISABLED};
+    font-family: {LABEL_FONT};
+    font-size: 10.5px;
+    padding: 4px 2px 2px 2px;
+    border-bottom: 1px solid {BORDER_SUBTLE};
+}}
+
+QWidget#upcomingStepRow {{
+    background: transparent;
+}}
+QLabel#upcomingStepLabel {{
+    color: {TEXT_DISABLED};
+    font-family: {DISPLAY_FONT};
+    font-size: 11px;
+    font-style: italic;
+}}
+
+QLabel#dialogActionLine {{
+    color: {TEXT_PRIMARY};
+    font-family: {LABEL_FONT};
+    font-size: 12px;
+}}
 """
 
 _BRACKET_LENGTH = 14

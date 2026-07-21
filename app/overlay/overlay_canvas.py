@@ -39,7 +39,12 @@ class OverlayCanvas(HudWindow):
 
         results_panel.add_route_requested.connect(self._on_add_route_requested)
         trade_runs_panel.run_finalized.connect(self._on_run_finalized)
+        trade_runs_panel.runs_changed.connect(self._on_runs_changed)
         self.tabs.currentChanged.connect(self._on_tab_changed)
+
+    def _on_runs_changed(self, count):
+        index = self.tabs.indexOf(self.trade_runs_panel)
+        self.tabs.setTabText(index, f"In Progress ({count})" if count else "In Progress")
 
     @asyncSlot(object)
     async def _on_add_route_requested(self, route):

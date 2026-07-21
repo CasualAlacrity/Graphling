@@ -237,6 +237,68 @@ def test_finalize_button_enabled_when_every_leg_is_finalized(trade_runs_panel):
     assert finalize_button.isEnabled() is True
 
 
+def test_upcoming_finalize_row_shown_while_a_leg_is_unfinished(trade_runs_panel):
+    run = make_trade_run(legs=[make_trade_leg(LegType.ACQUISITION), make_trade_leg(LegType.SALE)])
+    card = trade_runs_panel._build_run_card(run, 0)
+    assert card.findChild(QLabel, "upcomingStepLabel") is not None
+
+
+def test_upcoming_finalize_row_hidden_once_every_leg_is_finalized(trade_runs_panel):
+    now = datetime.now(UTC)
+
+    def _finished(leg_type):
+        return make_trade_leg(
+            leg_type, started_at=now, reached_at=now, transaction_completed_at=now,
+            transferred_at=now, finalized_at=now,
+        )
+
+    run = make_trade_run(legs=[_finished(LegType.ACQUISITION), _finished(LegType.SALE)])
+    card = trade_runs_panel._build_run_card(run, 0)
+    assert card.findChild(QLabel, "upcomingStepLabel") is None
+
+
+def test_run_header_shows_quantity_pill(trade_runs_panel):
+    leg = make_trade_leg(LegType.ACQUISITION, quantity_scu=281)
+    run = make_trade_run(legs=[leg, make_trade_leg(LegType.SALE, quantity_scu=281)])
+    card = trade_runs_panel._build_run_card(run, 0)
+
+    values = [label.text() for label in card.findChildren(QLabel, "runMoneyValue")]
+    assert "281 SCU" in values
+
+
+def test_help_text_present_on_in_progress_panel(trade_runs_panel):
+    assert trade_runs_panel.findChild(QLabel, "panelHelpText") is not None
+
+
+def test_help_text_absent_on_ledger_panel(trade_ledger_panel):
+    assert trade_ledger_panel.findChild(QLabel, "panelHelpText") is None
+
+
+def test_buy_dialog_restates_the_action_as_plain_language(trade_runs_panel):
+    leg = make_trade_leg(
+        LegType.ACQUISITION, quantity_scu=281, commodity_name="Medical Supplies", terminal_name="Admin - Terra Gateway",
+        started_at=datetime.now(UTC), reached_at=datetime.now(UTC),
+    )
+    run = make_trade_run(legs=[leg])
+    card = trade_runs_panel._build_run_card(run, 0)
+
+    action_line = card.findChild(QLabel, "dialogActionLine")
+    assert action_line.text() == "Purchase 281 SCU of Medical Supplies at Admin - Terra Gateway"
+
+
+def test_sell_dialog_restates_the_action_as_plain_language(trade_runs_panel):
+    leg = make_trade_leg(
+        LegType.SALE, CargoTransferType.AUTOLOAD,
+        quantity_scu=281, commodity_name="Medical Supplies", terminal_name="Rod's Fuel",
+        started_at=datetime.now(UTC), reached_at=datetime.now(UTC),
+    )
+    run = make_trade_run(legs=[leg])
+    card = trade_runs_panel._build_run_card(run, 0)
+
+    action_line = card.findChild(QLabel, "dialogActionLine")
+    assert action_line.text() == "Sell 281 SCU of Medical Supplies at Rod's Fuel"
+
+
 def test_abandon_button_shown_before_anything_is_bought(trade_runs_panel):
     run = make_trade_run(legs=[make_trade_leg(LegType.ACQUISITION), make_trade_leg(LegType.SALE)])
     card = trade_runs_panel._build_run_card(run, 0)

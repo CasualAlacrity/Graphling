@@ -44,7 +44,7 @@ LEDGER_PROFIT_COLUMN_WIDTH = 110
 LEDGER_SCROLLBAR_COLUMN_WIDTH = 10
 
 
-def _build_scroll_list(parent, header_text, column_header=None):
+def _build_scroll_list(parent, header_text, column_header=None, help_text=None):
     """Shared scaffold for both panels: a header label over a scrollable, top-packed
     column of cards. Uses a plain QScrollArea + QVBoxLayout rather than QListWidget —
     QListWidget's setItemWidget() mechanism has a confirmed PySide6 bug where a deeply
@@ -56,11 +56,17 @@ def _build_scroll_list(parent, header_text, column_header=None):
 
     column_header, if given, is a widget (e.g. a table-style header row) inserted
     between the panel title and the scrollable area — only the Ledger uses this.
+    help_text, if given, is a short explainer inserted the same way — only In Progress
+    uses this, for a first-time pilot who hasn't seen the leg/milestone flow before.
     """
     layout = QVBoxLayout(parent)
     layout.setContentsMargins(12, 5, 12, 6)
     layout.setSpacing(2)
     layout.addWidget(QLabel(parent=parent, text=header_text, objectName="panelHeader"))
+    if help_text is not None:
+        help_label = QLabel(parent=parent, text=help_text, objectName="panelHelpText")
+        help_label.setWordWrap(True)
+        layout.addWidget(help_label)
     if column_header is not None:
         layout.addWidget(column_header)
 
@@ -233,6 +239,7 @@ def _projected_totals(run, draft_by_leg_id):
 
 class TradeRunsPanel(HudWindow):
     run_finalized = Signal(object)
+    runs_changed = Signal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -254,7 +261,14 @@ class TradeRunsPanel(HudWindow):
         self._build_ui()
 
     def _build_ui(self):
-        self.runs_list, self._runs_content_layout = _build_scroll_list(self, "▸ TRADE RUNS IN PROGRESS")
+        self.runs_list, self._runs_content_layout = _build_scroll_list(
+            self, "▸ TRADE RUNS IN PROGRESS",
+            help_text=(
+                "Each run tracks one Acquisition and one Sale leg. Work through a leg's "
+                "milestones in order — travel, transact, confirm — then Finalize once "
+                "every leg is done to move the run to the Ledger."
+            ),
+        )
 
     @asyncSlot()
     async def refresh(self):
@@ -268,6 +282,7 @@ class TradeRunsPanel(HudWindow):
     def render_runs(self, runs):
         self._last_runs = runs
         self._run_header_labels = {}
+        self.runs_changed.emit(len(runs))
         if not runs:
             _show_message_row(
                 self._runs_content_layout,
@@ -310,6 +325,11 @@ class TradeRunsPanel(HudWindow):
         for leg in _ordered_legs(run):
             is_current = leg.id == (current_leg.id if current_leg else None)
             body_layout.addWidget(self._build_leg_container(run, leg, is_current))
+        if not _is_ready_to_finalize(run):
+            # Every leg gets its own row already (current or collapsed "Pending"), but
+            # finalization itself had no representation at all until every leg was
+            # already done — this greyed row previews that it's still coming.
+            body_layout.addWidget(self._build_upcoming_finalize_row())
         body_layout.addWidget(self._build_run_footer(run))
         # Reparent into the card's layout BEFORE touching visibility — setVisible() on a
         # still-parentless QWidget makes Qt treat it as a top-level window for a moment,
@@ -342,11 +362,17 @@ class TradeRunsPanel(HudWindow):
         layout.addWidget(title)
         layout.addStretch()
 
+        quantity_label = QLabel(
+            parent=row, text=f"{trade_run_store.run_acquired_scu(run):,} SCU", objectName="runMoneyValue"
+        )
         investment, profit = _projected_totals(run, self._draft_purchase)
         investment_label = QLabel(parent=row, text=f"{investment:,} aUEC", objectName="runMoneyValue")
         profit_label = QLabel(parent=row, objectName="runMoneyValue")
         self._set_profit_label(profit_label, profit)
-        for label_title, value_label in (("Investment", investment_label), ("Projected profit", profit_label)):
+        pills = (
+            ("Quantity", quantity_label), ("Investment", investment_label), ("Projected profit", profit_label),
+        )
+        for label_title, value_label in pills:
             block = QWidget()
             block_layout = QVBoxLayout(block)
             block_layout.setContentsMargins(0, 0, 0, 0)
@@ -480,6 +506,15 @@ class TradeRunsPanel(HudWindow):
         mark_done_button.clicked.connect(lambda checked=False, lid=leg.id: self._on_advance(lid))
         button_layout.addWidget(mark_done_button)
         return button_row
+
+    @staticmethod
+    def _build_upcoming_finalize_row():
+        row = QWidget(objectName="upcomingStepRow")
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(28, 2, 4, 2)
+        layout.addWidget(QLabel(parent=row, text="Run Summary and Finalization", objectName="upcomingStepLabel"))
+        layout.addStretch()
+        return row
 
     def _build_run_footer(self, run):
         row = QWidget()
