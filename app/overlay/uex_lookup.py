@@ -98,32 +98,29 @@ def commodity_code_for_name(commodity_name):
     return commodity.code if commodity else commodity_name
 
 
+def _find(collection, attr, value):
+    return next((item for item in collection if getattr(item, attr) == value), None)
+
+
 def find_terminal(name):
-    for terminal in uex_cache.terminals:
-        if terminal.nickname == name:
-            return terminal
-    return None
+    return _find(uex_cache.terminals, "nickname", name)
 
 
 def find_terminal_by_id(terminal_id):
-    for terminal in uex_cache.terminals:
-        if terminal.id == terminal_id:
-            return terminal
-    return None
+    return _find(uex_cache.terminals, "id", terminal_id)
+
+
+def _terminal_is_auto_load(terminal_id):
+    terminal = find_terminal_by_id(terminal_id)
+    return terminal.is_auto_load if terminal else 0
 
 
 def find_commodity(name):
-    for commodity in uex_cache.commodities:
-        if commodity.name == name:
-            return commodity
-    return None
+    return _find(uex_cache.commodities, "name", name)
 
 
 def find_vehicle(name):
-    for vehicle in uex_cache.vehicles:
-        if vehicle.name_full == name:
-            return vehicle
-    return None
+    return _find(uex_cache.vehicles, "name_full", name)
 
 
 def inventory_code_for(status_name, status_type):
@@ -201,9 +198,7 @@ async def terminal_ids_for(commodity_id, side):
 # destination-only search fans out across every commodity sold there instead — bounded
 # to this many concurrent live fetches so one search can't burst-hammer the API; each
 # fetch is cached afterward (get_commodity_route_rows), so repeat/overlapping searches
-# get progressively cheaper instead of re-paying the same cost every time. Same
-# reasoning as Arkanis's own background sync (they batch 10 at a time); this is a bit
-# more conservative since it runs reactively per user action, not as a one-off job.
+# get progressively cheaper instead of re-paying the same cost every time.
 ROUTE_FANOUT_CONCURRENCY = 5
 
 
@@ -217,6 +212,14 @@ async def _fanout_route_rows(commodity_ids) -> list[dict]:
 
     results = await asyncio.gather(*(fetch(commodity_id) for commodity_id in commodity_ids))
     return [row for rows in results for row in rows]
+
+
+def _filter_by_origin(rows, terminal_id):
+    return [row for row in rows if row.get("id_terminal_origin") == terminal_id]
+
+
+def _filter_by_destination(rows, terminal_id):
+    return [row for row in rows if row.get("id_terminal_destination") == terminal_id]
 
 
 async def search_routes(
@@ -236,34 +239,51 @@ async def search_routes(
         async with SessionLocal() as session:
             raw_routes = await get_commodity_route_rows(uex_client, session, commodity_id)
         if source_terminal_id is not None:
-            raw_routes = [row for row in raw_routes if row.get("id_terminal_origin") == source_terminal_id]
+            raw_routes = _filter_by_origin(raw_routes, source_terminal_id)
         if destination_terminal_id is not None:
-            raw_routes = [row for row in raw_routes if row.get("id_terminal_destination") == destination_terminal_id]
+            raw_routes = _filter_by_destination(raw_routes, destination_terminal_id)
     elif source_terminal_id is not None:
         commodity_ids = await commodity_ids_at(source_terminal_id, "buy")
         raw_routes = await _fanout_route_rows(commodity_ids)
-        raw_routes = [row for row in raw_routes if row.get("id_terminal_origin") == source_terminal_id]
+        raw_routes = _filter_by_origin(raw_routes, source_terminal_id)
         # source+destination-with-no-commodity lands here (source is checked first) —
         # without this, destination_terminal_id was silently ignored whenever a source
         # was also set, returning every destination reachable from that source instead
         # of just the one the pilot picked.
         if destination_terminal_id is not None:
-            raw_routes = [row for row in raw_routes if row.get("id_terminal_destination") == destination_terminal_id]
+            raw_routes = _filter_by_destination(raw_routes, destination_terminal_id)
     elif destination_terminal_id is not None:
         commodity_ids = await commodity_ids_at(destination_terminal_id, "sell")
         raw_routes = await _fanout_route_rows(commodity_ids)
-        raw_routes = [row for row in raw_routes if row.get("id_terminal_destination") == destination_terminal_id]
+        raw_routes = _filter_by_destination(raw_routes, destination_terminal_id)
     else:
         raw_routes = []
 
     routes = [UEXTradeRoute.model_validate(row) for row in raw_routes]
+    # is_auto_load is a terminal property (from the terminals endpoint), not a per-route
+    # field commodities_routes returns — has_loading_dock_origin/destination looked like
+    # the right field but is a distinct thing (a physical dock facility, not the cargo
+    # kiosk's autoload capability); confirmed against live UEX data that the two disagree
+    # for real terminals. Filled in here via the reference-cache terminal lookup instead.
+    routes = [
+        route.model_copy(update={
+            "is_auto_load_origin": _terminal_is_auto_load(route.origin_terminal_id),
+            "is_auto_load_destination": _terminal_is_auto_load(route.destination_terminal_id),
+        })
+        for route in routes
+    ]
 
-    # Space Only should only constrain an end the search left open — a pinned terminal
-    # (the player explicitly chose it) shouldn't get excluded by its own ground status.
-    # e.g. source=TDD Orison (a ground landing zone) + Space Only should still return
-    # its space-station destinations, not zero results because Orison itself is ground.
+    # Space Only / Auto Load Only should only constrain an end the search left open — a
+    # pinned terminal (the player explicitly chose it) shouldn't get excluded by its own
+    # ground/autoload status. e.g. source=TDD Orison (a ground landing zone) + Space Only
+    # should still return its space-station destinations, not zero results because Orison
+    # itself is ground. Same reasoning applies to autoload: destination=Rod's Fuel + Auto
+    # Load Only should still return autoload-capable origins, not zero results because of
+    # the pinned destination's own status.
     constrain_origin_to_space = space_only and source_terminal_id is None
     constrain_destination_to_space = space_only and destination_terminal_id is None
+    constrain_origin_to_autoload = require_autoload and source_terminal_id is None
+    constrain_destination_to_autoload = require_autoload and destination_terminal_id is None
 
     return [
         route for route in routes
@@ -271,5 +291,6 @@ async def search_routes(
         and (max_destination_code is None or route.status_destination <= max_destination_code)
         and (not constrain_origin_to_space or route.is_on_ground_origin == 0)
         and (not constrain_destination_to_space or route.is_on_ground_destination == 0)
-        and (not require_autoload or (route.has_loading_dock_origin == 1 and route.has_loading_dock_destination == 1))
+        and (not constrain_origin_to_autoload or route.is_auto_load_origin == 1)
+        and (not constrain_destination_to_autoload or route.is_auto_load_destination == 1)
     ]

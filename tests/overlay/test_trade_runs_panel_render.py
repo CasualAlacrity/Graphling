@@ -56,6 +56,29 @@ def test_departed_acquisition_leg_shows_buy_cargo_widget(trade_runs_panel):
     assert card.findChild(BuyCargoWidget) is not None
 
 
+def test_buy_cargo_widget_suggests_container_mix_when_ship_and_sizes_known(trade_runs_panel):
+    now = datetime.now(UTC)
+    leg = make_trade_leg(LegType.ACQUISITION, started_at=now, reached_at=now)
+    run = make_trade_run(legs=[leg], ship="Railen", usable_container_sizes="16,32")
+    card = trade_runs_panel._build_run_card(run, 0)
+
+    widget = card.findChild(BuyCargoWidget)
+    suggestion = widget.findChild(QLabel, "legDetail")
+    # Railen (96 SCU) with only 16/32 SCU containers packs exactly: 3 x 32 = 96 SCU.
+    assert "Railen" in suggestion.text()
+    assert "96" in suggestion.text()
+
+
+def test_buy_cargo_widget_has_no_suggestion_without_a_ship(trade_runs_panel):
+    now = datetime.now(UTC)
+    leg = make_trade_leg(LegType.ACQUISITION, started_at=now, reached_at=now)
+    run = make_trade_run(legs=[leg], ship=None, usable_container_sizes="16,32")
+    card = trade_runs_panel._build_run_card(run, 0)
+
+    widget = card.findChild(BuyCargoWidget)
+    assert widget.findChild(QLabel, "legDetail") is None
+
+
 def test_bought_acquisition_leg_shows_confirm_loaded_widget(trade_runs_panel):
     now = datetime.now(UTC)
     leg = make_trade_leg(LegType.ACQUISITION, started_at=now, reached_at=now, transaction_completed_at=now)

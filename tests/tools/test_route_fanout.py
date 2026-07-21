@@ -19,7 +19,6 @@ def _route_row(commodity_id, origin_id, destination_id):
         "scu_origin": 100, "scu_destination": 100, "status_origin": 2, "status_destination": 1,
         "distance": 10,
         "is_on_ground_origin": 0, "is_on_ground_destination": 0,
-        "has_loading_dock_origin": 1, "has_loading_dock_destination": 1,
     }
 
 
@@ -28,6 +27,11 @@ FAKE_ROUTES_BY_COMMODITY = {
     2: [_route_row(2, 100, 202)],
     3: [_route_row(3, 101, 200)],
 }
+
+# is_auto_load is a terminal property search_routes looks up separately from the route
+# row itself (see uex_lookup._terminal_is_auto_load) — every terminal referenced above
+# defaults to autoload-capable; tests that need otherwise override this per-terminal.
+TERMINAL_AUTOLOAD = {100: 1, 101: 1, 200: 1, 201: 1, 202: 1}
 
 SEARCH_DEFAULTS = {
     "min_source_code": None,
@@ -69,6 +73,7 @@ def fake_route_source(monkeypatch, call_log):
     monkeypatch.setattr(uex_lookup, "SessionLocal", lambda: FakeSession())
     monkeypatch.setattr(uex_lookup, "get_commodity_route_rows", fake_get_commodity_route_rows)
     monkeypatch.setattr(uex_lookup, "commodity_ids_at", fake_commodity_ids_at)
+    monkeypatch.setattr(uex_lookup, "_terminal_is_auto_load", lambda terminal_id: TERMINAL_AUTOLOAD.get(terminal_id, 0))
 
 
 async def test_commodity_specified_search_does_a_single_cached_fetch(call_log):
@@ -110,6 +115,37 @@ async def test_destination_only_search_fans_out_and_filters(call_log):
     assert sorted(call_log) == [1, 3]
     assert len(routes) == 2
     assert all(route.destination_terminal_id == 200 for route in routes)
+
+
+async def test_require_autoload_does_not_exclude_a_pinned_terminal_lacking_it(call_log, monkeypatch):
+    # Regression test: require_autoload used to check both ends unconditionally, so a
+    # pinned terminal without autoload (the player explicitly chose it) zeroed out every
+    # result regardless of the open end's status. It should only constrain the end the
+    # search left open, matching space_only's behavior.
+    monkeypatch.setitem(TERMINAL_AUTOLOAD, 201, 0)
+    routes = await uex_lookup.search_routes(
+        commodity_id=1, source_terminal_id=None, destination_terminal_id=201,
+        min_source_code=None, max_destination_code=None, space_only=False, require_autoload=True,
+    )
+    assert len(routes) == 1
+    assert routes[0].destination_terminal_id == 201
+
+
+async def test_require_autoload_still_filters_the_open_end(call_log, monkeypatch):
+    # The origin end is left open here, so it should still be constrained to
+    # autoload-capable terminals even though the destination is pinned.
+    routes = await uex_lookup.search_routes(
+        commodity_id=3, source_terminal_id=None, destination_terminal_id=200,
+        min_source_code=None, max_destination_code=None, space_only=False, require_autoload=True,
+    )
+    assert len(routes) == 1
+
+    monkeypatch.setitem(TERMINAL_AUTOLOAD, 101, 0)
+    routes = await uex_lookup.search_routes(
+        commodity_id=3, source_terminal_id=None, destination_terminal_id=200,
+        min_source_code=None, max_destination_code=None, space_only=False, require_autoload=True,
+    )
+    assert routes == []
 
 
 async def test_nothing_set_returns_empty_without_fetching(call_log):

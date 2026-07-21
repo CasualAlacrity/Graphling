@@ -71,6 +71,7 @@ class CachedTerminal(CachedBase):
     space_station_name:str|None
     outpost_name:str|None
     city_name:str|None
+    is_auto_load: int
 
 
 class CachedMoon(CachedBase):

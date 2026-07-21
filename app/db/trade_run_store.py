@@ -6,6 +6,7 @@ from sqlalchemy.orm import selectinload
 
 from db.models import CargoTransferType, LegType, TradeLeg, TradeRun
 from db.session import SessionLocal
+from tools.cargo_packing import format_container_sizes, usable_container_sizes
 from tools.uexcorp.trade_data import UEXTradeRoute
 
 # ACQUISITION always stops independently at transferred_at (Confirm Loaded) — loading is
@@ -104,7 +105,7 @@ async def create_run_from_route(route: UEXTradeRoute, quantity_scu: int, ship: s
         commodity_name=route.commodity_name,
         quantity_scu=quantity_scu,
         price_per_unit=int(round(route.price_origin)),
-        cargo_transfer_type=CargoTransferType.AUTOLOAD if route.has_loading_dock_origin else CargoTransferType.MANUAL,
+        cargo_transfer_type=CargoTransferType.AUTOLOAD if route.is_auto_load_origin else CargoTransferType.MANUAL,
     )
     sale = TradeLeg(
         leg_type=LegType.SALE,
@@ -114,10 +115,11 @@ async def create_run_from_route(route: UEXTradeRoute, quantity_scu: int, ship: s
         quantity_scu=quantity_scu,
         price_per_unit=int(round(route.price_destination)),
         cargo_transfer_type=(
-            CargoTransferType.AUTOLOAD if route.has_loading_dock_destination else CargoTransferType.MANUAL
+            CargoTransferType.AUTOLOAD if route.is_auto_load_destination else CargoTransferType.MANUAL
         ),
     )
-    run = TradeRun(ship=ship, legs=[acquisition, sale])
+    usable_sizes = usable_container_sizes(route.container_sizes_origin, route.container_sizes_destination)
+    run = TradeRun(ship=ship, usable_container_sizes=format_container_sizes(usable_sizes), legs=[acquisition, sale])
 
     async with SessionLocal() as session:
         session.add(run)

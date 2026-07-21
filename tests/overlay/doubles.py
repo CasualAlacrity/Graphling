@@ -19,16 +19,19 @@ TERMINALS = [
         id=1, name="Orison TDD", type=TerminalType.COMMODITY, star_system_name="Stanton",
         orbit_name="Stanton", moon_name=None, planet_name="Crusader", displayname="Orison TDD",
         nickname="Orison TDD", space_station_name=None, outpost_name=None, city_name="Orison",
+        is_auto_load=1,
     ),
     CachedTerminal(
         id=2, name="Seraphim Station", type=TerminalType.COMMODITY, star_system_name="Stanton",
         orbit_name="Stanton", moon_name=None, planet_name="Crusader", displayname="Seraphim Station",
         nickname="Seraphim Station", space_station_name="Seraphim Station", outpost_name=None, city_name=None,
+        is_auto_load=1,
     ),
     CachedTerminal(
         id=3, name="Baijini Point", type=TerminalType.COMMODITY, star_system_name="Stanton",
         orbit_name="Stanton", moon_name=None, planet_name=None, displayname="Baijini Point",
         nickname="Baijini Point", space_station_name="Baijini Point", outpost_name=None, city_name=None,
+        is_auto_load=1,
     ),
 ]
 
@@ -62,6 +65,7 @@ def make_route(
     destination_id=2, destination_name="Seraphim Station", price_origin=10.0, price_destination=20.0,
     price_margin=15.0, scu_origin=100, scu_destination=100, distance=10.0,
     origin_system="Stanton", origin_planet="Crusader", destination_system="Stanton", destination_planet="Crusader",
+    container_sizes_origin=None, container_sizes_destination=None,
 ) -> UEXTradeRoute:
     return UEXTradeRoute(
         id_commodity=commodity_id, commodity_name=commodity_name,
@@ -72,7 +76,13 @@ def make_route(
         price_origin=price_origin, price_destination=price_destination, price_margin=price_margin,
         scu_origin=scu_origin, scu_destination=scu_destination, status_origin=2, status_destination=1,
         distance=distance, is_on_ground_origin=0, is_on_ground_destination=0,
-        has_loading_dock_origin=1, has_loading_dock_destination=1,
+        is_auto_load_origin=1, is_auto_load_destination=1,
+        container_sizes_origin=(
+            container_sizes_origin if container_sizes_origin is not None else [1, 2, 4, 8, 16, 24, 32]
+        ),
+        container_sizes_destination=(
+            container_sizes_destination if container_sizes_destination is not None else [1, 2, 4, 8, 16, 24, 32]
+        ),
     )
 
 
@@ -99,6 +109,9 @@ def make_trade_run(ship=None, legs=None, **overrides) -> TradeRun:
             make_trade_leg(LegType.ACQUISITION, terminal_id=1, terminal_name="Orison TDD"),
             make_trade_leg(LegType.SALE, terminal_id=2, terminal_name="Seraphim Station"),
         ]
-    fields = {"id": uuid.uuid4(), "ship": ship, "created_at": datetime.now(UTC), "finalized_at": None, "legs": legs}
+    fields = {
+        "id": uuid.uuid4(), "ship": ship, "usable_container_sizes": "1,2,4,8,16,24,32",
+        "created_at": datetime.now(UTC), "finalized_at": None, "legs": legs,
+    }
     fields.update(overrides)
     return TradeRun(**fields)

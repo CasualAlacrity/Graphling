@@ -34,6 +34,11 @@ class TradeRun(Base):
     __tablename__ = "trade_run"
 
     ship: Mapped[str | None] = mapped_column(String, nullable=True)
+    # CSV of SCU sizes (e.g. "1,2,4,8,16,24,32") loadable at the origin AND unloadable at
+    # the destination — snapshotted from the route at creation time, same as
+    # quantity_scu/price_per_unit on TradeLeg, rather than a live re-lookup. Empty string
+    # for runs created before this existed or where the route had no container data.
+    usable_container_sizes: Mapped[str] = mapped_column(String, nullable=False, default="")
     finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     legs: Mapped[list["TradeLeg"]] = relationship(

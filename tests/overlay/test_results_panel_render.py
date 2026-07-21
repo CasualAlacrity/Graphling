@@ -57,6 +57,46 @@ def test_sort_by_margin_orders_highest_margin_first(results_panel, monkeypatch):
     assert rendered_calls[-1] == [high_margin, low_margin]
 
 
+def test_reachable_scu_for_accounts_for_container_packing(results_panel):
+    # 180 SCU ship with only 16/32 SCU containers loadable at both ends caps at 176,
+    # not 180 — the concrete example from the decided design.
+    route = make_route(
+        scu_origin=1000, scu_destination=1000,
+        container_sizes_origin=[16, 32], container_sizes_destination=[16, 32],
+    )
+    results_panel.cargo_scu = 180
+    assert results_panel.reachable_scu_for(route) == 176
+
+
+def test_reachable_scu_for_falls_back_to_capacity_without_container_data(results_panel):
+    route = make_route(
+        scu_origin=1000, scu_destination=1000,
+        container_sizes_origin=[], container_sizes_destination=[],
+    )
+    results_panel.cargo_scu = 180
+    assert results_panel.reachable_scu_for(route) == 180
+
+
+def test_reachable_scu_for_only_uses_sizes_usable_at_both_ends(results_panel):
+    # Origin only has 32s, destination only unloads up to 16 -> usable set is just [16].
+    route = make_route(
+        scu_origin=1000, scu_destination=1000,
+        container_sizes_origin=[16, 32], container_sizes_destination=[1, 2, 4, 8, 16],
+    )
+    results_panel.cargo_scu = 180
+    assert results_panel.reachable_scu_for(route) == 176  # 11 x 16 = 176, still not 180
+
+
+def test_estimated_profit_for_uses_container_aware_scu(results_panel):
+    route = make_route(
+        price_origin=10.0, price_destination=20.0,
+        scu_origin=1000, scu_destination=1000,
+        container_sizes_origin=[16, 32], container_sizes_destination=[16, 32],
+    )
+    results_panel.cargo_scu = 180
+    assert results_panel.estimated_profit_for(route) == 10.0 * 176
+
+
 def test_breadcrumb_and_commodity_code_used_instead_of_raw_names(results_panel):
     route = make_route(
         commodity_id=10, commodity_name="Agricium",

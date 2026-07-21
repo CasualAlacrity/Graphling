@@ -16,6 +16,7 @@ from db import trade_run_store
 from db.models import CargoTransferType
 from overlay import theme, uex_lookup
 from overlay.results_panel import SortToggle
+from tools.cargo_packing import best_container_mix, parse_container_sizes
 
 # aUEC has no fractional units, so every quantity/price field here is an integer —
 # fixed to a US-style locale (not just the default constructor locale) so thousands
@@ -98,9 +99,10 @@ class _TransactionWidget(QWidget):
     PRICE_LABEL = ""
     FEE_LABEL = ""
 
-    def __init__(self, leg, on_change, on_submit, parent=None):
+    def __init__(self, leg, on_change, on_submit, run=None, parent=None):
         super().__init__(parent)
         self._leg = leg
+        self._run = run
         self._on_change = on_change
         self._on_submit = on_submit
         self._build_ui()
@@ -122,6 +124,8 @@ class _TransactionWidget(QWidget):
         field_row.addWidget(self._field_column(self.QUANTITY_LABEL, self.quantity_input))
         field_row.addWidget(self._field_column(self.PRICE_LABEL, self.price_input))
         layout.addLayout(field_row)
+
+        self._build_suggestion_section(layout)
 
         toggle_row = QHBoxLayout()
         self.manual_label = QLabel(parent=self, text="MANUAL", objectName="sortToggleLabel")
@@ -147,6 +151,11 @@ class _TransactionWidget(QWidget):
 
         self._update_toggle_labels()
         self._update_fee_visibility()
+
+    def _build_suggestion_section(self, layout):
+        """Hook for a subclass to insert advisory content between the quantity/price
+        fields and the manual/autoload toggle. No-op by default — only BuyCargoWidget
+        uses this, to suggest a container mix for the ship's full hold."""
 
     @staticmethod
     def _field_column(label_text, widget):
@@ -217,6 +226,25 @@ class BuyCargoWidget(_TransactionWidget):
     def _build_ui(self):
         super()._build_ui()
         self.confirm_button.setText("Confirm purchase")
+
+    def _build_suggestion_section(self, layout):
+        # Answers "how should I fill my whole hold," so this is based on the ship's full
+        # capacity, not whatever partial quantity happens to be typed in right now —
+        # skipped entirely if there's no ship on the run or no container data for the route.
+        vehicle = uex_lookup.find_vehicle(self._run.ship) if self._run and self._run.ship else None
+        if vehicle is None:
+            return
+        sizes = parse_container_sizes(self._run.usable_container_sizes)
+        if not sizes:
+            return
+        mix = best_container_mix(vehicle.scu, sizes)
+        if not mix:
+            return
+
+        breakdown = " + ".join(f"{count}×{size}" for size, count in sorted(mix.items(), reverse=True))
+        total = sum(size * count for size, count in mix.items())
+        text = f"Best fill for {vehicle.name_full}: {breakdown} SCU ({total}/{vehicle.scu:.0f} SCU)"
+        layout.addWidget(QLabel(parent=self, text=text, objectName="legDetail"))
 
 
 class SellCargoWidget(_TransactionWidget):

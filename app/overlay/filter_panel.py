@@ -107,7 +107,7 @@ class FilterPanel(HudWindow):
         self._main_layout.addWidget(filter_header)
 
         # --- Ship, Cargo & Commodity ---
-        self.ship_input = QLineEdit(placeholderText="Enter a ship name")
+        self.ship_input = QLineEdit(placeholderText="Search ship...")
         self.ship_completer = QCompleter(
             uex_lookup.ship_names,
             parent=self.ship_input,
@@ -117,7 +117,7 @@ class FilterPanel(HudWindow):
         )
         self.ship_input.setCompleter(self.ship_completer)
         self.ship_input.setClearButtonEnabled(True)
-        self.ship_input.installEventFilter(CompleterFocusFilter(parent=self.ship_input))
+        # self.ship_input.installEventFilter(CompleterFocusFilter(parent=self.ship_input))
 
         self.cargo_input = QSpinBox(minimum=0, maximum=3000, suffix=" SCU")
 
@@ -130,7 +130,7 @@ class FilterPanel(HudWindow):
         )
         self.commodity_input.setCompleter(self.commodity_completer)
         self.commodity_input.setClearButtonEnabled(True)
-        self.commodity_input.installEventFilter(CompleterFocusFilter(parent=self.commodity_input))
+        # self.commodity_input.installEventFilter(CompleterFocusFilter(parent=self.commodity_input))
 
         self._main_layout.addWidget(self._section_row(
             "SHIP AND CARGO",
@@ -150,7 +150,7 @@ class FilterPanel(HudWindow):
         )
         self.source_terminal_input.setCompleter(self.source_terminal_completer)
         self.source_terminal_input.setClearButtonEnabled(True)
-        self.source_terminal_input.installEventFilter(CompleterFocusFilter(parent=self.source_terminal_input))
+        # self.source_terminal_input.installEventFilter(CompleterFocusFilter(parent=self.source_terminal_input))
 
         self.min_source_inventory_input = QComboBox()
         self.min_source_inventory_input.addItems(["Select..."] + uex_lookup.SOURCE_INVENTORY_LEVELS)
@@ -172,9 +172,9 @@ class FilterPanel(HudWindow):
         )
         self.destination_terminal_input.setCompleter(self.destination_terminal_completer)
         self.destination_terminal_input.setClearButtonEnabled(True)
-        self.destination_terminal_input.installEventFilter(
-            CompleterFocusFilter(parent=self.destination_terminal_input)
-        )
+        # self.destination_terminal_input.installEventFilter(
+        #     CompleterFocusFilter(parent=self.destination_terminal_input)
+        # )
 
         self.max_destination_inventory_input = QComboBox()
         self.max_destination_inventory_input.addItems(["Select..."] + uex_lookup.DESTINATION_INVENTORY_LEVELS)
@@ -187,22 +187,22 @@ class FilterPanel(HudWindow):
 
         # --- Options ---
         options_row = QHBoxLayout()
-        self.space_only_checkbox = QPushButton(parent=self, objectName="filterIconToggle")
-        self.space_only_checkbox.setCheckable(True)
-        self.space_only_checkbox.setIcon(theme.load_icon("plane-up", theme.TEXT_DISABLED))
-        self.space_only_checkbox.setIconSize(QSize(16, 16))
-        self.space_only_checkbox.setToolTip("Space stations only")
+        self.space_only_filter_toggle = QPushButton(parent=self, objectName="filterIconToggle")
+        self.space_only_filter_toggle.setCheckable(True)
+        self.space_only_filter_toggle.setIcon(theme.load_icon("plane-up", theme.TEXT_DISABLED))
+        self.space_only_filter_toggle.setIconSize(QSize(16, 16))
+        self.space_only_filter_toggle.setToolTip("Space stations only")
 
-        self.autoload_checkbox = QPushButton(parent=self, objectName="filterIconToggle")
-        self.autoload_checkbox.setCheckable(True)
-        self.autoload_checkbox.setIcon(theme.load_icon("cart-flatbed", theme.TEXT_DISABLED))
-        self.autoload_checkbox.setIconSize(QSize(16, 16))
-        self.autoload_checkbox.setToolTip("Autoload-capable terminals only")
+        self.autoload_filter_toggle = QPushButton(parent=self, objectName="filterIconToggle")
+        self.autoload_filter_toggle.setCheckable(True)
+        self.autoload_filter_toggle.setIcon(theme.load_icon("cart-flatbed", theme.TEXT_DISABLED))
+        self.autoload_filter_toggle.setIconSize(QSize(16, 16))
+        self.autoload_filter_toggle.setToolTip("Autoload-capable terminals only")
 
         self.options_caption = QLabel(parent=self, objectName="filterOptionsCaption")
 
-        options_row.addWidget(self.space_only_checkbox)
-        options_row.addWidget(self.autoload_checkbox)
+        options_row.addWidget(self.space_only_filter_toggle)
+        options_row.addWidget(self.autoload_filter_toggle)
         options_row.addWidget(self.options_caption)
         options_row.addStretch()
 
@@ -226,12 +226,12 @@ class FilterPanel(HudWindow):
         self.commodity_completer.activated[str].connect(lambda _: self.refresh_filters())
         self.source_terminal_completer.activated[str].connect(lambda _: self.refresh_filters())
         self.destination_terminal_completer.activated[str].connect(lambda _: self.refresh_filters())
-        self.space_only_checkbox.toggled.connect(
-            lambda checked: self._on_toggle_changed(self.space_only_checkbox, "plane-up", checked)
+        self.space_only_filter_toggle.toggled.connect(
+            lambda checked: self._on_toggle_changed(self.space_only_filter_toggle, "plane-up", checked)
         )
-        self.space_only_checkbox.toggled.connect(lambda _: self.refresh_filters())
-        self.autoload_checkbox.toggled.connect(
-            lambda checked: self._on_toggle_changed(self.autoload_checkbox, "cart-flatbed", checked)
+        self.space_only_filter_toggle.toggled.connect(lambda _: self.refresh_filters())
+        self.autoload_filter_toggle.toggled.connect(
+            lambda checked: self._on_toggle_changed(self.autoload_filter_toggle, "cart-flatbed", checked)
         )
 
         self.commodity_input.textChanged.connect(
@@ -264,8 +264,8 @@ class FilterPanel(HudWindow):
         self._update_options_caption()
 
     def _update_options_caption(self):
-        space_only = self.space_only_checkbox.isChecked()
-        autoload_only = self.autoload_checkbox.isChecked()
+        space_only = self.space_only_filter_toggle.isChecked()
+        autoload_only = self.autoload_filter_toggle.isChecked()
         terminal_clause = "Space stations only" if space_only else "Any terminal"
         loading_clause = "autoload-capable only" if autoload_only else "any loading type"
         self.options_caption.setText(f"{terminal_clause}, {loading_clause}")
@@ -354,7 +354,7 @@ class FilterPanel(HudWindow):
         # Space Only only narrows a field once something actually drives its reachable
         # set (commodity, or the other terminal) — with nothing set yet there's no
         # "missing location" to narrow against, so the completer stays unfiltered.
-        space_only = self.space_only_checkbox.isChecked()
+        space_only = self.space_only_filter_toggle.isChecked()
         # A field that already holds a resolved value is pinned, not still being
         # searched — narrowing (and thus space-only filtering) only makes sense for
         # whichever field is still open, same principle as search_routes' pinning.
@@ -443,8 +443,8 @@ class FilterPanel(HudWindow):
 
         min_source_code = inventory_code_for(self.min_source_inventory_input.currentText(), "buy")
         max_destination_code = inventory_code_for(self.max_destination_inventory_input.currentText(), "sell")
-        space_only = self.space_only_checkbox.isChecked()
-        require_autoload = self.autoload_checkbox.isChecked()
+        space_only = self.space_only_filter_toggle.isChecked()
+        require_autoload = self.autoload_filter_toggle.isChecked()
 
         self.search_button.setEnabled(False)
         self.search_button.setText("SEARCHING…")

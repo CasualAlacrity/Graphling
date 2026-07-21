@@ -449,6 +449,7 @@ class TradeRunsPanel(HudWindow):
         if field == "transaction_completed_at" and leg.leg_type == LegType.ACQUISITION:
             return BuyCargoWidget(
                 leg,
+                run=run,
                 on_change=lambda draft, lid=leg.id, rid=run.id: self._on_draft_changed(lid, rid, draft),
                 on_submit=lambda *values, lid=leg.id: self._on_record_purchase(lid, *values),
             )

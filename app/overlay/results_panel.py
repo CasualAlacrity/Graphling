@@ -17,6 +17,7 @@ from qasync import asyncSlot
 from overlay import theme
 from overlay.theme import HudWindow
 from overlay.uex_lookup import commodity_code_for, commodity_volatility, route_breadcrumb
+from tools.cargo_packing import max_packable_scu, usable_container_sizes
 
 # CV = volatility_price / price, the docs' "price coefficient of variation" — a raw
 # volatility_price_* value is a currency stddev, meaningless without dividing by price.
@@ -205,16 +206,21 @@ class ResultsPanel(HudWindow):
         self.results_list.addItem(message)
 
     def estimated_profit_for(self, route):
-        reachable_scu = min(route.scu_origin, route.scu_destination)
-        if self.cargo_scu > 0:
-            reachable_scu = min(reachable_scu, self.cargo_scu)
-        return (route.price_destination - route.price_origin) * reachable_scu
+        return (route.price_destination - route.price_origin) * self.reachable_scu_for(route)
 
     def reachable_scu_for(self, route):
-        reachable_scu = min(route.scu_origin, route.scu_destination)
+        # Naive full-fill overstates capacity whenever it doesn't divide evenly into the
+        # container sizes actually loadable at both ends — an Asgard (180 SCU) with only
+        # 32/16 SCU containers available caps out at 176, not 180. The DP finds the true
+        # achievable total within the existing stock/ship ceiling, it doesn't relax it.
+        capacity = min(route.scu_origin, route.scu_destination)
         if self.cargo_scu > 0:
-            reachable_scu = min(reachable_scu, self.cargo_scu)
-        return reachable_scu
+            capacity = min(capacity, self.cargo_scu)
+
+        sizes = usable_container_sizes(route.container_sizes_origin, route.container_sizes_destination)
+        if not sizes:
+            return capacity
+        return max_packable_scu(capacity, sizes)
 
     async def _fetch_missing_volatility(self, routes):
         commodity_ids = {route.commodity_id for route in routes}
