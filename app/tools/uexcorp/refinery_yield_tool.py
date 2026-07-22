@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 from tools.uexcorp.args import LocationArgs
 from tools.uexcorp.matching import filter_by_location, find_commodity_by_id, match_by_name_or_code
-from tools.uplink_tool import UplinkTool
+from tools.uplink_tool import UEXBackedTool
 
 
 def _resolve_raw_commodity(matched_commodity, cache):
@@ -27,7 +27,7 @@ class RefineryYieldArgs(LocationArgs):
     )
 
 
-class RefineryYieldTool(UplinkTool):
+class RefineryYieldTool(UEXBackedTool):
     name: str = "refinery_yield_lookup"
     description: str = (
         "Look up current refinery yield bonuses for a Star Citizen raw ore across refinery "

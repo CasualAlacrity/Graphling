@@ -5,10 +5,10 @@ from typing import Any
 from tools.uexcorp.matching import filter_by_location, match_by_name_or_code
 from tools.uexcorp.reference_cache import UexReferenceCache
 from tools.uexcorp.trade_data import UEXTradeData
-from tools.uplink_tool import UplinkTool
+from tools.uplink_tool import UEXBackedTool
 
 
-class TradePriceTool(UplinkTool):
+class TradePriceTool(UEXBackedTool):
 
     async def _lookup(self, query: str, catalog_selector: Callable[[UexReferenceCache], list],
                       fetch_prices: Callable[[int], Any], not_found_label: str,

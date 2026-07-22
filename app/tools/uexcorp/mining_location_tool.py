@@ -3,7 +3,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from tools.uexcorp.matching import filter_by_match, find_commodity_by_id, match_by_name_or_code
-from tools.uplink_tool import UplinkTool
+from tools.uplink_tool import UEXBackedTool
 
 
 def _has_location_data(commodity) -> bool:
@@ -47,7 +47,7 @@ class MiningLocationArgs(BaseModel):
     )
 
 
-class MiningLocationTool(UplinkTool):
+class MiningLocationTool(UEXBackedTool):
     name: str = "mining_location_lookup"
     description: str = (
         "Look up where a Star Citizen raw ore or harvestable material can actually be found/mined "

@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 from tools.uexcorp.args import LocationArgs
 from tools.uexcorp.matching import filter_by_location, match_by_name_or_code
-from tools.uplink_tool import UplinkTool
+from tools.uplink_tool import UEXBackedTool
 
 
 class VehicleRentalData(BaseModel):
@@ -25,7 +25,7 @@ class VehicleRentalArgs(LocationArgs):
     )
 
 
-class VehicleRentalTool(UplinkTool):
+class VehicleRentalTool(UEXBackedTool):
     name: str = "vehicle_rental_lookup"
     description: str = (
         "Look up current daily rental rates for a Star Citizen ship or ground vehicle across "

@@ -11,9 +11,6 @@ logger = logging.getLogger(__name__)
 
 class UplinkTool(BaseTool):
     progress_label: str
-    # Every tool in this app is UEX-backed today, so the client lives here rather than on each
-    # subclass individually — revisit if a second tool provider is ever added.
-    client: UEXCorpClient
 
     def _run(self, *args: Any, **kwargs: Any) -> Any:
         raise NotImplementedError(f"{type(self).__name__} only supports async execution — use _arun.")
@@ -25,3 +22,7 @@ class UplinkTool(BaseTool):
             logger.exception(f"{self.name} failed")
             return ("The UEX pricing API is temporarily unavailable. Tell the user their request couldn't be "
                     "completed and suggest trying again shortly.")
+
+
+class UEXBackedTool(UplinkTool):
+    client: UEXCorpClient
