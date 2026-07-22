@@ -190,18 +190,6 @@ def _group_runs_by_day(runs):
     return groups
 
 
-def _ordered_legs(run):
-    acquisitions = sorted(
-        (leg for leg in run.legs if leg.leg_type == LegType.ACQUISITION), key=lambda leg: leg.created_at
-    )
-    sales = sorted((leg for leg in run.legs if leg.leg_type == LegType.SALE), key=lambda leg: leg.created_at)
-    return acquisitions + sales
-
-
-def _current_leg(run):
-    return next((leg for leg in _ordered_legs(run) if leg.finalized_at is None), None)
-
-
 def _can_abandon(run):
     # Nothing's actually been bought yet — deleting the run loses no real progress.
     return not any(
@@ -321,8 +309,8 @@ class TradeRunsPanel(HudWindow):
         body_layout.setContentsMargins(0, 4, 0, 0)
         body_layout.setSpacing(4)
 
-        current_leg = _current_leg(run)
-        for leg in _ordered_legs(run):
+        current_leg = trade_run_store.current_leg(run)
+        for leg in trade_run_store.ordered_legs(run):
             is_current = leg.id == (current_leg.id if current_leg else None)
             body_layout.addWidget(self._build_leg_container(run, leg, is_current))
         if not _is_ready_to_finalize(run):

@@ -192,13 +192,13 @@ async def advance_leg(leg_id: UUID) -> TradeLeg:
 
 
 def _apply_transaction(
-    leg: TradeLeg,
-    quantity_scu: int,
-    price_per_unit: int,
-    cargo_transfer_type: CargoTransferType,
-    cargo_transfer_fee: int,
-    *,
-    also_stamp_transferred: bool,
+        leg: TradeLeg,
+        quantity_scu: int,
+        price_per_unit: int,
+        cargo_transfer_type: CargoTransferType,
+        cargo_transfer_fee: int,
+        *,
+        also_stamp_transferred: bool,
 ) -> None:
     leg.quantity_scu = quantity_scu
     leg.price_per_unit = price_per_unit
@@ -210,8 +210,8 @@ def _apply_transaction(
 
 
 async def record_purchase(
-    leg_id: UUID, quantity_scu: int, price_per_unit: int,
-    cargo_transfer_type: CargoTransferType, cargo_transfer_fee: int,
+        leg_id: UUID, quantity_scu: int, price_per_unit: int,
+        cargo_transfer_type: CargoTransferType, cargo_transfer_fee: int,
 ) -> TradeLeg:
     async with SessionLocal() as session:
         leg = await session.get(TradeLeg, leg_id)
@@ -231,8 +231,8 @@ async def record_purchase(
 
 
 async def record_sale(
-    leg_id: UUID, quantity_scu: int, price_per_unit: int,
-    cargo_transfer_type: CargoTransferType, cargo_transfer_fee: int,
+        leg_id: UUID, quantity_scu: int, price_per_unit: int,
+        cargo_transfer_type: CargoTransferType, cargo_transfer_fee: int,
 ) -> TradeLeg:
     async with SessionLocal() as session:
         leg = await session.get(TradeLeg, leg_id)
@@ -278,3 +278,15 @@ async def delete_run(run_id: UUID) -> None:
         if run is not None:
             await session.delete(run)
             await session.commit()
+
+
+def ordered_legs(run) -> list[TradeLeg]:
+    acquisitions = sorted(
+        (leg for leg in run.legs if leg.leg_type == LegType.ACQUISITION), key=lambda leg: leg.created_at
+    )
+    sales = sorted((leg for leg in run.legs if leg.leg_type == LegType.SALE), key=lambda leg: leg.created_at)
+    return acquisitions + sales
+
+
+def current_leg(run) -> TradeLeg | None:
+    return next((leg for leg in ordered_legs(run) if leg.finalized_at is None), None)
