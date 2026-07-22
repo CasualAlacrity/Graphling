@@ -26,6 +26,9 @@
     in the push-to-talk voice loop (just speak when the timer fires); needs more thought in
     Chainlit, which doesn't have an obvious way to push a new message into a session from a
     background task without holding onto that session's context.
+  * Query remaining time mid-wait ("how much longer until the cargo is loaded?") — returns a
+    formatted mm:ss countdown. Ordinary request/response, no proactive-notification problem to
+    solve — just needs the timer's start time + duration held somewhere queryable.
 
 # Done
 What's the price of Iron in Stanton? (Commodity)(Station, Orbit, System)
@@ -41,3 +44,4 @@ Can I find Copper on Lyria? (Minable, Harvestable)(Planet, Orbit, System)
 Start a timer for 15 minutes. (Timer)(Notify — voice required, Chainlit nice-to-have)
 Notify me in 15 minutes. (Timer)(Notify — voice required, Chainlit nice-to-have)
 "They're loading the cargo, it'll take 15 minutes. Let me know when it's done." (Timer)(Notify, spoken proactively when it fires)
+How much longer until the cargo is loaded? (Timer)(Query remaining time — mm:ss, ordinary request/response)

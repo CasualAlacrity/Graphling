@@ -98,7 +98,7 @@ justifies it, not new design work from scratch — confirm this when scoping the
 | 1. Cold open | Nothing new — existing overlay. |
 | 2. Competence | Nothing new — existing tools (`commodity_price_lookup`, vehicle tools) already in `graph.py`. |
 | 3. Guardrail | Built — `classify_topic` node + `topic-classification` Hub prompt + decline-line bank. See "Security hardening backlog" below for the remaining gap (this filters off-topic, not adversarial). |
-| 4. Real-world action | AI/voice tools for the trade run store (`mark_cargo_acquired` etc., per `docs/trade-route-tracker.md`'s Build plan step 3 — not built). |
+| 4. Real-world action | AI/voice tools for the trade run store (`mark_cargo_acquired` etc., per `docs/trade-route-tracker.md`'s Build plan step 3 — not built). Natural extension: an autoload timer — "it'll take 8 minutes" starts a timer, proactively notifies when done, and supports a "how much longer" query in the meantime. Tracked in detail in `prompts/Example Prompts.md`'s Timer/Notification section — proactive notify needs voice as the primary path (Chainlit has no clean way to push a message from a background task), the "how much longer" query is ordinary request/response and has no such gap. |
 | 5. Memory beat | Reviving the shelved memory system from `pilot-preference-memory` (or a scoped subset of it) — not built, not yet re-scoped. |
 | 6. Trade Advisor | The scoring engine designed in `docs/trade-route-tracker.md` ("Trade Advisor — scoring & inferred preferences") — designed, not built. |
 
