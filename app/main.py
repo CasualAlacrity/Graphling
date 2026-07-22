@@ -36,6 +36,8 @@ async def handle_message(message: cl.Message):
                 chunk = event["data"]["chunk"]
                 if chunk.content:
                     await msg.stream_token(chunk.content)
+            if event["event"] == "on_chain_end" and event["metadata"].get("langgraph_node") == "decline":
+                msg.content = event["data"]["output"]["messages"][0].content
             if event["event"] == "on_tool_start":
                 step = cl.Step(
                     name=TOOL_LABELS.get(event["name"], event["name"]),

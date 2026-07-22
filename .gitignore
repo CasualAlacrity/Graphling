@@ -21,6 +21,7 @@ build/
 # LangSmith / LangChain local cache
 .langchain/
 .cache/
+prompts/.prompt_cache.json
 
 # Chainlit auto-generated local state (was previously only excluding translations/,
 # but that pattern is anchored to the repo root and never matched app/.chainlit/)
