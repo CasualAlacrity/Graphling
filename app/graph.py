@@ -2,7 +2,7 @@ import os
 from typing import Annotated
 
 from dotenv import load_dotenv
-from langchain_core.messages import BaseMessage, AIMessage
+from langchain_core.messages import AIMessage, BaseMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import START, StateGraph
 from langgraph.graph.message import add_messages
