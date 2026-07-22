@@ -9,25 +9,28 @@ from db.session import SessionLocal
 from tools.cargo_packing import format_container_sizes, usable_container_sizes
 from tools.uexcorp.trade_data import UEXTradeRoute
 
+# started_at is deliberately not in these sequences — a leg is considered "already
+# traveling" from the moment it exists (see create_run_from_route / advance_leg's
+# finalized_at branch, which stamp it automatically), not something a pilot ever
+# advances through manually. Only reached_at is a real, waited-on milestone.
+#
 # ACQUISITION always stops independently at transferred_at (Confirm Loaded) — loading is
 # real separate time regardless of transfer type. SALE only does the same for MANUAL:
 # unloading cargo by hand genuinely takes time before the sale can be recorded at the
 # kiosk. AUTOLOAD unloading has no real time cost — record_sale stamps transferred_at in
 # the same call as the sale, so it's never independently reachable for that case.
-_ACQUISITION_SEQUENCE = ["started_at", "reached_at", "transaction_completed_at", "transferred_at", "finalized_at"]
-_SALE_MANUAL_SEQUENCE = ["started_at", "reached_at", "transferred_at", "transaction_completed_at", "finalized_at"]
-_SALE_AUTOLOAD_SEQUENCE = ["started_at", "reached_at", "transaction_completed_at", "finalized_at"]
+_ACQUISITION_SEQUENCE = ["reached_at", "transaction_completed_at", "transferred_at", "finalized_at"]
+_SALE_MANUAL_SEQUENCE = ["reached_at", "transferred_at", "transaction_completed_at", "finalized_at"]
+_SALE_AUTOLOAD_SEQUENCE = ["reached_at", "transaction_completed_at", "finalized_at"]
 
 _STEP_TITLES = {
     LegType.ACQUISITION: {
-        "started_at": "Depart for pickup",
         "reached_at": "Mark arrived",
         "transaction_completed_at": "Buy cargo",
         "transferred_at": "Confirm loaded",
         "finalized_at": "Finalize",
     },
     LegType.SALE: {
-        "started_at": "Depart for sale",
         "reached_at": "Mark arrived",
         "transferred_at": "Confirm unloaded",
         "transaction_completed_at": "Sell cargo",
@@ -58,12 +61,12 @@ def current_step_title(leg: TradeLeg) -> str:
 
 
 def breadcrumb_steps(leg: TradeLeg) -> list[tuple[str, str]]:
-    """(field, label) pairs for the leg's remaining milestones, skipping started_at/
-    reached_at — the UI collapses those two into a single combined Travel node."""
+    """(field, label) pairs for the leg's remaining milestones, skipping reached_at — the
+    UI renders that one as its own combined Travel node instead."""
     return [
         (field, _STEP_TITLES[leg.leg_type][field])
         for field in _milestone_sequence(leg)
-        if field not in ("started_at", "reached_at")
+        if field != "reached_at"
     ]
 
 
@@ -106,6 +109,9 @@ async def create_run_from_route(route: UEXTradeRoute, quantity_scu: int, ship: s
         quantity_scu=quantity_scu,
         price_per_unit=int(round(route.price_origin)),
         cargo_transfer_type=CargoTransferType.AUTOLOAD if route.is_auto_load_origin else CargoTransferType.MANUAL,
+        # A run is only ever created once the pilot has committed to it — travel to
+        # pickup starts right then, with nothing left to separately confirm.
+        started_at=datetime.now(UTC),
     )
     sale = TradeLeg(
         leg_type=LegType.SALE,
@@ -169,6 +175,18 @@ async def advance_leg(leg_id: UUID) -> TradeLeg:
             )
 
         setattr(leg, field, datetime.now(UTC))
+
+        if field == "finalized_at":
+            # This leg is done — the run's other leg starts traveling right now, the
+            # same "no separate confirmation" rule create_run_from_route applies to the
+            # very first leg. Only ever one sibling per run (Acquisition + Sale).
+            result = await session.execute(
+                select(TradeLeg).where(TradeLeg.run_id == leg.run_id, TradeLeg.id != leg.id)
+            )
+            sibling = result.scalar_one_or_none()
+            if sibling is not None and sibling.started_at is None:
+                sibling.started_at = datetime.now(UTC)
+
         await session.commit()
         return leg
 

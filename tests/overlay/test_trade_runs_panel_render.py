@@ -43,7 +43,10 @@ def _mark_done_buttons(card):
 
 
 def test_fresh_acquisition_leg_shows_travel_widget(trade_runs_panel):
-    run = make_trade_run(legs=[make_trade_leg(LegType.ACQUISITION)])
+    # started_at is always set by the time a real leg exists (see trade_run_store) —
+    # "fresh" means not yet arrived, not "not yet started".
+    leg = make_trade_leg(LegType.ACQUISITION, started_at=datetime.now(UTC))
+    run = make_trade_run(legs=[leg])
     card = trade_runs_panel._build_run_card(run, 0)
     assert card.findChild(TravelWidget) is not None
 
@@ -88,7 +91,8 @@ def test_bought_acquisition_leg_shows_confirm_loaded_widget(trade_runs_panel):
 
 
 def test_fresh_sale_leg_shows_travel_widget(trade_runs_panel):
-    run = make_trade_run(legs=[make_trade_leg(LegType.SALE)])
+    leg = make_trade_leg(LegType.SALE, started_at=datetime.now(UTC))
+    run = make_trade_run(legs=[leg])
     card = trade_runs_panel._build_run_card(run, 0)
     assert card.findChild(TravelWidget) is not None
 

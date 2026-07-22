@@ -33,12 +33,12 @@ def _integer_spinbox(minimum, maximum, suffix):
 
 
 class TravelWidget(QWidget):
-    """Reused for both the depart (started_at) and arrive (reached_at) milestones — neither
-    has data to capture, just a place to confirm against. The destination name/copy button
-    matter at both points (set nav before departing, double-check on arrival), so both stay
-    visible either way; only the confirm button's label depends on which field is next."""
+    """The arrive (reached_at) milestone — started_at is stamped automatically the moment
+    a leg becomes travelable (see trade_run_store.create_run_from_route/advance_leg), so
+    this only ever confirms arrival, never departure. No data to capture, just a place to
+    confirm against, plus a copy button for pasting the destination into Mobiglass nav."""
 
-    def __init__(self, leg, next_field, on_confirm, parent=None):
+    def __init__(self, leg, on_confirm, parent=None):
         super().__init__(parent)
         self._on_confirm = on_confirm
 
@@ -66,8 +66,7 @@ class TravelWidget(QWidget):
         subtitle_row.addWidget(copy_button)
         layout.addLayout(subtitle_row)
 
-        confirm_text = f"Departing for {place_name}" if next_field == "started_at" else f"I'm at {place_name}"
-        confirm_button = QPushButton(parent=self, text=confirm_text, objectName="confirmButton")
+        confirm_button = QPushButton(parent=self, text=f"I'm at {place_name}", objectName="confirmButton")
         confirm_button.clicked.connect(self._on_confirm)
         layout.addWidget(confirm_button)
 
@@ -458,18 +457,20 @@ def _breadcrumb_node(dot_widget, label_text, current):
 
 
 def build_leg_breadcrumb(leg):
-    """The Arkanis-style step tracker for a leg's current milestone. Depart/Arrive
-    collapse into one Travel node; the rest come straight from
-    trade_run_store.breadcrumb_steps, so the step count/labels always match whatever
-    next_unset_field is actually walking (Acquisition, Sale/Manual, Sale/Autoload)."""
+    """The Arkanis-style step tracker for a leg's current milestone. started_at is always
+    already set by the time a leg is shown here (stamped automatically, never a manual
+    step — see trade_run_store), so the Travel node only ever visually distinguishes
+    in-transit (orange) from arrived (green), never an unstarted state. The rest come
+    straight from trade_run_store.breadcrumb_steps, so the step count/labels always match
+    whatever next_unset_field is actually walking (Acquisition, Sale/Manual, Sale/Autoload)."""
     row = QWidget()
     layout = QHBoxLayout(row)
     layout.setContentsMargins(0, 2, 0, 12)
     layout.setSpacing(0)
 
     current_field = trade_run_store.next_unset_field(leg)
-    travel_done = leg.started_at is not None and leg.reached_at is not None
-    travel_current = current_field in ("started_at", "reached_at")
+    travel_done = leg.reached_at is not None
+    travel_current = current_field == "reached_at"
 
     travel_dot = _TravelNode(leg.started_at is not None, leg.reached_at is not None)
     layout.addWidget(_breadcrumb_node(travel_dot, "Travel", travel_current))

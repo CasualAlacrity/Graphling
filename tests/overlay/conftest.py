@@ -130,6 +130,9 @@ def wired_canvas(wired_panels, monkeypatch):
     async def fake_create_run_from_route(route, quantity_scu, ship):
         call_log.append(("create_run_from_route", route, quantity_scu, ship))
         run = make_trade_run(ship=ship)
+        # Mirrors the real store: the acquisition leg starts traveling the instant the
+        # run is committed to, no separate depart step.
+        run.legs[0].started_at = datetime.now(UTC)
         store_state["in_progress"].append(run)
         return run
 

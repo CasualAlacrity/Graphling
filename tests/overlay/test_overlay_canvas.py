@@ -118,7 +118,7 @@ def test_advance_updates_leg_and_rerenders(qasync_loop, wired_canvas):
 
     qasync_loop.run_until_complete(scenario())
 
-    assert leg.started_at is not None
+    assert leg.reached_at is not None
     assert canvas.trade_runs_panel.row_count() == 1
 
 

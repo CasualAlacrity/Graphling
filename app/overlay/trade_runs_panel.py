@@ -469,8 +469,8 @@ class TradeRunsPanel(HudWindow):
     def _build_leg_dialog(self, run, leg):
         field = trade_run_store.next_unset_field(leg)
 
-        if field in ("started_at", "reached_at"):
-            return TravelWidget(leg, field, lambda checked=False, lid=leg.id: self._on_advance(lid))
+        if field == "reached_at":
+            return TravelWidget(leg, lambda checked=False, lid=leg.id: self._on_advance(lid))
 
         if field == "transaction_completed_at" and leg.leg_type == LegType.ACQUISITION:
             return BuyCargoWidget(

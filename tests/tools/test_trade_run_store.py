@@ -40,7 +40,6 @@ def _make_run(legs, **overrides):
 
 
 ACQUISITION_SEQUENCE = [
-    ("started_at", "Depart for pickup"),
     ("reached_at", "Mark arrived"),
     ("transaction_completed_at", "Buy cargo"),
     ("transferred_at", "Confirm loaded"),
@@ -64,8 +63,6 @@ def test_current_step_title_walks_sale_manual_sequence():
     # unlike autoload below.
     leg = _make_leg(LegType.SALE, CargoTransferType.MANUAL)
 
-    assert trade_run_store.current_step_title(leg) == "Depart for sale"
-    leg.started_at = datetime.now(UTC)
     assert trade_run_store.current_step_title(leg) == "Mark arrived"
     leg.reached_at = datetime.now(UTC)
     assert trade_run_store.current_step_title(leg) == "Confirm unloaded"
@@ -83,8 +80,6 @@ def test_current_step_title_walks_sale_autoload_sequence():
     # confirm-unloaded step to walk through here.
     leg = _make_leg(LegType.SALE, CargoTransferType.AUTOLOAD)
 
-    assert trade_run_store.current_step_title(leg) == "Depart for sale"
-    leg.started_at = datetime.now(UTC)
     assert trade_run_store.current_step_title(leg) == "Mark arrived"
     leg.reached_at = datetime.now(UTC)
     assert trade_run_store.current_step_title(leg) == "Sell cargo"
@@ -102,9 +97,7 @@ def test_sale_autoload_next_unset_field_skips_transferred_at_once_transacted():
     # sequence has no transferred_at position at all — record_sale sets it together with
     # transaction_completed_at, so the position in between is never independently
     # reachable — this asserts that skip actually happens.
-    leg = _make_leg(
-        LegType.SALE, CargoTransferType.AUTOLOAD, started_at=datetime.now(UTC), reached_at=datetime.now(UTC)
-    )
+    leg = _make_leg(LegType.SALE, CargoTransferType.AUTOLOAD, reached_at=datetime.now(UTC))
     assert trade_run_store.next_unset_field(leg) == "transaction_completed_at"
 
     now = datetime.now(UTC)
@@ -116,9 +109,7 @@ def test_sale_autoload_next_unset_field_skips_transferred_at_once_transacted():
 def test_sale_manual_next_unset_field_reaches_transferred_before_transaction():
     # The new behavior this whole change is about: manual unload is a real, independent,
     # timestamped step that happens before the sale, not bundled with it.
-    leg = _make_leg(
-        LegType.SALE, CargoTransferType.MANUAL, started_at=datetime.now(UTC), reached_at=datetime.now(UTC)
-    )
+    leg = _make_leg(LegType.SALE, CargoTransferType.MANUAL, reached_at=datetime.now(UTC))
     assert trade_run_store.next_unset_field(leg) == "transferred_at"
 
     leg.transferred_at = datetime.now(UTC)
@@ -250,14 +241,56 @@ class _FakeSession:
 
 
 async def test_advance_leg_sets_the_next_field(monkeypatch):
-    leg = _make_leg(LegType.ACQUISITION)
+    # started_at is already set on any real leg by the time it's queryable (stamped by
+    # create_run_from_route/advance_leg's own finalized_at branch, never a manual step) —
+    # reflected here so the fixture matches reality, not just the pure sequence logic.
+    leg = _make_leg(LegType.ACQUISITION, started_at=datetime.now(UTC))
     session = _FakeSession(get_value=leg)
     monkeypatch.setattr(trade_run_store, "SessionLocal", lambda: session)
 
     result = await trade_run_store.advance_leg(leg.id)
 
-    assert result.started_at is not None
+    assert result.reached_at is not None
     assert session.committed
+
+
+async def test_advance_leg_finalizing_starts_the_sibling_leg(monkeypatch):
+    # The behavior this whole change is about: finalizing one leg is what starts the
+    # other, automatically — no separate "depart" step for the sale leg either.
+    now = datetime.now(UTC)
+    run_id = uuid.uuid4()
+    acquisition = _make_leg(
+        LegType.ACQUISITION, started_at=now, reached_at=now,
+        transaction_completed_at=now, transferred_at=now,
+    )
+    acquisition.run_id = run_id
+    sale = _make_leg(LegType.SALE)
+    sale.run_id = run_id
+    session = _FakeSession(get_value=acquisition, execute_value=sale)
+    monkeypatch.setattr(trade_run_store, "SessionLocal", lambda: session)
+
+    await trade_run_store.advance_leg(acquisition.id)
+
+    assert sale.started_at is not None
+
+
+async def test_advance_leg_finalizing_does_not_clobber_an_already_started_sibling(monkeypatch):
+    now = datetime.now(UTC)
+    run_id = uuid.uuid4()
+    acquisition = _make_leg(
+        LegType.ACQUISITION, started_at=now, reached_at=now,
+        transaction_completed_at=now, transferred_at=now,
+    )
+    acquisition.run_id = run_id
+    original_start = datetime.now(UTC)
+    sale = _make_leg(LegType.SALE, started_at=original_start)
+    sale.run_id = run_id
+    session = _FakeSession(get_value=acquisition, execute_value=sale)
+    monkeypatch.setattr(trade_run_store, "SessionLocal", lambda: session)
+
+    await trade_run_store.advance_leg(acquisition.id)
+
+    assert sale.started_at == original_start
 
 
 async def test_advance_leg_raises_when_already_finalized(monkeypatch):
