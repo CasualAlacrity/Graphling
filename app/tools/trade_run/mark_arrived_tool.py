@@ -38,7 +38,7 @@ class MarkArrivedTool(UplinkTool):
         "has been loaded or unloaded."
     )
     args_schema: type[BaseModel] = MarkArrivedArgs
-    progress_label: str = "Resolving trade leg to flag."
+    progress_label: str = "Updating trade run, marking arrived at terminal location."
 
     async def _arun(self, commodity: str | None, terminal: str | None, *args: Any, **kwargs: Any) -> Any:
         try:

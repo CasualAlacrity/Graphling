@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from llm import get_chat_llm
 from prompt_loader import load_prompt
 from tools.trade_run.mark_arrived_tool import MarkArrivedTool
+from tools.trade_run.mark_cargo_acquired_tool import MarkCargoAcquiredTool
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.commodity_tool import CommodityPriceTool
 from tools.uexcorp.item_tool import ItemPriceTool
@@ -59,9 +60,10 @@ mining_location_tool = MiningLocationTool(client=uex_client)
 
 # Trade Run Voice Tools
 mark_arrived_tool = MarkArrivedTool()
+mark_cargo_acquired_tool = MarkCargoAcquiredTool()
 
 tools = [commodity_price_tool, item_price_tool, vehicle_purchase_tool, vehicle_rental_tool, refinery_yield_tool,
-         mining_location_tool, mark_arrived_tool]
+         mining_location_tool, mark_arrived_tool, mark_cargo_acquired_tool]
 
 llm = get_chat_llm().bind_tools(tools)
 classifier_llm = get_chat_llm().with_structured_output(TopicClassification)
