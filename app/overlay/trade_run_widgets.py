@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from db import trade_run_store
-from db.models import CargoTransferType
+from db.models import CargoTransferType, LegMilestone
 from overlay import theme, uex_lookup
 from overlay.results_panel import SortToggle
 from tools.cargo_packing import best_container_mix, parse_container_sizes
@@ -470,7 +470,7 @@ def build_leg_breadcrumb(leg):
 
     current_field = trade_run_store.next_unset_field(leg)
     travel_done = leg.reached_at is not None
-    travel_current = current_field == "reached_at"
+    travel_current = current_field == LegMilestone.REACHED_AT
 
     travel_dot = _TravelNode(leg.started_at is not None, leg.reached_at is not None)
     layout.addWidget(_breadcrumb_node(travel_dot, "Travel", travel_current))

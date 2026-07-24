@@ -16,7 +16,9 @@ class AmbiguousLegError(Exception):
         self.candidates = candidates
 
 
-async def resolve_leg(leg_type: LegType, commodity: str | None = None, terminal: str | None = None) -> TradeLeg:
+async def resolve_leg(
+        leg_type: LegType | None = None, commodity: str | None = None, terminal: str | None = None
+) -> TradeLeg:
     cache = await uex_client.get_uex_cache()
     current_runs = await trade_run_store.get_in_progress_runs()
 
@@ -26,7 +28,7 @@ async def resolve_leg(leg_type: LegType, commodity: str | None = None, terminal:
     matches = []
     for run in current_runs:
         leg = trade_run_store.current_leg(run)
-        if leg and leg.leg_type == leg_type:
+        if leg and (leg_type is None or leg.leg_type == leg_type):
             if ((matched_commodity and matched_commodity.name == leg.commodity_name)
                     or (matched_terminal and matched_terminal.name == leg.terminal_name)):
                 matches.append(leg)

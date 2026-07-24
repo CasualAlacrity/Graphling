@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 from qasync import asyncSlot
 
 from db import trade_run_store
-from db.models import LegType
+from db.models import LegMilestone, LegType
 from overlay import theme, uex_lookup
 from overlay.theme import HudWindow
 from overlay.trade_run_widgets import (
@@ -457,10 +457,10 @@ class TradeRunsPanel(HudWindow):
     def _build_leg_dialog(self, run, leg):
         field = trade_run_store.next_unset_field(leg)
 
-        if field == "reached_at":
+        if field == LegMilestone.REACHED_AT:
             return TravelWidget(leg, lambda checked=False, lid=leg.id: self._on_advance(lid))
 
-        if field == "transaction_completed_at" and leg.leg_type == LegType.ACQUISITION:
+        if field == LegMilestone.TRANSACTION_COMPLETED_AT and leg.leg_type == LegType.ACQUISITION:
             return BuyCargoWidget(
                 leg,
                 run=run,
@@ -468,17 +468,17 @@ class TradeRunsPanel(HudWindow):
                 on_submit=lambda *values, lid=leg.id: self._on_record_purchase(lid, *values),
             )
 
-        if field == "transaction_completed_at":
+        if field == LegMilestone.TRANSACTION_COMPLETED_AT:
             return SellCargoWidget(
                 leg,
                 on_change=lambda draft, lid=leg.id, rid=run.id: self._on_draft_changed(lid, rid, draft),
                 on_submit=lambda *values, lid=leg.id: self._on_record_sale(lid, *values),
             )
 
-        if field == "transferred_at" and leg.leg_type == LegType.SALE:
+        if field == LegMilestone.TRANSFERRED_AT and leg.leg_type == LegType.SALE:
             return ConfirmUnloadedWidget(leg, lambda checked=False, lid=leg.id: self._on_advance(lid))
 
-        if field == "transferred_at":
+        if field == LegMilestone.TRANSFERRED_AT:
             return ConfirmLoadedWidget(leg, lambda checked=False, lid=leg.id: self._on_advance(lid))
 
         # finalized_at (or already fully advanced) — no more fields to capture, but the

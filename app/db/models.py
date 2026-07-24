@@ -30,6 +30,17 @@ class CargoTransferType(enum.StrEnum):
     AUTOLOAD = "autoload"
 
 
+class LegMilestone(enum.StrEnum):
+    """The manually-advanced fields on TradeLeg, in no particular order here — the actual
+    per-leg-type progression order lives in trade_run_store's sequence lists. started_at
+    is deliberately excluded — it's auto-stamped, never advanced through by field name."""
+
+    REACHED_AT = "reached_at"
+    TRANSACTION_COMPLETED_AT = "transaction_completed_at"
+    TRANSFERRED_AT = "transferred_at"
+    FINALIZED_AT = "finalized_at"
+
+
 class TradeRun(Base):
     __tablename__ = "trade_run"
 
