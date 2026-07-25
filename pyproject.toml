@@ -21,7 +21,7 @@ uplink-voice = "voice:main"
 # app/ is the package root rather than a package itself.
 [tool.setuptools]
 package-dir = { "" = "app" }
-py-modules = ["main", "graph", "llm", "persona"]
+py-modules = ["main", "graph", "llm", "prompt_loader"]
 
 [tool.setuptools.packages.find]
 where = ["app"]
