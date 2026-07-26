@@ -1,7 +1,9 @@
 import os
 
+from rapidfuzz import fuzz
+
 from db import trade_run_store
-from db.models import LegType, TradeLeg
+from db.models import LegType, TradeLeg, TradeRun
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.matching import match_by_name_or_code
 
@@ -16,6 +18,11 @@ class AmbiguousLegError(Exception):
         self.candidates = candidates
 
 
+class AmbiguousRunError(Exception):
+    def __init__(self, candidates: list[TradeRun]):
+        self.candidates = candidates
+
+
 async def resolve_leg(
         leg_type: LegType | None = None, commodity: str | None = None, terminal: str | None = None
 ) -> TradeLeg:
@@ -25,11 +32,19 @@ async def resolve_leg(
     matched_commodity = match_by_name_or_code(commodity, cache.commodities)
     matched_terminal = match_by_name_or_code(terminal, cache.terminals)
 
+    # With no commodity/terminal hint given at all, a leg's leg_type match is treated
+    # as sufficient on its own — the pilot referring to "the cargo" with no name usually
+    # means there's only one sensible answer, not that they want to be asked to repeat
+    # the commodity every time. Still fully safe: with more than one candidate leg, this
+    # falls through to the len(matches) > 1 branch and raises AmbiguousLegError.
+    no_hint_given = matched_commodity is None and matched_terminal is None
+
     matches = []
     for run in current_runs:
         leg = trade_run_store.current_leg(run)
         if leg and (leg_type is None or leg.leg_type == leg_type):
-            if ((matched_commodity and matched_commodity.name == leg.commodity_name)
+            if (no_hint_given
+                    or (matched_commodity and matched_commodity.name == leg.commodity_name)
                     or (matched_terminal and matched_terminal.name == leg.terminal_name)):
                 matches.append(leg)
 
@@ -39,3 +54,23 @@ async def resolve_leg(
         raise ValueError(f"No run with leg for {leg_type} with {commodity} or {terminal}")
 
     return matches[0] if matches else None
+
+
+async def resolve_run(ship: str | None = None) -> TradeRun:
+    """Resolves to a single active TradeRun — no UEX lookup involved, since ship here is
+    just matched against each run's own stored ship string, not a reference catalog. With
+    no hint, or only one active run regardless of hint, that run is the answer; with more
+    than one candidate this raises AmbiguousRunError instead of guessing."""
+    current_runs = await trade_run_store.get_in_progress_runs()
+
+    if ship:
+        matches = [run for run in current_runs if run.ship and fuzz.partial_ratio(ship.lower(), run.ship.lower()) >= 60]
+    else:
+        matches = current_runs
+
+    if len(matches) > 1:
+        raise AmbiguousRunError(matches)
+    elif len(matches) < 1:
+        raise ValueError(f"No active trade run found for ship '{ship}'" if ship else "No active trade runs")
+
+    return matches[0]

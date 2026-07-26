@@ -65,6 +65,25 @@ def current_step_title(leg: TradeLeg) -> str:
         return "Mark leg finalized"
     return _STEP_TITLES[leg.leg_type][field]
 
+def trade_run_info(run: TradeRun) -> str:
+    """Describes every leg of a run, not just the current one, so a question like "what's
+    my destination" is answerable regardless of which leg is currently active — the
+    current leg additionally reports its next milestone via current_step_title."""
+    active_leg = current_leg(run)
+    lines = [f"Trade run status — ship: {run.ship or 'unspecified'}"]
+    for leg in ordered_legs(run):
+        leg_label = "Acquisition" if leg.leg_type == LegType.ACQUISITION else "Sale"
+        detail = (f"{leg_label} — {leg.quantity_scu} SCU {leg.commodity_name} at "
+                  f"{leg.terminal_name}, {leg.price_per_unit} aUEC/unit")
+        if leg.finalized_at is not None:
+            status = "finalized"
+        elif leg is active_leg:
+            status = f"current — next step: {current_step_title(leg)}"
+        else:
+            status = "pending"
+        lines.append(f"{detail} ({status})")
+    return "\n".join(lines)
+
 
 def breadcrumb_steps(leg: TradeLeg) -> list[tuple[LegMilestone, str]]:
     """(field, label) pairs for the leg's remaining milestones, skipping reached_at — the

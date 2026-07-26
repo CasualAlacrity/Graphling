@@ -16,6 +16,7 @@ from tools.trade_run.confirm_cargo_unloaded import ConfirmCargoUnloadedTool
 from tools.trade_run.mark_arrived_tool import MarkArrivedTool
 from tools.trade_run.mark_cargo_acquired_tool import MarkCargoAcquiredTool
 from tools.trade_run.mark_cargo_sold_tool import MarkCargoSoldTool
+from tools.trade_run.trade_run_status_tool import TradeRunStatusTool
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.commodity_tool import CommodityPriceTool
 from tools.uexcorp.item_tool import ItemPriceTool
@@ -60,6 +61,9 @@ vehicle_purchase_tool = VehiclePurchaseTool(client=uex_client)
 vehicle_rental_tool = VehicleRentalTool(client=uex_client)
 refinery_yield_tool = RefineryYieldTool(client=uex_client)
 mining_location_tool = MiningLocationTool(client=uex_client)
+uex_backed_tools = [commodity_price_tool, item_price_tool, vehicle_purchase_tool, vehicle_rental_tool,
+                    refinery_yield_tool,
+                    mining_location_tool]
 
 # Trade Run Voice Tools
 mark_arrived_tool = MarkArrivedTool()
@@ -67,10 +71,11 @@ mark_cargo_acquired_tool = MarkCargoAcquiredTool()
 mark_cargo_sold_tool = MarkCargoSoldTool()
 confirm_cargo_loaded_tool = ConfirmCargoLoadedTool()
 confirm_cargo_unloaded_tool = ConfirmCargoUnloadedTool()
+trade_run_status_tool = TradeRunStatusTool()
+trade_run_tools = [mark_arrived_tool, mark_cargo_acquired_tool, mark_cargo_sold_tool,
+                   confirm_cargo_loaded_tool, confirm_cargo_unloaded_tool, trade_run_status_tool]
 
-tools = [commodity_price_tool, item_price_tool, vehicle_purchase_tool, vehicle_rental_tool, refinery_yield_tool,
-         mining_location_tool, mark_arrived_tool, mark_cargo_acquired_tool, mark_cargo_sold_tool,
-         confirm_cargo_loaded_tool, confirm_cargo_unloaded_tool]
+tools = uex_backed_tools + trade_run_tools
 
 llm = get_chat_llm().bind_tools(tools)
 classifier_llm = get_chat_llm().with_structured_output(TopicClassification)
