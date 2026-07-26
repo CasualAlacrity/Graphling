@@ -79,3 +79,15 @@ class OverlayCanvas(HudWindow):
             await self.trade_runs_panel.refresh()
         elif widget is self.trade_ledger_panel:
             await self.trade_ledger_panel.refresh()
+
+    @asyncSlot()
+    async def refresh(self):
+        """Re-fetch whichever tab is currently showing. _on_tab_changed already covers
+        switching tabs — this covers the F3-reopen case, where the current tab doesn't
+        change but the underlying data may have (e.g. an AI trade-run tool ran while the
+        overlay was hidden)."""
+        widget = self.tabs.currentWidget()
+        if widget is self.trade_runs_panel:
+            await self.trade_runs_panel.refresh()
+        elif widget is self.trade_ledger_panel:
+            await self.trade_ledger_panel.refresh()

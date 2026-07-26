@@ -16,7 +16,7 @@ def _async_url(url: str) -> str:
 # Creating an engine per request spins up a fresh connection pool each time and
 # exhausts Postgres connections under load.
 engine = create_async_engine(
-    _async_url(os.getenv("DATABASE_URL")),
+    _async_url(os.getenv("TRADE_DB_URL")),
     pool_pre_ping=True,
 )
 

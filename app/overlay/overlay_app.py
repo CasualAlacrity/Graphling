@@ -27,7 +27,8 @@ def main():
         toggle_requested = Signal()
 
     bridge = HotkeyBridge()
-    hotkeys = keyboard.GlobalHotKeys({'<f3>': lambda: bridge.toggle_requested.emit()})
+    overlay_hotkey = os.getenv("OVERLAY_HOTKEY", "<f3>")
+    hotkeys = keyboard.GlobalHotKeys({overlay_hotkey: lambda: bridge.toggle_requested.emit()})
 
     app = QApplication()
     # Native macOS ("Aqua") widget rendering doesn't fully respect QSS box-model
@@ -79,10 +80,20 @@ def main():
         from voice import run as voice_run
         threading.Thread(target=lambda: asyncio.run(voice_run()), daemon=True).start()
 
-    bridge.toggle_requested.connect(lambda: canvas.setVisible(not canvas.isVisible()))
+    def _toggle_canvas():
+        showing = not canvas.isVisible()
+        canvas.setVisible(showing)
+        if showing:
+            # Data may have changed while the overlay was hidden (e.g. an AI trade-run
+            # tool ran from Chainlit/voice, a separate process) — refresh on reopen
+            # rather than showing stale state. Only on open, not close — no point
+            # refreshing a tab nobody's about to look at.
+            canvas.refresh()
+
+    bridge.toggle_requested.connect(_toggle_canvas)
 
     hotkeys.start()
-    print("Ready. Press F3 to toggle the overlay.", flush=True)
+    print(f"Ready. Press {overlay_hotkey} to toggle the overlay.", flush=True)
     with event_loop:
         event_loop.run_forever()
 
