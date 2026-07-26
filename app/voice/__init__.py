@@ -11,7 +11,6 @@ import uuid
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 
-from graph import State, graph
 from voice.audio_output import play_audio
 from voice.tts import synthesize
 from voice.voice_input import listen_once, load_whisper
@@ -20,6 +19,12 @@ load_dotenv()
 
 
 async def run() -> None:
+    # Imported here, not at module level — graph.py imports tools.timer_tool (a
+    # submodule of this package), which would otherwise trigger this file's own
+    # execution mid-way through graph.py's initialization, circling back on a
+    # not-yet-finished module.
+    from graph import State, graph
+
     print("=" * 40)
     print("  UPLINK — Push to talk")
     print("=" * 40)

@@ -25,6 +25,7 @@ from tools.uexcorp.mining_location_tool import MiningLocationTool
 from tools.uexcorp.refinery_yield_tool import RefineryYieldTool
 from tools.uexcorp.vehicle_purchase_tool import VehiclePurchaseTool
 from tools.uexcorp.vehicle_rental_tool import VehicleRentalTool
+from voice.timer_tool import CheckTimerTool, StartTimerTool
 
 
 class State(BaseModel):
@@ -78,7 +79,13 @@ trade_run_tools = [mark_arrived_tool, mark_cargo_acquired_tool, mark_cargo_sold_
                    confirm_cargo_loaded_tool, confirm_cargo_unloaded_tool, trade_run_status_tool,
                    cargo_packing_tool]
 
-tools = uex_backed_tools + trade_run_tools
+# General Tools
+timer_tool = StartTimerTool()
+check_timer_tool = CheckTimerTool()
+
+general_tools = [timer_tool, check_timer_tool]
+
+tools = uex_backed_tools + trade_run_tools + general_tools
 
 llm = get_chat_llm().bind_tools(tools)
 classifier_llm = get_chat_llm().with_structured_output(TopicClassification)
