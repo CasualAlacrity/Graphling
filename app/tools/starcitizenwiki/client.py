@@ -1,4 +1,5 @@
 import asyncio
+import re
 
 from pydantic import BaseModel, PrivateAttr
 
@@ -80,23 +81,38 @@ class StarCitizenWikiClient(BaseModel):
         return None
 
     async def find_jump_point(self, from_system: str, to_system: str) -> LocationPosition | None:
-        """The jump point anomaly connecting two systems, located in from_system (a jump
-        point has a separate location entry — different coordinates — on each side).
-        Not type="JumpPoint" — confirmed live, real jump points (e.g. "Stanton-Pyro Jump
-        Point") are tagged type="Anomaly" instead; only 2 locations actually use the
-        JumpPoint type and neither is a real inter-system connector. Name formatting
-        isn't consistent either ("Stanton-Pyro Jump Point" vs "Pyro - Nyx Jump Point",
-        dash spacing varies) and "Wreck Site" decoys exist (e.g. "Stanton-Pyro Jump
-        Point Wreck Site"), so this matches loosely: type Anomaly, name mentions "jump
-        point" but not "wreck", and mentions both system names."""
+        """The connector to to_system, located in from_system (a jump point/gateway has
+        a separate location entry — different coordinates — on each side).
+
+        Three real, confirmed data quirks this works around:
+        - Not always type="JumpPoint" — real jump points (e.g. "Stanton-Pyro Jump
+          Point") are mostly tagged type="Anomaly" instead; only 2 locations actually
+          use the JumpPoint type and neither is a real inter-system connector.
+        - Not always named "Jump Point" either — Stanton's connector to Nyx has no
+          Anomaly-type "Jump Point" entry at all, only "Nyx Gateway" (type="Manmade"),
+          a waypoint station near the actual point rather than the point itself. Both
+          types are searched; an actual "Jump Point" is preferred when one exists,
+          since its coordinates are presumably more precise than a nearby station's.
+        - Substring matching on the destination system name is unsafe — "Nyx" as a
+          plain substring also matches "Onyx Facility ..." (120+ unrelated entries).
+          Matched as a whole word instead.
+
+        "Wreck Site" decoys (e.g. "Stanton-Pyro Jump Point Wreck Site") are excluded.
+        """
         locations = await self.get_locations()
-        from_lower, to_lower = from_system.lower(), to_system.lower()
+        from_lower = from_system.lower()
+        to_pattern = re.compile(rf"\b{re.escape(to_system.lower())}\b")
+
+        candidates = []
         for location in locations:
-            if location.system.lower() != from_lower or location.type != "Anomaly":
+            if location.system.lower() != from_lower or location.type not in ("Anomaly", "Manmade"):
                 continue
             name_lower = location.name.lower()
-            if "jump point" not in name_lower or "wreck" in name_lower:
+            if "wreck" in name_lower or not to_pattern.search(name_lower):
                 continue
-            if from_lower in name_lower and to_lower in name_lower:
+            candidates.append(location)
+
+        for location in candidates:
+            if "jump point" in location.name.lower():
                 return location
-        return None
+        return candidates[0] if candidates else None
