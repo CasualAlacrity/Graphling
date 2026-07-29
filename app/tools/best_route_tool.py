@@ -45,7 +45,10 @@ class BestRouteTool(UplinkTool):
         "Railen'. This is not about whether an existing committed run is still the best "
         "call — use trade_advisor for that instead. Doesn't require an active trade run. "
         "Searches routes matching the ship and origin (and commodity, if named), ranks "
-        "by profit per hour, and reports the best one found."
+        "by profit per hour, and reports the best one found. The profit/hour figure "
+        "already accounts for estimated travel time and cargo transfer time, not just "
+        "the raw trade margin — if asked whether travel time factors in, the answer is "
+        "yes."
     )
     args_schema: type[BaseModel] = BestRouteArgs
     progress_label: str = "Searching routes from your location."

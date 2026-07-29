@@ -160,6 +160,30 @@ that combination scores higher.
    substantial piece of this step — not just tools that log what already
    happened, but ranking what to do next.
 
+## Known gaps (live-testing, 2026-07-29)
+
+**High priority — missing "commit to this route" tool.** `create_run_from_route`
+(`app/db/trade_run_store.py`) already exists and is exactly what's needed — it's
+what the overlay's manual UI calls (`overlay_canvas.py`) — but nothing wraps it
+as an `UplinkTool`. Live trace: pilot asked `best_route`, got a recommendation,
+said "yes" to "want to proceed with this one?" — with no commit tool available,
+the model re-ran `best_route` (redundant restatement of info already given) and
+then improvised by calling `start_timer`, which only starts a countdown, not an
+actual trade run. Needs a tool (e.g. `start_route`) that takes a chosen
+`UEXTradeRoute` + quantity + ship and calls `create_run_from_route`, following
+the Build plan's AI-integration pattern below (`mark_cargo_acquired` etc.).
+
+**Minor — `best_route`/Trade Advisor scoring isn't self-documenting to the
+model.** `find_best_route` (`app/tools/route_ranking.py`) already includes
+travel + transfer time in every profit/hour figure it returns (`total_time =
+transfer_seconds + travel`, `score = profit / total_time`) — the math is
+correct. But neither `BestRouteTool`'s description nor its reported message
+says so, so when asked directly "is travel time included?" the model (gpt-4o-
+mini) had nothing to ground an answer in and said "no" — a hallucination, not
+a real calculation gap. Worth a small copy fix once the commit tool above
+exists (that's the bigger fix — once "yes" has a real action to take, this
+kind of unmoored follow-up question mostly stops coming up).
+
 ## Trade Advisor — scoring & inferred preferences (AI integration phase)
 
 **This is the "AI aspect" of the feature, built once the ledger and manual UI
