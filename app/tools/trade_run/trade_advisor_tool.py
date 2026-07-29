@@ -112,7 +112,7 @@ class TradeAdvisorTool(UplinkTool):
             self.uex_client, self.scw_client, acquisition_leg.terminal_id, ship, matched_vehicle.scu, cache,
             commodity_id=matched_commodity.id, exclude_destination_terminal_name=sale_leg.terminal_name,
         )
-        best_alt, best_alt_score = result if result is not None else (None, None)
+        best_alt, best_alt_score, best_alt_scu = result if result is not None else (None, None, None)
 
         if committed_score is None:
             if best_alt is None:
@@ -124,9 +124,11 @@ class TradeAdvisorTool(UplinkTool):
             terminal_kind = "a ground station" if best_alt.is_on_ground_destination else "an orbital/space station"
             return (
                 f"Can't estimate your committed route's time to {sale_leg.terminal_name} — it "
-                "crosses star systems. By profit per hour, the best in-system option from "
-                f"{acquisition_leg.terminal_name} is {best_alt.destination_terminal_name} — "
-                f"about {best_alt_score * 3600:.0f} aUEC/hour. It's {terminal_kind}."
+                f"crosses star systems. In the {matched_vehicle.name}, by profit per hour, the "
+                f"best in-system option from {acquisition_leg.terminal_name} is "
+                f"{best_alt_scu:.0f} SCU of {best_alt.commodity_name} to "
+                f"{best_alt.destination_terminal_name} — about {best_alt_score * 3600:.0f} "
+                f"aUEC/hour. It's {terminal_kind}."
             )
 
         if best_alt is None or best_alt_score <= committed_score:
@@ -137,7 +139,8 @@ class TradeAdvisorTool(UplinkTool):
 
         terminal_kind = "a ground station" if best_alt.is_on_ground_destination else "an orbital/space station"
         return (
-            f"By profit per hour, {best_alt.destination_terminal_name} beats {sale_leg.terminal_name} — "
-            f"about {best_alt_score * 3600:.0f} aUEC/hour versus {committed_score * 3600:.0f} aUEC/hour. "
-            f"It's {terminal_kind}."
+            f"In the {matched_vehicle.name}, by profit per hour, {best_alt_scu:.0f} SCU of "
+            f"{best_alt.commodity_name} to {best_alt.destination_terminal_name} beats "
+            f"{sale_leg.terminal_name} — about {best_alt_score * 3600:.0f} aUEC/hour versus "
+            f"{committed_score * 3600:.0f} aUEC/hour. It's {terminal_kind}."
         )
