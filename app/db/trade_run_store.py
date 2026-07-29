@@ -65,6 +65,35 @@ def current_step_title(leg: TradeLeg) -> str:
         return "Mark leg finalized"
     return _STEP_TITLES[leg.leg_type][field]
 
+
+# Describes what the pilot hasn't done yet, not the action's name — trade_run_info feeds
+# this to the LLM, and _STEP_TITLES' phrasing ("next step: Mark arrived") reads as an
+# instruction to call the mark_arrived tool rather than a status description, since it's
+# nearly identical wording to the tool itself. _STEP_TITLES stays as-is for the overlay UI,
+# where it labels an actual button the pilot clicks — imperative phrasing is correct there.
+_PENDING_STATE_DESCRIPTIONS = {
+    LegType.ACQUISITION: {
+        LegMilestone.REACHED_AT: "not yet arrived",
+        LegMilestone.TRANSACTION_COMPLETED_AT: "arrived, cargo not yet purchased",
+        LegMilestone.TRANSFERRED_AT: "purchased, cargo not yet loaded",
+        LegMilestone.FINALIZED_AT: "loaded, leg not yet finalized",
+    },
+    LegType.SALE: {
+        LegMilestone.REACHED_AT: "not yet arrived",
+        LegMilestone.TRANSFERRED_AT: "arrived, cargo not yet unloaded",
+        LegMilestone.TRANSACTION_COMPLETED_AT: "unloaded, cargo not yet sold",
+        LegMilestone.FINALIZED_AT: "sold, leg not yet finalized",
+    },
+}
+
+
+def current_step_description(leg: TradeLeg) -> str:
+    field = next_unset_field(leg)
+    if field is None:
+        return "leg finalized"
+    return _PENDING_STATE_DESCRIPTIONS[leg.leg_type][field]
+
+
 def trade_run_info(run: TradeRun) -> str:
     """Describes every leg of a run, not just the current one, so a question like "what's
     my destination" is answerable regardless of which leg is currently active — the
@@ -78,7 +107,7 @@ def trade_run_info(run: TradeRun) -> str:
         if leg.finalized_at is not None:
             status = "finalized"
         elif leg is active_leg:
-            status = f"current — next step: {current_step_title(leg)}"
+            status = f"current — {current_step_description(leg)}"
         else:
             status = "pending"
         lines.append(f"{detail} ({status})")

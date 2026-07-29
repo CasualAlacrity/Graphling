@@ -1,6 +1,6 @@
 from tools.starcitizenwiki.client import StarCitizenWikiClient
 from tools.uexcorp.client import UEXCorpClient
-from tools.uexcorp.matching import match_by_name_or_code
+from tools.uexcorp.matching import LOW_CONFIDENCE_MAX, match_by_name_or_code, match_by_name_or_code_with_score
 
 METERS_PER_GM = 1_000_000_000
 
@@ -31,9 +31,19 @@ async def estimate_travel_time(
     if origin_terminal.star_system_name != destination_terminal.star_system_name:
         return "That route crosses star systems — jump travel time isn't estimated."
 
-    ship_speed = await scw_client.get_ship_speed(ship_name)
+    matched_ship = match_by_name_or_code_with_score(ship_name, cache.vehicles)
+    if matched_ship is None:
+        return f"Couldn't find a ship matching '{ship_name}'."
+    vehicle, ship_score = matched_ship
+    if ship_score < LOW_CONFIDENCE_MAX:
+        return (
+            f"Not sure which ship you meant by '{ship_name}' — closest match is the "
+            f"{vehicle.name}. Confirm and I'll check again."
+        )
+
+    ship_speed = await scw_client.get_ship_speed(vehicle.name)
     if ship_speed is None:
-        return f"Couldn't find speed data for '{ship_name}'."
+        return f"Couldn't find speed data for '{vehicle.name}'."
 
     if origin_terminal.orbit_name == destination_terminal.orbit_name:
         distance_gm = 0.0

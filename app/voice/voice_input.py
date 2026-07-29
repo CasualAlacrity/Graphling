@@ -78,21 +78,26 @@ def record_until_release(hotkey: str | None = None) -> np.ndarray:
     return np.concatenate(frames, axis=0).flatten()
 
 
-def transcribe(audio: np.ndarray) -> str:
-    """Run Whisper on a float32 16kHz numpy array. Returns transcribed text."""
+def transcribe(audio: np.ndarray, initial_prompt: str | None = None) -> str:
+    """Run Whisper on a float32 16kHz numpy array. Returns transcribed text.
+
+    initial_prompt seeds Whisper's decoder with expected vocabulary (e.g. ship names) —
+    it biases recognition toward correctly rendering unusual proper nouns, it doesn't
+    force them into the output. See app/voice/__init__.py for how the prompt is built.
+    """
     if _model is None:
         raise RuntimeError("Whisper model not loaded — call load_whisper() at startup")
 
     if len(audio) == 0:
         return ""
 
-    result = _model.transcribe(audio, fp16=False, language="en")
+    result = _model.transcribe(audio, fp16=False, language="en", initial_prompt=initial_prompt)
     text = result["text"].strip()
     print(f"[Voice] Transcribed: {text!r}")
     return text
 
 
-def listen_once(hotkey: str | None = None) -> str:
+def listen_once(hotkey: str | None = None, initial_prompt: str | None = None) -> str:
     """
     Full PTT cycle: wait for key → record → transcribe → return text.
     Falls back to typed input if PTT_MODE=text (useful when the OS hasn't
@@ -103,4 +108,4 @@ def listen_once(hotkey: str | None = None) -> str:
         return input("[Voice] Type your query: ").strip()
 
     audio = record_until_release(hotkey)
-    return transcribe(audio)
+    return transcribe(audio, initial_prompt=initial_prompt)

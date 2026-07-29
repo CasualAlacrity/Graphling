@@ -17,7 +17,7 @@ from tools.trade_run import resolver
 from tools.trade_run.resolver import AmbiguousRunError
 from tools.travel_time import estimate_travel_time
 from tools.uexcorp.client import UEXCorpClient
-from tools.uexcorp.matching import match_by_name_or_code
+from tools.uexcorp.matching import LOW_CONFIDENCE_MAX, match_by_name_or_code, match_by_name_or_code_with_score
 from tools.uexcorp.trade_data import UEXTradeRoute
 from tools.uplink_tool import UplinkTool
 
@@ -82,13 +82,15 @@ class TradeAdvisorTool(UplinkTool):
         if matched_commodity is None:
             return f"Couldn't find a commodity matching '{commodity}'."
 
-        matched_vehicle = match_by_name_or_code(ship, cache.vehicles)
-        if matched_vehicle is None:
+        matched_ship = match_by_name_or_code_with_score(ship, cache.vehicles)
+        if matched_ship is None:
             return f"Couldn't find a ship matching '{ship}' in the UEX vehicle catalog."
-
-        ship_speed = await self.scw_client.get_ship_speed(ship)
-        if ship_speed is None:
-            return f"Couldn't find speed data for '{ship}'."
+        matched_vehicle, ship_score = matched_ship
+        if ship_score < LOW_CONFIDENCE_MAX:
+            return (
+                f"Not sure which ship you meant by '{ship}' — closest match is the "
+                f"{matched_vehicle.name}. Confirm and I'll check again."
+            )
 
         acquisition_leg = next((leg for leg in run.legs if leg.leg_type == LegType.ACQUISITION), None)
         sale_leg = next((leg for leg in run.legs if leg.leg_type == LegType.SALE), None)

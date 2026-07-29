@@ -23,7 +23,7 @@ async def run() -> None:
     # submodule of this package), which would otherwise trigger this file's own
     # execution mid-way through graph.py's initialization, circling back on a
     # not-yet-finished module.
-    from graph import State, graph
+    from graph import State, graph, uex_client
 
     print("=" * 40)
     print("  UPLINK — Push to talk")
@@ -33,10 +33,18 @@ async def run() -> None:
     thread_id = str(uuid.uuid4())
     config = {"configurable": {"thread_id": thread_id}}
 
+    # Whisper has no built-in awareness that "Railen" or "Baijini Point" are expected
+    # words — without a hint it renders an unusual proper noun as the nearest common
+    # English word instead (e.g. "Railen" -> "railing"). Ship names are the highest-value
+    # vocabulary to bias toward: they're short, numerous, and the exact case that broke.
+    # Built once from the already-cached UEX catalog, not per-utterance.
+    cache = await uex_client.get_uex_cache()
+    ship_name_prompt = ", ".join(vehicle.name for vehicle in cache.vehicles)
+
     print("[Uplink] Ready. Hold PTT key to speak.")
 
     while True:
-        text = listen_once()
+        text = listen_once(initial_prompt=ship_name_prompt)
 
         if not text:
             print("[Uplink] Nothing transcribed, listening again...")

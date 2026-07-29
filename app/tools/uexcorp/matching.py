@@ -7,13 +7,19 @@ _HasNameAndCode = TypeVar("_HasNameAndCode")
 
 DEFAULT_NEAR_DISTANCE = 25  # gm — used when 'near' is set without an explicit max_distance
 
+# Below this score (but still >= score_cutoff), treat a match as a guess worth confirming
+# rather than a certainty — e.g. a voice-transcribed "railing" matching "Railen" at 60,
+# one point above the cutoff, with zero margin. Only meaningful to callers using
+# match_by_name_or_code_with_score; match_by_name_or_code's plain callers are unaffected.
+LOW_CONFIDENCE_MAX = 80
+
 
 class OrbitDistance(BaseModel):
     orbit_destination_name: str
     distance: float
 
 
-def match_by_name_or_code(query: str, items: list[_HasNameAndCode], score_cutoff: int = 60) -> _HasNameAndCode | None:
+def _choices_and_lookup(items: list[_HasNameAndCode]) -> tuple[list[str], list[_HasNameAndCode]]:
     choices = []
     lookup = []
     for item in items:
@@ -24,9 +30,27 @@ def match_by_name_or_code(query: str, items: list[_HasNameAndCode], score_cutoff
         if code:
             choices.append(code)
             lookup.append(item)
+    return choices, lookup
 
+
+def match_by_name_or_code(query: str, items: list[_HasNameAndCode], score_cutoff: int = 60) -> _HasNameAndCode | None:
+    choices, lookup = _choices_and_lookup(items)
     match = process.extractOne(query, choices, score_cutoff=score_cutoff)
     return lookup[match[2]] if match else None
+
+
+def match_by_name_or_code_with_score(
+        query: str, items: list[_HasNameAndCode], score_cutoff: int = 60,
+) -> tuple[_HasNameAndCode, float] | None:
+    """Same matching as match_by_name_or_code, but also returns the match score so a
+    caller can tell a barely-passing match (near score_cutoff) from a confident one, and
+    hedge accordingly instead of silently committing to a guess. Kept separate from
+    match_by_name_or_code — that function has 10+ call sites that don't need this."""
+    choices, lookup = _choices_and_lookup(items)
+    match = process.extractOne(query, choices, score_cutoff=score_cutoff)
+    if not match:
+        return None
+    return lookup[match[2]], match[1]
 
 
 def filter_by_match(rows, query, candidates, attr):
