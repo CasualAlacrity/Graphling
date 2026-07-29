@@ -1,6 +1,7 @@
 from typing import Any
 
 from pydantic import BaseModel, Field
+from rapidfuzz import fuzz
 
 from db.models import LegType
 from tools.cargo_packing import best_container_mix, parse_container_sizes
@@ -47,7 +48,7 @@ class CargoPackingTool(UEXBackedTool):
         if not isinstance(cache_result, UexReferenceCache):
             return cache_result
 
-        matched_vehicle = match_by_name_or_code(run.ship, cache_result.vehicles)
+        matched_vehicle = match_by_name_or_code(run.ship, cache_result.vehicles, scorer=fuzz.token_sort_ratio)
         if matched_vehicle is None:
             return f"Couldn't find a ship matching '{run.ship}' in the UEX vehicle catalog."
 

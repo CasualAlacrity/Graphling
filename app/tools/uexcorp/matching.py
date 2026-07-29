@@ -1,7 +1,7 @@
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel
-from rapidfuzz import process
+from rapidfuzz import fuzz, process
 
 _HasNameAndCode = TypeVar("_HasNameAndCode")
 
@@ -30,24 +30,43 @@ def _choices_and_lookup(items: list[_HasNameAndCode]) -> tuple[list[str], list[_
         if code:
             choices.append(code)
             lookup.append(item)
+
+        # Vehicles have name_full (e.g. "Gatac Railen") alongside the short name
+        # ("Railen") — manufacturer-prefixed phrasing is how ships are naturally
+        # referred to (including by trade_run_status's own output), so leaving it out
+        # of the match pool meant a correctly-typed full name still scored worse than
+        # it should have, purely from the unmatched "Gatac " prefix diluting the score.
+        name_full = getattr(item, "name_full", None)
+        if name_full:
+            choices.append(name_full)
+            lookup.append(item)
     return choices, lookup
 
 
-def match_by_name_or_code(query: str, items: list[_HasNameAndCode], score_cutoff: int = 60) -> _HasNameAndCode | None:
+def match_by_name_or_code(
+        query: str, items: list[_HasNameAndCode], score_cutoff: int = 60, scorer: Any = fuzz.WRatio,
+) -> _HasNameAndCode | None:
     choices, lookup = _choices_and_lookup(items)
-    match = process.extractOne(query, choices, score_cutoff=score_cutoff)
+    match = process.extractOne(query, choices, score_cutoff=score_cutoff, scorer=scorer)
     return lookup[match[2]] if match else None
 
 
 def match_by_name_or_code_with_score(
-        query: str, items: list[_HasNameAndCode], score_cutoff: int = 60,
+        query: str, items: list[_HasNameAndCode], score_cutoff: int = 60, scorer: Any = fuzz.WRatio,
 ) -> tuple[_HasNameAndCode, float] | None:
     """Same matching as match_by_name_or_code, but also returns the match score so a
     caller can tell a barely-passing match (near score_cutoff) from a confident one, and
     hedge accordingly instead of silently committing to a guess. Kept separate from
-    match_by_name_or_code — that function has 10+ call sites that don't need this."""
+    match_by_name_or_code — that function has 10+ call sites that don't need this.
+
+    scorer defaults to WRatio (rapidfuzz's own default) — good for short queries against
+    long official names (e.g. "Orison" against a terminal's full official name), since it
+    rewards a query matching a substring/fragment of the choice. Vehicle name matching
+    wants the opposite: fuzz.token_sort_ratio, a whole-string comparison — WRatio's
+    substring credit is what let unrelated short names like "600i Touring" outscore the
+    actually-closest "Railen" for a garbled query like "railing"."""
     choices, lookup = _choices_and_lookup(items)
-    match = process.extractOne(query, choices, score_cutoff=score_cutoff)
+    match = process.extractOne(query, choices, score_cutoff=score_cutoff, scorer=scorer)
     if not match:
         return None
     return lookup[match[2]], match[1]

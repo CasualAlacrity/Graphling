@@ -1,6 +1,7 @@
 from typing import Any
 
 from pydantic import BaseModel, Field
+from rapidfuzz import fuzz
 
 from db import trade_run_store
 from db.models import LegType
@@ -75,7 +76,7 @@ class TradeAdvisorTool(UplinkTool):
         if matched_commodity is None:
             return f"Couldn't find a commodity matching '{commodity}'."
 
-        matched_ship = match_by_name_or_code_with_score(ship, cache.vehicles)
+        matched_ship = match_by_name_or_code_with_score(ship, cache.vehicles, scorer=fuzz.token_sort_ratio)
         if matched_ship is None:
             return f"Couldn't find a ship matching '{ship}' in the UEX vehicle catalog."
         matched_vehicle, ship_score = matched_ship

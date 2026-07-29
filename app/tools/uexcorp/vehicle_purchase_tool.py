@@ -1,6 +1,7 @@
 from typing import Any
 
 from pydantic import BaseModel, Field
+from rapidfuzz import fuzz
 
 from tools.uexcorp.args import LocationArgs
 from tools.uexcorp.trade_tool import TradePriceTool
@@ -34,5 +35,5 @@ class VehiclePurchaseTool(TradePriceTool):
         return await self._safe_run(self._lookup(
             vehicle, lambda cache: cache.vehicles, self.client.get_vehicle_purchase_prices, "vehicle",
             star_system=star_system, orbit=orbit, terminal=terminal, moon=moon,
-            near=near, max_distance=max_distance,
+            near=near, max_distance=max_distance, scorer=fuzz.token_sort_ratio,
         ))

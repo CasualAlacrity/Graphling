@@ -2,6 +2,7 @@ from operator import attrgetter
 from typing import Any
 
 from pydantic import BaseModel, Field
+from rapidfuzz import fuzz
 
 from tools.uexcorp.args import LocationArgs
 from tools.uexcorp.matching import filter_by_location, match_by_name_or_code
@@ -47,7 +48,7 @@ class VehicleRentalTool(UEXBackedTool):
     async def _lookup(self, vehicle, star_system, orbit, terminal, moon, near, max_distance) -> dict[str, Any] | str:
         cache = await self.client.get_uex_cache()
 
-        matched_vehicle = match_by_name_or_code(vehicle, cache.vehicles)
+        matched_vehicle = match_by_name_or_code(vehicle, cache.vehicles, scorer=fuzz.token_sort_ratio)
         if matched_vehicle is None:
             return f"No vehicle matching '{vehicle}' was found."
 

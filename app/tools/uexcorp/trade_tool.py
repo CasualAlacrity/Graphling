@@ -2,6 +2,8 @@ from collections.abc import Callable
 from operator import attrgetter
 from typing import Any
 
+from rapidfuzz import fuzz
+
 from tools.uexcorp.matching import filter_by_location, match_by_name_or_code
 from tools.uexcorp.reference_cache import UexReferenceCache
 from tools.uexcorp.trade_data import UEXTradeData
@@ -15,10 +17,11 @@ class TradePriceTool(UEXBackedTool):
                       star_system: str | None = None, orbit: str | None = None,
                       terminal: str | None = None, moon: str | None = None,
                       near: str | None = None, max_distance: float | None = None,
+                      scorer: Any = fuzz.WRatio,
                       ) -> dict[str, Any] | str:
         cache = await self.client.get_uex_cache()
 
-        matched = match_by_name_or_code(query, catalog_selector(cache))
+        matched = match_by_name_or_code(query, catalog_selector(cache), scorer=scorer)
         if matched is None:
             return f"No {not_found_label} matching '{query}' was found."
 

@@ -1,6 +1,7 @@
 from typing import Any
 
 from pydantic import BaseModel, Field
+from rapidfuzz import fuzz
 
 from tools.route_ranking import find_best_route
 from tools.starcitizenwiki.client import StarCitizenWikiClient
@@ -81,7 +82,7 @@ class BestRouteTool(UplinkTool):
         if origin_terminal is None:
             return f"Couldn't find a location matching '{origin}'."
 
-        matched_ship = match_by_name_or_code_with_score(ship, cache.vehicles)
+        matched_ship = match_by_name_or_code_with_score(ship, cache.vehicles, scorer=fuzz.token_sort_ratio)
         if matched_ship is None:
             return f"Couldn't find a ship matching '{ship}' in the UEX vehicle catalog."
         vehicle, ship_score = matched_ship

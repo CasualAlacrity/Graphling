@@ -1,3 +1,5 @@
+from rapidfuzz import fuzz
+
 from tools.starcitizenwiki.client import StarCitizenWikiClient
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.matching import LOW_CONFIDENCE_MAX, match_by_name_or_code, match_by_name_or_code_with_score
@@ -31,7 +33,7 @@ async def estimate_travel_time(
     if origin_terminal.star_system_name != destination_terminal.star_system_name:
         return "That route crosses star systems — jump travel time isn't estimated."
 
-    matched_ship = match_by_name_or_code_with_score(ship_name, cache.vehicles)
+    matched_ship = match_by_name_or_code_with_score(ship_name, cache.vehicles, scorer=fuzz.token_sort_ratio)
     if matched_ship is None:
         return f"Couldn't find a ship matching '{ship_name}'."
     vehicle, ship_score = matched_ship
