@@ -94,12 +94,12 @@ def is_same_orbit_different_place(origin_terminal, destination_terminal) -> bool
 
 def travel_time_confidence(origin_terminal, destination_terminal) -> str:
     """"high" — the pure QT-cruise formula is actually accurate for this pair (same
-    physical location, station-to-station, or a normal cross-orbit hop via UEX).
-    "rough" — a real number, but a known partial/undercount: either at least one end
-    is on the ground (atmospheric entry isn't modeled), or the pair crosses star
-    systems (the number sums the QT-cruise legs on either side of the jump, excluding
-    jump-transit time itself). "unknown" — estimate_travel_time can't compute anything
-    at all for this pair (e.g. no jump point data between the two systems).
+    physical location, or both ends orbital — station-to-station, whether same orbit
+    or not). "rough" — a real number, but a known partial/undercount: either end is on
+    the ground (atmospheric entry isn't modeled, regardless of which distance source
+    supplied the number), or the pair crosses star systems (sums the QT-cruise legs on
+    either side of the jump, excluding jump-transit time itself). "unknown" —
+    estimate_travel_time can't compute anything at all for this pair.
 
     A hint for presentation, not a guarantee the underlying fetch will actually
     succeed — callers should still treat a string result from estimate_travel_time as
@@ -107,9 +107,9 @@ def travel_time_confidence(origin_terminal, destination_terminal) -> str:
     obscure location)."""
     if origin_terminal.star_system_name != destination_terminal.star_system_name:
         return "rough"
-    if is_same_orbit_different_place(origin_terminal, destination_terminal) and not (
-        _is_orbital(origin_terminal) and _is_orbital(destination_terminal)
-    ):
+    if is_same_physical_location(origin_terminal, destination_terminal):
+        return "high"
+    if not (_is_orbital(origin_terminal) and _is_orbital(destination_terminal)):
         return "rough"
     return "high"
 
@@ -122,17 +122,19 @@ async def estimate_travel_time(
     couldn't be estimated — callers (an LLM tool, the Trade Advisor's scoring code) need
     to check which they got back, same pattern as the trade-run tools' _safe_run results.
 
-    Deliberately approximate. Cross-orbit hops use UEX's orbit-to-orbit distance
-    (terminal-to-terminal within that, not per-terminal QT drop-out distance). Same-orbit
-    hops between different specific places (e.g. an orbital station to a surface city)
-    fall back to real coordinates from the wiki's locations/positions data instead —
-    UEX has no distance data for that case at all. Cross-system routes get a partial
+    Deliberately approximate. Same-system pairs try real coordinates from the wiki's
+    locations/positions data first — validated to the decimal against a real route, and
+    not limited to any particular orbit relationship, so it's the primary distance
+    source now, not a special case. Falls back to UEX's orbit-to-orbit distance only
+    when coordinate data is missing for one end (terminal-to-terminal within that
+    matched orbit pair, not per-terminal QT drop-out distance — coarser than the
+    coordinate path, which is why it's the fallback). Cross-system routes get a partial
     estimate the same way — sum of the QT-cruise legs on either side of the jump point,
     excluding jump-transit time itself (not distance-proportional the way in-system QT
     is, and the wiki's own route-planner tool doesn't show a number for that phase
-    either, confirmed live). All of these are known undercounts, not full-trip times —
-    see travel_time_confidence for callers that need to tell a rough number from a
-    confident one.
+    either, confirmed live). Any of these can be a known undercount, not a full-trip
+    time, whenever atmospheric entry is involved — see travel_time_confidence for
+    callers that need to tell a rough number from a confident one.
     """
     cache = await uex_client.get_uex_cache()
 
@@ -158,44 +160,45 @@ async def estimate_travel_time(
         )
 
     if is_same_physical_location(origin_terminal, destination_terminal):
-        distance_gm = 0.0
-    elif is_same_orbit_different_place(origin_terminal, destination_terminal):
-        # UEX's orbit_distances is inter-orbit only, so this is exactly the gap it can't
-        # fill (e.g. an orbital station to a surface city, or two stations around the
-        # same planet) — the wiki's locations/positions dataset has real coordinates for
-        # both ends, so a genuine distance can be computed instead of giving up.
-        #
-        # When at least one end is on the ground, this is a known, deliberate
-        # undercount — the pure QT-cruise formula below doesn't model atmospheric entry
-        # (or ground-to-ground flight), a real phase with its own time cost. Reported
-        # anyway rather than withheld: a labeled rough estimate is more useful than
-        # nothing, as long as callers can tell it apart from a confident one — see
-        # travel_time_confidence, which callers should check before deciding how to
-        # present this number.
-        origin_location = await _resolve_location(scw_client, origin_terminal)
-        destination_location = await _resolve_location(scw_client, destination_terminal)
-        if origin_location is None or destination_location is None:
-            return (
-                f"Can't estimate travel time between '{origin_name}' and '{destination_name}' — "
-                "they're in the same orbit at different specific locations, and no "
-                "coordinate data was found for one or both."
-            )
-        distance_gm = _location_distance_gm(origin_location, destination_location)
-    else:
-        origin_orbit = next((o for o in cache.orbits if o.name == origin_terminal.orbit_name), None)
-        origin_star_system = next(
-            (s for s in cache.star_systems if s.name == origin_terminal.star_system_name), None
-        )
-        if origin_orbit is None or origin_star_system is None:
-            return f"Couldn't resolve location data for '{origin_name}'."
+        return _leg_time(0.0, ship_speed)
 
-        distances = await uex_client.get_orbit_distances(origin_orbit.id, origin_star_system.id)
-        matching = next(
-            (d for d in distances if d["orbit_destination_name"] == destination_terminal.orbit_name), None
+    # Try the coordinate-based distance first, for any same-system pair — not just
+    # same-orbit ones. It's validated to the decimal against real reference data (see
+    # _location_distance_gm), strictly more accurate than UEX's orbit-to-orbit
+    # approximation, and the positions dataset doesn't care about orbit boundaries: it
+    # can measure point-to-point distance between two terminals in different orbits
+    # just as well as two in the same one. UEX's orbit_distances is only a fallback now,
+    # for whichever pairs the positions dataset doesn't have coordinates for.
+    origin_location = await _resolve_location(scw_client, origin_terminal)
+    destination_location = await _resolve_location(scw_client, destination_terminal)
+    if origin_location is not None and destination_location is not None:
+        distance_gm = _location_distance_gm(origin_location, destination_location)
+        return _leg_time(distance_gm, ship_speed)
+
+    if is_same_orbit_different_place(origin_terminal, destination_terminal):
+        # Same orbit, different place, and no coordinate data for at least one end —
+        # UEX has no data for this case at all (orbit_distances is inter-orbit only),
+        # so there's no fallback left to try.
+        return (
+            f"Can't estimate travel time between '{origin_name}' and '{destination_name}' — "
+            "they're in the same orbit at different specific locations, and no "
+            "coordinate data was found for one or both."
         )
-        if matching is None:
-            return f"No known distance between '{origin_name}' and '{destination_name}'."
-        distance_gm = float(matching["distance"])
+
+    origin_orbit = next((o for o in cache.orbits if o.name == origin_terminal.orbit_name), None)
+    origin_star_system = next(
+        (s for s in cache.star_systems if s.name == origin_terminal.star_system_name), None
+    )
+    if origin_orbit is None or origin_star_system is None:
+        return f"Couldn't resolve location data for '{origin_name}'."
+
+    distances = await uex_client.get_orbit_distances(origin_orbit.id, origin_star_system.id)
+    matching = next(
+        (d for d in distances if d["orbit_destination_name"] == destination_terminal.orbit_name), None
+    )
+    if matching is None:
+        return f"No known distance between '{origin_name}' and '{destination_name}'."
+    distance_gm = float(matching["distance"])
 
     return _leg_time(distance_gm, ship_speed)
 
