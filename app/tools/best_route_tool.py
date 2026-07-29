@@ -26,7 +26,12 @@ class BestRouteArgs(BaseModel):
     exclude_ground_stations: bool = Field(
         default=False,
         description="Set true if the pilot asks to exclude, skip, or avoid ground "
-                    "stations (e.g. wants an orbital/space-station destination only)."
+                    "stations, or wants space/orbital stations only."
+    )
+    require_autoload: bool = Field(
+        default=False,
+        description="Set true if the pilot asks for auto-load-only, or wants to avoid "
+                    "manually unloading cargo at the destination."
     )
 
 
@@ -48,7 +53,8 @@ class BestRouteTool(UplinkTool):
 
     async def _arun(
             self, origin: str, ship: str | None = None, commodity: str | None = None,
-            exclude_ground_stations: bool = False, *args: Any, **kwargs: Any,
+            exclude_ground_stations: bool = False, require_autoload: bool = False,
+            *args: Any, **kwargs: Any,
     ) -> Any:
         if ship is None:
             try:
@@ -61,10 +67,13 @@ class BestRouteTool(UplinkTool):
         if ship is None:
             return "Which ship are you flying?"
 
-        return await self._safe_run(self._find_and_report(origin, ship, commodity, exclude_ground_stations))
+        return await self._safe_run(
+            self._find_and_report(origin, ship, commodity, exclude_ground_stations, require_autoload)
+        )
 
     async def _find_and_report(
-            self, origin: str, ship: str, commodity: str | None, exclude_ground_stations: bool = False,
+            self, origin: str, ship: str, commodity: str | None,
+            exclude_ground_stations: bool = False, require_autoload: bool = False,
     ) -> str:
         cache = await self.uex_client.get_uex_cache()
 
@@ -90,12 +99,17 @@ class BestRouteTool(UplinkTool):
             commodity_id = matched_commodity.id
 
         result = await find_best_route(
-            self.uex_client, self.scw_client, origin_terminal.id, ship, vehicle.scu,
-            commodity_id=commodity_id, exclude_ground=exclude_ground_stations,
+            self.uex_client, self.scw_client, origin_terminal.id, ship, vehicle.scu, cache,
+            commodity_id=commodity_id, exclude_ground=exclude_ground_stations, require_autoload=require_autoload,
         )
         if result is None:
-            qualifier = " excluding ground stations" if exclude_ground_stations else ""
-            return f"No usable in-system route turned up from {origin_terminal.name}{qualifier}."
+            qualifiers = []
+            if exclude_ground_stations:
+                qualifiers.append("excluding ground stations")
+            if require_autoload:
+                qualifiers.append("auto-load only")
+            suffix = f" ({', '.join(qualifiers)})" if qualifiers else ""
+            return f"No usable in-system route turned up from {origin_terminal.name}{suffix}."
 
         best, score = result
         terminal_kind = "a ground station" if best.is_on_ground_destination else "an orbital/space station"

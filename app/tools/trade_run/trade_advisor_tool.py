@@ -108,7 +108,7 @@ class TradeAdvisorTool(UplinkTool):
             committed_score = committed_profit / committed_total_time if committed_total_time > 0 else 0.0
 
         result = await find_best_route(
-            self.uex_client, self.scw_client, acquisition_leg.terminal_id, ship, matched_vehicle.scu,
+            self.uex_client, self.scw_client, acquisition_leg.terminal_id, ship, matched_vehicle.scu, cache,
             commodity_id=matched_commodity.id, exclude_destination_terminal_name=sale_leg.terminal_name,
         )
         best_alt, best_alt_score = result if result is not None else (None, None)

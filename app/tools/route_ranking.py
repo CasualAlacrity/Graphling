@@ -9,16 +9,28 @@ from tools.travel_time import estimate_travel_time
 from tools.uexcorp.trade_data import UEXTradeRoute
 
 
+def _terminal_is_auto_load(cache, terminal_id: int) -> bool:
+    # is_auto_load lives on the terminals endpoint, not the commodities_routes payload —
+    # UEXTradeRoute's is_auto_load_destination defaults to 0 until filled in from here.
+    terminal = next((t for t in cache.terminals if t.id == terminal_id), None)
+    return bool(terminal and terminal.is_auto_load)
+
+
 async def find_best_route(
-        uex_client, scw_client, origin_terminal_id: int, ship: str, ship_scu: float, *,
+        uex_client, scw_client, origin_terminal_id: int, ship: str, ship_scu: float, cache, *,
         commodity_id: int | None = None, exclude_destination_terminal_name: str | None = None,
-        exclude_ground: bool = False,
+        exclude_ground: bool = False, require_autoload: bool = False,
 ) -> tuple[UEXTradeRoute, float] | None:
     """Searches commodity routes from origin_terminal_id — narrowed to one commodity if
     commodity_id is given, otherwise every commodity sellable from there — and ranks by
     profit per hour. Returns the best (route, score), or None if nothing qualifies (e.g.
-    every candidate turned out cross-system, none reach a usable SCU amount, or
-    exclude_ground filtered out everything that was left).
+    every candidate turned out cross-system, none reach a usable SCU amount, or the
+    ground/autoload filters excluded everything that was left).
+
+    exclude_ground and require_autoload only ever constrain the destination — the origin
+    is always the pilot's own pinned starting point here (unlike the overlay's filter
+    panel, where either end can be open), so filtering it by its own ground/autoload
+    status would wrongly exclude routes just because of where the pilot already is.
 
     Shared by trade_advisor (comparing against a committed leg, hence
     exclude_destination_terminal_name to skip the committed choice itself) and any tool
@@ -35,6 +47,8 @@ async def find_best_route(
         if exclude_destination_terminal_name and route.destination_terminal_name == exclude_destination_terminal_name:
             continue
         if exclude_ground and route.is_on_ground_destination:
+            continue
+        if require_autoload and not _terminal_is_auto_load(cache, route.destination_terminal_id):
             continue
 
         scu = reachable_scu(route, int(ship_scu))
