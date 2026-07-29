@@ -30,6 +30,12 @@ class UEXCorpClient(BaseModel):
     bearer_token: str
     _uex_cache: UexReferenceCache | None = PrivateAttr(default=None)
     _cache_lock: asyncio.Lock = PrivateAttr(default_factory=asyncio.Lock)
+    # Orbit distances are static game-world data (no freshness window needed, unlike
+    # _uex_cache). Callers that rank many routes from one origin (find_best_route) were
+    # each independently re-fetching this per candidate route — same origin, same
+    # response, fetched dozens of times in a row. No lock: a race just costs one wasted
+    # duplicate fetch, not a correctness issue.
+    _orbit_distances_cache: dict[tuple[int, int], list[dict]] = PrivateAttr(default_factory=dict)
 
     def _is_fresh(self, uex_cache: UexReferenceCache) -> bool:
         return (datetime.now(UTC) - uex_cache.fetched_at) < timedelta(hours=24)
@@ -230,6 +236,11 @@ class UEXCorpClient(BaseModel):
 
     @traceable(name="uex_get_orbit_distances")
     async def get_orbit_distances(self, origin_orbit_id: int, origin_star_system_id: int) -> list[dict]:
+        cache_key = (origin_orbit_id, origin_star_system_id)
+        cached = self._orbit_distances_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         response = await asyncio.to_thread(
             requests.get,
             self.API_BASE_URL + 'orbits_distances',
@@ -241,7 +252,9 @@ class UEXCorpClient(BaseModel):
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
-        return response.json()["data"]
+        data = response.json()["data"]
+        self._orbit_distances_cache[cache_key] = data
+        return data
 
     def get_header(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.bearer_token}"}

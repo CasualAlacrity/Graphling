@@ -23,6 +23,11 @@ class BestRouteArgs(BaseModel):
         description="Narrow the search to one commodity, if the pilot named one. Leave "
                     "unset to search every commodity sellable from the origin."
     )
+    exclude_ground_stations: bool = Field(
+        default=False,
+        description="Set true if the pilot asks to exclude, skip, or avoid ground "
+                    "stations (e.g. wants an orbital/space-station destination only)."
+    )
 
 
 class BestRouteTool(UplinkTool):
@@ -43,7 +48,7 @@ class BestRouteTool(UplinkTool):
 
     async def _arun(
             self, origin: str, ship: str | None = None, commodity: str | None = None,
-            *args: Any, **kwargs: Any,
+            exclude_ground_stations: bool = False, *args: Any, **kwargs: Any,
     ) -> Any:
         if ship is None:
             try:
@@ -56,9 +61,11 @@ class BestRouteTool(UplinkTool):
         if ship is None:
             return "Which ship are you flying?"
 
-        return await self._safe_run(self._find_and_report(origin, ship, commodity))
+        return await self._safe_run(self._find_and_report(origin, ship, commodity, exclude_ground_stations))
 
-    async def _find_and_report(self, origin: str, ship: str, commodity: str | None) -> str:
+    async def _find_and_report(
+            self, origin: str, ship: str, commodity: str | None, exclude_ground_stations: bool = False,
+    ) -> str:
         cache = await self.uex_client.get_uex_cache()
 
         origin_terminal = match_by_name_or_code(origin, cache.terminals)
@@ -83,10 +90,12 @@ class BestRouteTool(UplinkTool):
             commodity_id = matched_commodity.id
 
         result = await find_best_route(
-            self.uex_client, self.scw_client, origin_terminal.id, ship, vehicle.scu, commodity_id=commodity_id,
+            self.uex_client, self.scw_client, origin_terminal.id, ship, vehicle.scu,
+            commodity_id=commodity_id, exclude_ground=exclude_ground_stations,
         )
         if result is None:
-            return f"No usable in-system route turned up from {origin_terminal.name}."
+            qualifier = " excluding ground stations" if exclude_ground_stations else ""
+            return f"No usable in-system route turned up from {origin_terminal.name}{qualifier}."
 
         best, score = result
         terminal_kind = "a ground station" if best.is_on_ground_destination else "an orbital/space station"

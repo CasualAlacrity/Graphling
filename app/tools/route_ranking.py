@@ -12,11 +12,13 @@ from tools.uexcorp.trade_data import UEXTradeRoute
 async def find_best_route(
         uex_client, scw_client, origin_terminal_id: int, ship: str, ship_scu: float, *,
         commodity_id: int | None = None, exclude_destination_terminal_name: str | None = None,
+        exclude_ground: bool = False,
 ) -> tuple[UEXTradeRoute, float] | None:
     """Searches commodity routes from origin_terminal_id — narrowed to one commodity if
     commodity_id is given, otherwise every commodity sellable from there — and ranks by
     profit per hour. Returns the best (route, score), or None if nothing qualifies (e.g.
-    every candidate turned out cross-system, or none reach a usable SCU amount).
+    every candidate turned out cross-system, none reach a usable SCU amount, or
+    exclude_ground filtered out everything that was left).
 
     Shared by trade_advisor (comparing against a committed leg, hence
     exclude_destination_terminal_name to skip the committed choice itself) and any tool
@@ -31,6 +33,8 @@ async def find_best_route(
     best_score = None
     for route in candidates:
         if exclude_destination_terminal_name and route.destination_terminal_name == exclude_destination_terminal_name:
+            continue
+        if exclude_ground and route.is_on_ground_destination:
             continue
 
         scu = reachable_scu(route, int(ship_scu))
