@@ -11,13 +11,16 @@ from pydantic import BaseModel
 
 from llm import get_chat_llm
 from prompt_loader import load_prompt
+from tools.starcitizenwiki.client import StarCitizenWikiClient
 from tools.trade_run.cargo_packing_tool import CargoPackingTool
 from tools.trade_run.confirm_cargo_loaded import ConfirmCargoLoadedTool
 from tools.trade_run.confirm_cargo_unloaded import ConfirmCargoUnloadedTool
 from tools.trade_run.mark_arrived_tool import MarkArrivedTool
 from tools.trade_run.mark_cargo_acquired_tool import MarkCargoAcquiredTool
 from tools.trade_run.mark_cargo_sold_tool import MarkCargoSoldTool
+from tools.trade_run.trade_advisor_tool import TradeAdvisorTool
 from tools.trade_run.trade_run_status_tool import TradeRunStatusTool
+from tools.travel_time_tool import TravelTimeTool
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.commodity_tool import CommodityPriceTool
 from tools.uexcorp.item_tool import ItemPriceTool
@@ -55,6 +58,7 @@ uex_client = UEXCorpClient(
     api_key=os.getenv("UEXCORP_API_KEY"),
     bearer_token=os.getenv("UEXCORP_BEARER_TOKEN"),
 )
+scw_client = StarCitizenWikiClient()
 
 # UEX Backed Tools
 commodity_price_tool = CommodityPriceTool(client=uex_client)
@@ -74,16 +78,18 @@ confirm_cargo_loaded_tool = ConfirmCargoLoadedTool()
 confirm_cargo_unloaded_tool = ConfirmCargoUnloadedTool()
 trade_run_status_tool = TradeRunStatusTool()
 cargo_packing_tool = CargoPackingTool(client=uex_client)
+trade_advisor_tool = TradeAdvisorTool(uex_client=uex_client, scw_client=scw_client)
 
 trade_run_tools = [mark_arrived_tool, mark_cargo_acquired_tool, mark_cargo_sold_tool,
                    confirm_cargo_loaded_tool, confirm_cargo_unloaded_tool, trade_run_status_tool,
-                   cargo_packing_tool]
+                   cargo_packing_tool, trade_advisor_tool]
 
 # General Tools
 timer_tool = StartTimerTool()
 check_timer_tool = CheckTimerTool()
+travel_time_tool = TravelTimeTool(uex_client=uex_client, scw_client=scw_client)
 
-general_tools = [timer_tool, check_timer_tool]
+general_tools = [timer_tool, check_timer_tool, travel_time_tool]
 
 tools = uex_backed_tools + trade_run_tools + general_tools
 

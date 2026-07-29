@@ -72,3 +72,45 @@ def parse_container_sizes(csv_string) -> list[int]:
 
 def format_container_sizes(sizes) -> str:
     return ",".join(str(size) for size in sorted(sizes))
+
+
+def reachable_scu(route, cargo_scu: int | None = None) -> int:
+    """Extracted from the overlay's ResultsPanel.reachable_scu_for — same true-capacity
+    logic (DP-based, not naive full-fill), just without the UI's self.cargo_scu binding.
+    cargo_scu caps to a specific ship's hold when known; leave unset to use only the
+    route's own origin/destination stock ceiling."""
+    capacity = min(route.scu_origin, route.scu_destination)
+    if cargo_scu is not None and cargo_scu > 0:
+        capacity = min(capacity, cargo_scu)
+
+    sizes = usable_container_sizes(route.container_sizes_origin, route.container_sizes_destination)
+    if not sizes:
+        return capacity
+    return max_packable_scu(capacity, sizes)
+
+
+def estimated_profit(route, scu: int) -> float:
+    """Extracted from the overlay's ResultsPanel.estimated_profit_for — same formula,
+    just taking an already-computed reachable_scu instead of calling back into a method."""
+    return (route.price_destination - route.price_origin) * scu
+
+
+# Placeholder values pending real footage-derived benchmarks (per-crate handling time,
+# and how much slower a big crate is to move than a small one) — not yet supplied. Rough,
+# deliberately-labeled guesses so the Trade Advisor's formula is wired and testable now;
+# swap these for real numbers later without touching any caller.
+DEFAULT_SECONDS_PER_CRATE = 4.0
+DEFAULT_SIZE_MODIFIERS = {1: 0.6, 2: 0.75, 4: 0.9, 8: 1.1, 16: 1.4, 24: 1.7, 32: 2.0}
+
+
+def estimate_transfer_time(
+        mix: dict[int, int],
+        seconds_per_crate: float = DEFAULT_SECONDS_PER_CRATE,
+        size_modifiers: dict[int, float] | None = None,
+) -> float:
+    """Estimated seconds to move a given {size: count} crate mix — one direction (loading
+    or unloading), not round-trip. Bigger crates take proportionally longer to handle than
+    small ones, not just more total SCU — see the module docstring's discussion; a 32 SCU
+    crate isn't "32x a 1 SCU crate," it's a handful of crates with a heavier per-crate cost."""
+    modifiers = size_modifiers if size_modifiers is not None else DEFAULT_SIZE_MODIFIERS
+    return sum(count * seconds_per_crate * modifiers.get(size, 1.0) for size, count in mix.items())

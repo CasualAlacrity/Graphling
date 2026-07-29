@@ -61,6 +61,22 @@ real-world action → personality/heart → payoff) rather than listed as flat f
    because profit/hour wins once load/travel/unload time factors in, and ALICE says why. Closes
    the show on genuine reasoning, not another lookup.
 
+## Design principle: information, not decisions
+
+Worth stating explicitly in the narrative, not just living implicitly in the code — this is the
+line that keeps ALICE a copilot instead of a "just follow the arrow" min-max bot: **ALICE surfaces
+computed facts; the pilot makes the judgment calls.** Profit/hour, a terminal's type, a price —
+these are numbers a tool can honestly compute and state, the same way `commodity_price_lookup`
+states a price. Trade-craft judgment — wait here for a station's demand to refresh vs. relocate to
+sell the rest elsewhere, how much risk to accept for how much upside — is deliberately never
+something a tool resolves, even when the data to attempt it exists. Those calls belong to the
+pilot's own skill and experience; that's the actual game being played, and the value ALICE adds is
+better information going into that decision, not the decision itself.
+
+This is the same throughline as the Finalize Leg/Finalize Run checkpoints staying manual-only —
+both are the same principle applied at different layers: the AI can inform and prompt, but the
+pilot's hand is always the one that actually moves.
+
 Narration technique for the "looks like noise to non-gamers" problem: a standing one-line
 translation habit ("in plain terms, it just...") after each beat's tool calls resolve, delivered
 by the presenter — cheaper than building on-screen captioning, and keeps the presenter steering
