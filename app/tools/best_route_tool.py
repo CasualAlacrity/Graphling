@@ -3,7 +3,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
-from tools.route_ranking import find_best_route
+from tools.route_ranking import find_best_route, profit_per_hour
 from tools.starcitizenwiki.client import StarCitizenWikiClient
 from tools.trade_run import resolver
 from tools.trade_run.resolver import AmbiguousRunError
@@ -117,5 +117,5 @@ class BestRouteTool(UplinkTool):
         return (
             f"Best from {origin_terminal.name} in the {vehicle.name}: {scu:.0f} SCU of "
             f"{best.commodity_name} to {best.destination_terminal_name} — about "
-            f"{score * 3600:.0f} aUEC/hour. It's {terminal_kind}."
+            f"{profit_per_hour(score):,} aUEC/hour. It's {terminal_kind}."
         )

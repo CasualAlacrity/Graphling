@@ -9,6 +9,16 @@ from tools.travel_time import estimate_travel_time
 from tools.uexcorp.trade_data import UEXTradeRoute
 
 
+def profit_per_hour(score: float) -> int:
+    """Converts a raw score (aUEC/second) to aUEC/hour, rounded to the nearest 1,000.
+    The figure is already an extrapolation (profit if this exact trade repeated
+    continuously for an hour), so reporting it to the exact aUEC is false precision —
+    and a live trace showed ElevenLabs mis-pronouncing a 7-digit comma-grouped number
+    (misread as starting with "three thousand"); a rounder number is far more reliable
+    for TTS to read correctly, independent of the precision concern."""
+    return round(score * 3600 / 1000) * 1000
+
+
 def _terminal_is_auto_load(cache, terminal_id: int) -> bool:
     # is_auto_load lives on the terminals endpoint, not the commodities_routes payload —
     # UEXTradeRoute's is_auto_load_destination defaults to 0 until filled in from here.

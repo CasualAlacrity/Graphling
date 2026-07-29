@@ -6,7 +6,7 @@ from rapidfuzz import fuzz
 from db import trade_run_store
 from db.models import LegType
 from tools.cargo_packing import best_container_mix, estimate_transfer_time, parse_container_sizes
-from tools.route_ranking import find_best_route
+from tools.route_ranking import find_best_route, profit_per_hour
 from tools.starcitizenwiki.client import StarCitizenWikiClient
 from tools.trade_run import resolver
 from tools.trade_run.resolver import AmbiguousRunError
@@ -127,20 +127,20 @@ class TradeAdvisorTool(UplinkTool):
                 f"crosses star systems. In the {matched_vehicle.name}, by profit per hour, the "
                 f"best in-system option from {acquisition_leg.terminal_name} is "
                 f"{best_alt_scu:.0f} SCU of {best_alt.commodity_name} to "
-                f"{best_alt.destination_terminal_name} — about {best_alt_score * 3600:.0f} "
+                f"{best_alt.destination_terminal_name} — about {profit_per_hour(best_alt_score):,} "
                 f"aUEC/hour. It's {terminal_kind}."
             )
 
         if best_alt is None or best_alt_score <= committed_score:
             return (
                 f"By profit per hour, {sale_leg.terminal_name} is still the best call — "
-                f"about {committed_score * 3600:.0f} aUEC/hour."
+                f"about {profit_per_hour(committed_score):,} aUEC/hour."
             )
 
         terminal_kind = "a ground station" if best_alt.is_on_ground_destination else "an orbital/space station"
         return (
             f"In the {matched_vehicle.name}, by profit per hour, {best_alt_scu:.0f} SCU of "
             f"{best_alt.commodity_name} to {best_alt.destination_terminal_name} beats "
-            f"{sale_leg.terminal_name} — about {best_alt_score * 3600:.0f} aUEC/hour versus "
-            f"{committed_score * 3600:.0f} aUEC/hour. It's {terminal_kind}."
+            f"{sale_leg.terminal_name} — about {profit_per_hour(best_alt_score):,} aUEC/hour versus "
+            f"{profit_per_hour(committed_score):,} aUEC/hour. It's {terminal_kind}."
         )
