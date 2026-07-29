@@ -16,8 +16,25 @@ from qasync import asyncSlot
 
 from overlay import theme
 from overlay.theme import HudWindow
-from overlay.uex_lookup import commodity_code_for, commodity_volatility, route_breadcrumb
+from overlay.uex_lookup import commodity_code_for, commodity_volatility, route_breadcrumb, route_travel_time
 from tools.cargo_packing import estimated_profit, reachable_scu
+
+
+def format_duration(seconds: float) -> str:
+    """"3h 3m 33s" style — omits any leading unit that's zero (a 2-minute trip reads
+    "2m 16s", not "0h 2m 16s") so the common case stays short, while the unit letters
+    make the format unambiguous regardless of magnitude (unlike bare "2:16", which reads
+    as minutes:seconds until you hit an hour and it silently isn't anymore)."""
+    total = int(round(seconds))
+    hours, remainder = divmod(total, 3600)
+    minutes, secs = divmod(remainder, 60)
+    parts = []
+    if hours:
+        parts.append(f"{hours}h")
+    if hours or minutes:
+        parts.append(f"{minutes}m")
+    parts.append(f"{secs}s")
+    return " ".join(parts)
 
 # CV = volatility_price / price, the docs' "price coefficient of variation" — a raw
 # volatility_price_* value is a currency stddev, meaningless without dividing by price.
@@ -31,6 +48,7 @@ VOLATILITY_MODERATE_MAX = 0.08
 # both sides fix the same non-stretching columns to the same pixel widths.
 SCU_COLUMN_WIDTH = 64
 ARROW_COLUMN_WIDTH = 48
+TIME_COLUMN_WIDTH = 60
 ACTION_COLUMN_WIDTH = 24
 
 
@@ -131,7 +149,14 @@ class ResultsPanel(HudWindow):
 
         self.last_routes = []
         self.cargo_scu = 0
+        self.ship_name = ""
         self._volatility_by_commodity = {}
+        # Keyed by (origin_terminal_id, destination_terminal_id, ship_name) — travel
+        # time depends on which ship (speed) as well as which route, unlike volatility
+        # which only depends on the commodity. Accumulates across different ships
+        # searched in the same session rather than being cleared per search; harmless,
+        # and a free cache hit if the pilot re-searches the same ship later.
+        self._travel_time_by_key = {}
         # Which sort is currently applied — re-render after the async volatility fetch
         # resolves needs to respect whatever the user picked.
         self._active_sort_key = self.estimated_profit_for
@@ -182,12 +207,13 @@ class ResultsPanel(HudWindow):
             label.style().unpolish(label)
             label.style().polish(label)
 
-    @asyncSlot(list, int)
-    async def set_routes(self, routes, cargo_scu):
+    @asyncSlot(list, int, str)
+    async def set_routes(self, routes, cargo_scu, ship_name):
         self.last_routes = routes
         self.cargo_scu = cargo_scu
-        # Renders immediately with whatever volatility is already cached (gray "Unknown"
-        # dots for anything not yet fetched) rather than making the user wait on a
+        self.ship_name = ship_name
+        # Renders immediately with whatever volatility/travel-time is already cached
+        # (gray "Unknown" dots, blank time) rather than making the user wait on a
         # network round trip before seeing results at all. Keeps whichever sort
         # (Profit/Margin) is already selected instead of resetting it every search.
         if self.sort_toggle.isChecked():
@@ -195,7 +221,9 @@ class ResultsPanel(HudWindow):
         else:
             self.sort_by_profit()
 
-        if await self._fetch_missing_volatility(routes):
+        volatility_changed = await self._fetch_missing_volatility(routes)
+        travel_time_changed = await self._fetch_missing_travel_times(routes, ship_name)
+        if volatility_changed or travel_time_changed:
             self.render_routes(sorted(self.last_routes, key=self._active_sort_key, reverse=True))
 
     @Slot(str)
@@ -224,6 +252,52 @@ class ResultsPanel(HudWindow):
         for commodity_id, result in zip(missing, results, strict=True):
             self._volatility_by_commodity[commodity_id] = result
         return True
+
+    async def _fetch_missing_travel_times(self, routes, ship_name):
+        if not ship_name:
+            return False
+
+        # Bounded to what render_routes will actually show (top 20 by the active sort)
+        # rather than every route in a broad search — travel time is a much heavier
+        # per-item fetch than volatility (ship speed + orbit distance, not just a
+        # cached price lookup), so no point paying for rows that never get displayed.
+        # Sort order here doesn't depend on travel time, so this slice is stable
+        # regardless of fetch order.
+        displayed = sorted(routes, key=self._active_sort_key, reverse=True)[:20]
+        missing = []
+        for route in displayed:
+            key = (route.origin_terminal_id, route.destination_terminal_id, ship_name)
+            if key not in self._travel_time_by_key:
+                missing.append((key, route))
+        if not missing:
+            return False
+
+        results = await asyncio.gather(*(route_travel_time(route, ship_name) for _, route in missing))
+        for (key, _), result in zip(missing, results, strict=True):
+            self._travel_time_by_key[key] = result
+        return True
+
+    def _travel_time_for(self, route):
+        key = (route.origin_terminal_id, route.destination_terminal_id, self.ship_name)
+        return self._travel_time_by_key.get(key)
+
+    @staticmethod
+    def _is_cross_system(route):
+        return route.origin_star_system_name != route.destination_star_system_name
+
+    def _travel_time_text(self, route):
+        if self._is_cross_system(route):
+            return "Jump"
+
+        # Same-orbit-different-place no longer means "unknowable" — travel_time.py falls
+        # back to real coordinates from the wiki's locations/positions data for that
+        # case, so the fetch result decides now, same as any other pair.
+        result = self._travel_time_for(route)
+        if result is None:
+            return "…" if self.ship_name else ""
+        if isinstance(result, str):
+            return "—"  # genuinely couldn't estimate (e.g. no coordinate data, no speed data)
+        return format_duration(result)
 
     def _volatility_cv_for(self, route, side):
         by_terminal = self._volatility_by_commodity.get(route.commodity_id, {})
@@ -302,6 +376,22 @@ class ResultsPanel(HudWindow):
         layout.addWidget(distance_label)
         return block
 
+    def _build_travel_time_label(self, route):
+        time_label = QLabel(parent=None, text=self._travel_time_text(route), objectName="routeTravelTime")
+        time_label.setAlignment(Qt.AlignCenter)
+        if self._is_cross_system(route):
+            tooltip = "Crosses star systems — jump travel time isn't estimated."
+        elif not self.ship_name:
+            tooltip = "Estimated travel time — pick a ship above to see this"
+        elif self._travel_time_for(route) is None:
+            tooltip = "Estimated travel time — loading…"
+        elif isinstance(self._travel_time_for(route), str):
+            tooltip = self._travel_time_for(route)  # some other reason it couldn't be estimated
+        else:
+            tooltip = "Estimated travel time"
+        time_label.setToolTip(tooltip)
+        return time_label
+
     def _build_route_row(self, route):
         row = QFrame(objectName="routeRow")
         layout = QHBoxLayout(row)
@@ -329,6 +419,10 @@ class ResultsPanel(HudWindow):
         connector = self._build_route_connector(route)
         connector.setFixedWidth(ARROW_COLUMN_WIDTH)
         layout.addWidget(connector, 0)
+
+        time_label = self._build_travel_time_label(route)
+        time_label.setFixedWidth(TIME_COLUMN_WIDTH)
+        layout.addWidget(time_label, 0)
 
         destination_breadcrumb = route_breadcrumb(
             route.destination_star_system_name, route.destination_planet_name,
@@ -365,6 +459,7 @@ class ResultsPanel(HudWindow):
         layout.addWidget(header_label("SCU", Qt.AlignRight, SCU_COLUMN_WIDTH), 0)
         layout.addWidget(header_label("ORIGIN — BUY"), 3)
         layout.addWidget(header_label("", width=ARROW_COLUMN_WIDTH), 0)
+        layout.addWidget(header_label("TIME", Qt.AlignCenter, TIME_COLUMN_WIDTH), 0)
         layout.addWidget(header_label("DESTINATION — SELL"), 3)
         layout.addWidget(header_label("PROFIT / MARGIN", Qt.AlignRight), 2)
         layout.addWidget(header_label("", width=ACTION_COLUMN_WIDTH), 0)

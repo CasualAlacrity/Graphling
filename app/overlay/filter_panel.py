@@ -43,7 +43,7 @@ class CompleterFocusFilter(QObject):
 
 
 class FilterPanel(HudWindow):
-    routes_found = Signal(list, int)  # filtered routes, cargo SCU at time of search
+    routes_found = Signal(list, int, str)  # filtered routes, cargo SCU, ship name at time of search
     search_rejected = Signal(str)  # no commodity/source/destination selected at all
 
     def __init__(self, parent=None):
@@ -465,4 +465,4 @@ class FilterPanel(HudWindow):
             self.search_button.setEnabled(True)
             self.search_button.setText("Search")
 
-        self.routes_found.emit(routes, self.cargo_input.value())
+        self.routes_found.emit(routes, self.cargo_input.value(), self.ship_input.text())

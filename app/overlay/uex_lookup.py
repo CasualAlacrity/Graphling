@@ -2,6 +2,8 @@ import asyncio
 import os
 
 from db.session import SessionLocal, engine
+from tools.starcitizenwiki.client import StarCitizenWikiClient
+from tools.travel_time import estimate_travel_time
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.matching import find_commodity_by_id as _find_commodity_by_id
 from tools.uexcorp.price_cache import get_commodity_price_rows, get_commodity_route_rows, get_terminal_price_rows
@@ -12,6 +14,7 @@ uex_client = UEXCorpClient(
     api_key=os.getenv("UEXCORP_API_KEY"),
     bearer_token=os.getenv("UEXCORP_BEARER_TOKEN"),
 )
+scw_client = StarCitizenWikiClient()
 
 # Populated by init() — every function below that touches these assumes init() has
 # already run. Left as plain module attributes (not a class) so `uex_lookup.X` access
@@ -64,6 +67,18 @@ def route_breadcrumb(system_name, planet_name, terminal_id, fallback_terminal_na
     terminal_name = terminal.nickname if terminal else fallback_terminal_name
     parts = [_star_system_codes.get(system_name, system_name), planet_name, terminal_name]
     return "/".join(part for part in parts if part)
+
+
+async def route_travel_time(route, ship_name):
+    """Estimated in-system travel time in seconds for a search result row, or a plain
+    string (e.g. cross-system) explaining why it can't be estimated — same float|str
+    contract as estimate_travel_time itself, since results_panel needs to tell the two
+    apart when rendering. Re-resolves the terminals by name even though the route
+    already carries their IDs — harmless (an exact name match scores ~100) and reuses
+    the same tested logic the AI tools use instead of a second, leaner path."""
+    return await estimate_travel_time(
+        uex_client, scw_client, route.origin_terminal_name, route.destination_terminal_name, ship_name,
+    )
 
 
 def terminal_place_name(terminal):
