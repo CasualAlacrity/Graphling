@@ -7,9 +7,6 @@ from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.matching import resolve_or_hedge
 
 METERS_PER_GM = 1_000_000_000
-# locations/positions coordinates are in km, confirmed live against the wiki's own
-# route-planner tool's displayed distance (see StarCitizenWikiClient.get_locations).
-KM_PER_GM = 1_000_000
 
 
 def _location_lookup_candidates(terminal) -> list[str]:
@@ -42,7 +39,17 @@ async def _resolve_location(scw_client, terminal):
 
 
 def _location_distance_gm(a, b) -> float:
-    return math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2) / KM_PER_GM
+    # locations/positions coordinates are in meters, not km — confirmed live against
+    # two independent legs of a real route (33.82 Gm and 90.23 Gm, exact to the
+    # decimal) from the wiki's own route-planner tool. An earlier single-point check
+    # (Seraphim to Orison) seemed to validate a km-based /1e6 conversion instead, but
+    # that was a false match — it wasn't cross-checked against a second data point at
+    # the time, and turned out to be off by exactly 1000x once it was.
+    return math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2) / METERS_PER_GM
+
+
+def _leg_time(distance_gm: float, ship_speed) -> float:
+    return distance_gm * METERS_PER_GM / ship_speed.quantum_speed + ship_speed.quantum_spool_time
 
 
 def _is_orbital(terminal) -> bool:
@@ -85,6 +92,28 @@ def is_same_orbit_different_place(origin_terminal, destination_terminal) -> bool
     )
 
 
+def travel_time_confidence(origin_terminal, destination_terminal) -> str:
+    """"high" — the pure QT-cruise formula is actually accurate for this pair (same
+    physical location, station-to-station, or a normal cross-orbit hop via UEX).
+    "rough" — a real number, but a known partial/undercount: either at least one end
+    is on the ground (atmospheric entry isn't modeled), or the pair crosses star
+    systems (the number sums the QT-cruise legs on either side of the jump, excluding
+    jump-transit time itself). "unknown" — estimate_travel_time can't compute anything
+    at all for this pair (e.g. no jump point data between the two systems).
+
+    A hint for presentation, not a guarantee the underlying fetch will actually
+    succeed — callers should still treat a string result from estimate_travel_time as
+    unknown regardless of what this predicts (e.g. coordinate data missing for an
+    obscure location)."""
+    if origin_terminal.star_system_name != destination_terminal.star_system_name:
+        return "rough"
+    if is_same_orbit_different_place(origin_terminal, destination_terminal) and not (
+        _is_orbital(origin_terminal) and _is_orbital(destination_terminal)
+    ):
+        return "rough"
+    return "high"
+
+
 async def estimate_travel_time(
         uex_client: UEXCorpClient, scw_client: StarCitizenWikiClient,
         origin_name: str, destination_name: str, ship_name: str,
@@ -97,9 +126,13 @@ async def estimate_travel_time(
     (terminal-to-terminal within that, not per-terminal QT drop-out distance). Same-orbit
     hops between different specific places (e.g. an orbital station to a surface city)
     fall back to real coordinates from the wiki's locations/positions data instead —
-    UEX has no distance data for that case at all. Cross-system jumps aren't estimated
-    either way — jump-point transit isn't distance-proportional the way in-system
-    quantum travel is, so it's out of scope entirely rather than guessed at.
+    UEX has no distance data for that case at all. Cross-system routes get a partial
+    estimate the same way — sum of the QT-cruise legs on either side of the jump point,
+    excluding jump-transit time itself (not distance-proportional the way in-system QT
+    is, and the wiki's own route-planner tool doesn't show a number for that phase
+    either, confirmed live). All of these are known undercounts, not full-trip times —
+    see travel_time_confidence for callers that need to tell a rough number from a
+    confident one.
     """
     cache = await uex_client.get_uex_cache()
 
@@ -111,9 +144,6 @@ async def estimate_travel_time(
     if error:
         return error
 
-    if origin_terminal.star_system_name != destination_terminal.star_system_name:
-        return "That route crosses star systems — jump travel time isn't estimated."
-
     vehicle, error = resolve_or_hedge(ship_name, cache.vehicles, "ship", scorer=fuzz.token_sort_ratio)
     if error:
         return error
@@ -122,23 +152,26 @@ async def estimate_travel_time(
     if ship_speed is None:
         return f"Couldn't find speed data for '{vehicle.name}'."
 
+    if origin_terminal.star_system_name != destination_terminal.star_system_name:
+        return await _estimate_cross_system(
+            scw_client, origin_terminal, destination_terminal, ship_speed, origin_name, destination_name,
+        )
+
     if is_same_physical_location(origin_terminal, destination_terminal):
         distance_gm = 0.0
-    elif (
-        is_same_orbit_different_place(origin_terminal, destination_terminal)
-        and _is_orbital(origin_terminal) and _is_orbital(destination_terminal)
-    ):
+    elif is_same_orbit_different_place(origin_terminal, destination_terminal):
         # UEX's orbit_distances is inter-orbit only, so this is exactly the gap it can't
-        # fill (e.g. two different orbital stations around the same planet) — the wiki's
-        # locations/positions dataset has real coordinates for both, so a genuine
-        # distance can be computed instead of giving up. Restricted to station-to-station
-        # (both _is_orbital) deliberately: the pure QT-cruise formula below is only
-        # actually correct when neither end involves atmospheric entry — a station-to-
-        # surface-city hop has that same coordinate data available, but computing "9
-        # seconds" for it would be a confident, precise-looking undercount (missing the
-        # atmospheric entry phase entirely), worse than an honest "can't estimate."
-        # Modeling that phase (and the equivalent QT-dropout-to-station-approach
-        # distance) is deferred, not attempted here.
+        # fill (e.g. an orbital station to a surface city, or two stations around the
+        # same planet) — the wiki's locations/positions dataset has real coordinates for
+        # both ends, so a genuine distance can be computed instead of giving up.
+        #
+        # When at least one end is on the ground, this is a known, deliberate
+        # undercount — the pure QT-cruise formula below doesn't model atmospheric entry
+        # (or ground-to-ground flight), a real phase with its own time cost. Reported
+        # anyway rather than withheld: a labeled rough estimate is more useful than
+        # nothing, as long as callers can tell it apart from a confident one — see
+        # travel_time_confidence, which callers should check before deciding how to
+        # present this number.
         origin_location = await _resolve_location(scw_client, origin_terminal)
         destination_location = await _resolve_location(scw_client, destination_terminal)
         if origin_location is None or destination_location is None:
@@ -148,16 +181,6 @@ async def estimate_travel_time(
                 "coordinate data was found for one or both."
             )
         distance_gm = _location_distance_gm(origin_location, destination_location)
-    elif is_same_orbit_different_place(origin_terminal, destination_terminal):
-        # Same orbit, different place, but at least one end is on the ground — real
-        # distance data may exist (positions dataset), but the pure QT-cruise formula
-        # would understate it (atmospheric entry, or ground-to-ground flight, isn't QT
-        # travel at all). Deferred, not guessed at.
-        return (
-            f"Can't estimate travel time between '{origin_name}' and '{destination_name}' — "
-            "at least one is a surface location, which involves atmospheric entry, not "
-            "just quantum cruise distance."
-        )
     else:
         origin_orbit = next((o for o in cache.orbits if o.name == origin_terminal.orbit_name), None)
         origin_star_system = next(
@@ -174,5 +197,38 @@ async def estimate_travel_time(
             return f"No known distance between '{origin_name}' and '{destination_name}'."
         distance_gm = float(matching["distance"])
 
-    distance_meters = distance_gm * METERS_PER_GM
-    return distance_meters / ship_speed.quantum_speed + ship_speed.quantum_spool_time
+    return _leg_time(distance_gm, ship_speed)
+
+
+async def _estimate_cross_system(
+        scw_client: StarCitizenWikiClient, origin_terminal, destination_terminal, ship_speed,
+        origin_name: str, destination_name: str,
+) -> float | str:
+    """Partial estimate matching the wiki's own route-planner tool: sum the QT-cruise
+    legs on either side of the jump (origin to its system's jump point, then the
+    destination-side jump point to the destination), excluding jump-transit time
+    itself."""
+    origin_jump_point = await scw_client.find_jump_point(
+        origin_terminal.star_system_name, destination_terminal.star_system_name
+    )
+    destination_jump_point = await scw_client.find_jump_point(
+        destination_terminal.star_system_name, origin_terminal.star_system_name
+    )
+    if origin_jump_point is None or destination_jump_point is None:
+        return (
+            f"That route crosses star systems, and no jump point data was found "
+            f"between '{origin_terminal.star_system_name}' and "
+            f"'{destination_terminal.star_system_name}' to even partially estimate it."
+        )
+
+    origin_location = await _resolve_location(scw_client, origin_terminal)
+    destination_location = await _resolve_location(scw_client, destination_terminal)
+    if origin_location is None or destination_location is None:
+        return (
+            f"That route crosses star systems, and no coordinate data was found for "
+            f"'{origin_name}' or '{destination_name}' to even partially estimate it."
+        )
+
+    leg1 = _leg_time(_location_distance_gm(origin_location, origin_jump_point), ship_speed)
+    leg2 = _leg_time(_location_distance_gm(destination_jump_point, destination_location), ship_speed)
+    return leg1 + leg2

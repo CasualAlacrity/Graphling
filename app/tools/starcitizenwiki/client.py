@@ -78,3 +78,25 @@ class StarCitizenWikiClient(BaseModel):
             if location.name.lower() == name_lower and location.system.lower() == system_lower:
                 return location
         return None
+
+    async def find_jump_point(self, from_system: str, to_system: str) -> LocationPosition | None:
+        """The jump point anomaly connecting two systems, located in from_system (a jump
+        point has a separate location entry — different coordinates — on each side).
+        Not type="JumpPoint" — confirmed live, real jump points (e.g. "Stanton-Pyro Jump
+        Point") are tagged type="Anomaly" instead; only 2 locations actually use the
+        JumpPoint type and neither is a real inter-system connector. Name formatting
+        isn't consistent either ("Stanton-Pyro Jump Point" vs "Pyro - Nyx Jump Point",
+        dash spacing varies) and "Wreck Site" decoys exist (e.g. "Stanton-Pyro Jump
+        Point Wreck Site"), so this matches loosely: type Anomaly, name mentions "jump
+        point" but not "wreck", and mentions both system names."""
+        locations = await self.get_locations()
+        from_lower, to_lower = from_system.lower(), to_system.lower()
+        for location in locations:
+            if location.system.lower() != from_lower or location.type != "Anomaly":
+                continue
+            name_lower = location.name.lower()
+            if "jump point" not in name_lower or "wreck" in name_lower:
+                continue
+            if from_lower in name_lower and to_lower in name_lower:
+                return location
+        return None

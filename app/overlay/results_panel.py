@@ -16,8 +16,15 @@ from qasync import asyncSlot
 
 from overlay import theme
 from overlay.theme import HudWindow
-from overlay.uex_lookup import commodity_code_for, commodity_volatility, route_breadcrumb, route_travel_time
+from overlay.uex_lookup import (
+    commodity_code_for,
+    commodity_volatility,
+    find_terminal_by_id,
+    route_breadcrumb,
+    route_travel_time,
+)
 from tools.cargo_packing import estimated_profit, reachable_scu
+from tools.travel_time import travel_time_confidence
 
 
 def format_duration(seconds: float) -> str:
@@ -281,23 +288,32 @@ class ResultsPanel(HudWindow):
         key = (route.origin_terminal_id, route.destination_terminal_id, self.ship_name)
         return self._travel_time_by_key.get(key)
 
-    @staticmethod
-    def _is_cross_system(route):
-        return route.origin_star_system_name != route.destination_star_system_name
-
     def _travel_time_text(self, route):
-        if self._is_cross_system(route):
-            return "Jump"
-
-        # Same-orbit-different-place no longer means "unknowable" — travel_time.py falls
-        # back to real coordinates from the wiki's locations/positions data for that
-        # case, so the fetch result decides now, same as any other pair.
+        # Cross-system no longer means "unknowable" either — travel_time.py now sums
+        # the QT-cruise legs on either side of the jump point when it can find one, so
+        # the fetch result decides display, same as every other pair.
         result = self._travel_time_for(route)
         if result is None:
             return "…" if self.ship_name else ""
         if isinstance(result, str):
-            return "—"  # genuinely couldn't estimate (e.g. no coordinate data, no speed data)
+            return "—"  # genuinely couldn't estimate (e.g. no coordinate/jump-point data)
         return format_duration(result)
+
+    @staticmethod
+    def _travel_time_confidence_for(route):
+        origin = find_terminal_by_id(route.origin_terminal_id)
+        destination = find_terminal_by_id(route.destination_terminal_id)
+        return travel_time_confidence(origin, destination) if origin and destination else "unknown"
+
+    def _travel_time_color(self, route):
+        result = self._travel_time_for(route)
+        if not isinstance(result, float):
+            return theme.TEXT_DISABLED  # loading, or genuinely couldn't estimate
+
+        confidence = self._travel_time_confidence_for(route)
+        if confidence == "rough":
+            return theme.WARNING  # a real number, but a known partial/undercount
+        return theme.TEXT_PRIMARY  # high confidence — the formula is actually accurate here
 
     def _volatility_cv_for(self, route, side):
         by_terminal = self._volatility_by_commodity.get(route.commodity_id, {})
@@ -379,14 +395,20 @@ class ResultsPanel(HudWindow):
     def _build_travel_time_label(self, route):
         time_label = QLabel(parent=None, text=self._travel_time_text(route), objectName="routeTravelTime")
         time_label.setAlignment(Qt.AlignCenter)
-        if self._is_cross_system(route):
-            tooltip = "Crosses star systems — jump travel time isn't estimated."
-        elif not self.ship_name:
+        time_label.setStyleSheet(f"color: {self._travel_time_color(route)};")
+
+        result = self._travel_time_for(route)
+        if not self.ship_name:
             tooltip = "Estimated travel time — pick a ship above to see this"
-        elif self._travel_time_for(route) is None:
+        elif result is None:
             tooltip = "Estimated travel time — loading…"
-        elif isinstance(self._travel_time_for(route), str):
-            tooltip = self._travel_time_for(route)  # some other reason it couldn't be estimated
+        elif isinstance(result, str):
+            tooltip = result  # the specific reason it couldn't be estimated
+        elif self._travel_time_confidence_for(route) == "rough":
+            tooltip = (
+                "Rough estimate — a known partial or undercount (e.g. atmospheric entry "
+                "isn't modeled, or this excludes jump-transit time), not a full-trip time."
+            )
         else:
             tooltip = "Estimated travel time"
         time_label.setToolTip(tooltip)
