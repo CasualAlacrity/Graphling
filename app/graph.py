@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from llm import get_chat_llm
 from prompt_loader import load_prompt
+from tools.best_route_tool import BestRouteTool
 from tools.starcitizenwiki.client import StarCitizenWikiClient
 from tools.trade_run.cargo_packing_tool import CargoPackingTool
 from tools.trade_run.confirm_cargo_loaded import ConfirmCargoLoadedTool
@@ -18,7 +19,6 @@ from tools.trade_run.confirm_cargo_unloaded import ConfirmCargoUnloadedTool
 from tools.trade_run.mark_arrived_tool import MarkArrivedTool
 from tools.trade_run.mark_cargo_acquired_tool import MarkCargoAcquiredTool
 from tools.trade_run.mark_cargo_sold_tool import MarkCargoSoldTool
-from tools.trade_run.trade_advisor_tool import TradeAdvisorTool
 from tools.trade_run.trade_run_status_tool import TradeRunStatusTool
 from tools.travel_time_tool import TravelTimeTool
 from tools.uexcorp.client import UEXCorpClient
@@ -78,18 +78,22 @@ confirm_cargo_loaded_tool = ConfirmCargoLoadedTool()
 confirm_cargo_unloaded_tool = ConfirmCargoUnloadedTool()
 trade_run_status_tool = TradeRunStatusTool()
 cargo_packing_tool = CargoPackingTool(client=uex_client)
-trade_advisor_tool = TradeAdvisorTool(uex_client=uex_client, scw_client=scw_client)
+# TradeAdvisorTool ("is my committed run still the best call") is parked, not deleted —
+# best_route below covers the question pilots actually ask ("what's the best route from
+# here"); the committed-vs-alternatives framing wasn't judged worth keeping in the tool
+# list. Code stays intact in case that changes.
 
 trade_run_tools = [mark_arrived_tool, mark_cargo_acquired_tool, mark_cargo_sold_tool,
                    confirm_cargo_loaded_tool, confirm_cargo_unloaded_tool, trade_run_status_tool,
-                   cargo_packing_tool, trade_advisor_tool]
+                   cargo_packing_tool]
 
 # General Tools
 timer_tool = StartTimerTool()
 check_timer_tool = CheckTimerTool()
 travel_time_tool = TravelTimeTool(uex_client=uex_client, scw_client=scw_client)
+best_route_tool = BestRouteTool(uex_client=uex_client, scw_client=scw_client)
 
-general_tools = [timer_tool, check_timer_tool, travel_time_tool]
+general_tools = [timer_tool, check_timer_tool, travel_time_tool, best_route_tool]
 
 tools = uex_backed_tools + trade_run_tools + general_tools
 

@@ -4,21 +4,14 @@ from pydantic import BaseModel, Field
 
 from db import trade_run_store
 from db.models import LegType
-from tools.cargo_packing import (
-    best_container_mix,
-    estimate_transfer_time,
-    estimated_profit,
-    parse_container_sizes,
-    reachable_scu,
-    usable_container_sizes,
-)
+from tools.cargo_packing import best_container_mix, estimate_transfer_time, parse_container_sizes
+from tools.route_ranking import find_best_route
 from tools.starcitizenwiki.client import StarCitizenWikiClient
 from tools.trade_run import resolver
 from tools.trade_run.resolver import AmbiguousRunError
 from tools.travel_time import estimate_travel_time
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.matching import LOW_CONFIDENCE_MAX, match_by_name_or_code, match_by_name_or_code_with_score
-from tools.uexcorp.trade_data import UEXTradeRoute
 from tools.uplink_tool import UplinkTool
 
 
@@ -101,49 +94,39 @@ class TradeAdvisorTool(UplinkTool):
         committed_mix = best_container_mix(matched_vehicle.scu, container_sizes)
         committed_transfer_seconds = 2 * estimate_transfer_time(committed_mix)
 
+        # A cross-system committed leg means its own time can't be estimated, but that's
+        # no reason to give up on the whole comparison — same-origin alternatives may
+        # well be in-system and answerable. committed_score stays None in that case
+        # rather than short-circuiting the alternative search below.
         committed_travel = await estimate_travel_time(
             self.uex_client, self.scw_client, acquisition_leg.terminal_name, sale_leg.terminal_name, ship
         )
-        if isinstance(committed_travel, str):
-            return committed_travel
+        committed_score = None
+        if isinstance(committed_travel, float):
+            committed_total_time = committed_transfer_seconds + committed_travel
+            committed_profit = trade_run_store.run_profit(run)
+            committed_score = committed_profit / committed_total_time if committed_total_time > 0 else 0.0
 
-        committed_total_time = committed_transfer_seconds + committed_travel
-        committed_profit = trade_run_store.run_profit(run)
-        committed_score = committed_profit / committed_total_time if committed_total_time > 0 else 0.0
-
-        raw_routes = await self.uex_client.get_commodity_routes(
-            commodity_id=matched_commodity.id, origin_terminal_id=acquisition_leg.terminal_id,
+        result = await find_best_route(
+            self.uex_client, self.scw_client, acquisition_leg.terminal_id, ship, matched_vehicle.scu,
+            commodity_id=matched_commodity.id, exclude_destination_terminal_name=sale_leg.terminal_name,
         )
-        candidates = [UEXTradeRoute.model_validate(row) for row in raw_routes]
+        best_alt, best_alt_score = result if result is not None else (None, None)
 
-        best_alt: UEXTradeRoute | None = None
-        best_alt_score = None
-        for route in candidates:
-            if route.destination_terminal_name == sale_leg.terminal_name:
-                continue  # the committed choice itself, not an alternative
-
-            scu = reachable_scu(route, int(matched_vehicle.scu))
-            if scu <= 0:
-                continue
-
-            mix = best_container_mix(
-                scu, usable_container_sizes(route.container_sizes_origin, route.container_sizes_destination)
+        if committed_score is None:
+            if best_alt is None:
+                return (
+                    f"Can't estimate your committed route's time to {sale_leg.terminal_name} — "
+                    "it crosses star systems — and no in-system alternative turned up for "
+                    f"{matched_commodity.name} from {acquisition_leg.terminal_name}."
+                )
+            terminal_kind = "a ground station" if best_alt.is_on_ground_destination else "an orbital/space station"
+            return (
+                f"Can't estimate your committed route's time to {sale_leg.terminal_name} — it "
+                "crosses star systems. By profit per hour, the best in-system option from "
+                f"{acquisition_leg.terminal_name} is {best_alt.destination_terminal_name} — "
+                f"about {best_alt_score * 3600:.0f} aUEC/hour. It's {terminal_kind}."
             )
-            transfer_seconds = 2 * estimate_transfer_time(mix)
-
-            travel = await estimate_travel_time(
-                self.uex_client, self.scw_client, route.origin_terminal_name, route.destination_terminal_name, ship
-            )
-            if isinstance(travel, str):
-                continue  # can't estimate this candidate (e.g. cross-system) — skip, don't guess
-
-            total_time = transfer_seconds + travel
-            if total_time <= 0:
-                continue
-            score = estimated_profit(route, scu) / total_time
-
-            if best_alt_score is None or score > best_alt_score:
-                best_alt, best_alt_score = route, score
 
         if best_alt is None or best_alt_score <= committed_score:
             return (

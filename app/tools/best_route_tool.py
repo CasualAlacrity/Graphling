@@ -1,0 +1,97 @@
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+from tools.route_ranking import find_best_route
+from tools.starcitizenwiki.client import StarCitizenWikiClient
+from tools.trade_run import resolver
+from tools.trade_run.resolver import AmbiguousRunError
+from tools.uexcorp.client import UEXCorpClient
+from tools.uexcorp.matching import LOW_CONFIDENCE_MAX, match_by_name_or_code, match_by_name_or_code_with_score
+from tools.uplink_tool import UplinkTool
+
+
+class BestRouteArgs(BaseModel):
+    origin: str = Field(description="Where the pilot currently is, e.g. 'Seraphim'.")
+    ship: str | None = Field(
+        default=None,
+        description="The ship being flown, if named. Leave unset to fall back to an "
+                    "active trade run's ship, if there is one."
+    )
+    commodity: str | None = Field(
+        default=None,
+        description="Narrow the search to one commodity, if the pilot named one. Leave "
+                    "unset to search every commodity sellable from the origin."
+    )
+
+
+class BestRouteTool(UplinkTool):
+    name: str = "best_route"
+    description: str = (
+        "Find the best trade route to take right now from a given location — call this "
+        "when the pilot wants a fresh route recommendation, e.g. 'what's the best route "
+        "from Seraphim', 'what should I haul out of here', 'find me a route in my "
+        "Railen'. This is not about whether an existing committed run is still the best "
+        "call — use trade_advisor for that instead. Doesn't require an active trade run. "
+        "Searches routes matching the ship and origin (and commodity, if named), ranks "
+        "by profit per hour, and reports the best one found."
+    )
+    args_schema: type[BaseModel] = BestRouteArgs
+    progress_label: str = "Searching routes from your location."
+    uex_client: UEXCorpClient
+    scw_client: StarCitizenWikiClient
+
+    async def _arun(
+            self, origin: str, ship: str | None = None, commodity: str | None = None,
+            *args: Any, **kwargs: Any,
+    ) -> Any:
+        if ship is None:
+            try:
+                run = await resolver.resolve_run()
+            except (ValueError, AmbiguousRunError):
+                run = None
+            if run is not None:
+                ship = run.ship
+
+        if ship is None:
+            return "Which ship are you flying?"
+
+        return await self._safe_run(self._find_and_report(origin, ship, commodity))
+
+    async def _find_and_report(self, origin: str, ship: str, commodity: str | None) -> str:
+        cache = await self.uex_client.get_uex_cache()
+
+        origin_terminal = match_by_name_or_code(origin, cache.terminals)
+        if origin_terminal is None:
+            return f"Couldn't find a location matching '{origin}'."
+
+        matched_ship = match_by_name_or_code_with_score(ship, cache.vehicles)
+        if matched_ship is None:
+            return f"Couldn't find a ship matching '{ship}' in the UEX vehicle catalog."
+        vehicle, ship_score = matched_ship
+        if ship_score < LOW_CONFIDENCE_MAX:
+            return (
+                f"Not sure which ship you meant by '{ship}' — closest match is the "
+                f"{vehicle.name}. Confirm and I'll check again."
+            )
+
+        commodity_id = None
+        if commodity is not None:
+            matched_commodity = match_by_name_or_code(commodity, cache.commodities)
+            if matched_commodity is None:
+                return f"Couldn't find a commodity matching '{commodity}'."
+            commodity_id = matched_commodity.id
+
+        result = await find_best_route(
+            self.uex_client, self.scw_client, origin_terminal.id, ship, vehicle.scu, commodity_id=commodity_id,
+        )
+        if result is None:
+            return f"No usable in-system route turned up from {origin_terminal.name}."
+
+        best, score = result
+        terminal_kind = "a ground station" if best.is_on_ground_destination else "an orbital/space station"
+        return (
+            f"Best from {origin_terminal.name}: {best.commodity_name} to "
+            f"{best.destination_terminal_name} — about {score * 3600:.0f} aUEC/hour. "
+            f"It's {terminal_kind}."
+        )
