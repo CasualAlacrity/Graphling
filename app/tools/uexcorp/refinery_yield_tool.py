@@ -4,7 +4,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from tools.uexcorp.args import LocationArgs
-from tools.uexcorp.matching import filter_by_location, find_commodity_by_id, match_by_name_or_code
+from tools.uexcorp.matching import filter_by_location, find_commodity_by_id, resolve_or_hedge
 from tools.uplink_tool import UEXBackedTool
 
 
@@ -51,9 +51,9 @@ class RefineryYieldTool(UEXBackedTool):
     async def _lookup(self, commodity, star_system, orbit, terminal, moon, near, max_distance) -> dict[str, Any] | str:
         cache = await self.client.get_uex_cache()
 
-        matched_commodity = match_by_name_or_code(commodity, cache.commodities)
-        if matched_commodity is None:
-            return f"No commodity matching '{commodity}' was found."
+        matched_commodity, error = resolve_or_hedge(commodity, cache.commodities, "commodity")
+        if error:
+            return error
 
         raw_commodity = _resolve_raw_commodity(matched_commodity, cache)
         if raw_commodity is None:

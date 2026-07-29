@@ -5,7 +5,7 @@ from rapidfuzz import fuzz
 from db import trade_run_store
 from db.models import LegType, TradeLeg, TradeRun
 from tools.uexcorp.client import UEXCorpClient
-from tools.uexcorp.matching import match_by_name_or_code
+from tools.uexcorp.matching import LOW_CONFIDENCE_MAX, match_by_name_or_code_with_score
 
 uex_client = UEXCorpClient(
     api_key=os.getenv("UEXCORP_API_KEY"),
@@ -23,14 +23,29 @@ class AmbiguousRunError(Exception):
         self.candidates = candidates
 
 
+def _confident_match(query, items):
+    # A low-confidence canonicalization here is treated the same as no match at all,
+    # rather than trusted — the caller falls back to matching on leg_type alone, which
+    # is still fully safe (more than one candidate raises AmbiguousLegError rather than
+    # silently picking one). Better than confidently filtering against a wrong
+    # commodity/terminal a garbled hint happened to score just above the cutoff for.
+    if query is None:
+        return None
+    matched = match_by_name_or_code_with_score(query, items)
+    if matched is None:
+        return None
+    item, score = matched
+    return item if score >= LOW_CONFIDENCE_MAX else None
+
+
 async def resolve_leg(
         leg_type: LegType | None = None, commodity: str | None = None, terminal: str | None = None
 ) -> TradeLeg:
     cache = await uex_client.get_uex_cache()
     current_runs = await trade_run_store.get_in_progress_runs()
 
-    matched_commodity = match_by_name_or_code(commodity, cache.commodities)
-    matched_terminal = match_by_name_or_code(terminal, cache.terminals)
+    matched_commodity = _confident_match(commodity, cache.commodities)
+    matched_terminal = _confident_match(terminal, cache.terminals)
 
     # With no commodity/terminal hint given at all, a leg's leg_type match is treated
     # as sufficient on its own — the pilot referring to "the cargo" with no name usually

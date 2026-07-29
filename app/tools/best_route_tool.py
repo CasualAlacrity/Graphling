@@ -8,7 +8,7 @@ from tools.starcitizenwiki.client import StarCitizenWikiClient
 from tools.trade_run import resolver
 from tools.trade_run.resolver import AmbiguousRunError
 from tools.uexcorp.client import UEXCorpClient
-from tools.uexcorp.matching import match_by_name_or_code, resolve_or_hedge
+from tools.uexcorp.matching import resolve_or_hedge
 from tools.uplink_tool import UplinkTool
 
 
@@ -88,9 +88,9 @@ class BestRouteTool(UplinkTool):
 
         commodity_id = None
         if commodity is not None:
-            matched_commodity = match_by_name_or_code(commodity, cache.commodities)
-            if matched_commodity is None:
-                return f"Couldn't find a commodity matching '{commodity}'."
+            matched_commodity, error = resolve_or_hedge(commodity, cache.commodities, "commodity")
+            if error:
+                return error
             commodity_id = matched_commodity.id
 
         result = await find_best_route(

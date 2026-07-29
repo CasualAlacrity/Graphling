@@ -12,7 +12,7 @@ from tools.trade_run import resolver
 from tools.trade_run.resolver import AmbiguousRunError
 from tools.travel_time import estimate_travel_time
 from tools.uexcorp.client import UEXCorpClient
-from tools.uexcorp.matching import match_by_name_or_code, resolve_or_hedge
+from tools.uexcorp.matching import resolve_or_hedge
 from tools.uplink_tool import UplinkTool
 
 
@@ -72,9 +72,9 @@ class TradeAdvisorTool(UplinkTool):
     async def _compute_recommendation(self, run, commodity: str, ship: str) -> str:
         cache = await self.uex_client.get_uex_cache()
 
-        matched_commodity = match_by_name_or_code(commodity, cache.commodities)
-        if matched_commodity is None:
-            return f"Couldn't find a commodity matching '{commodity}'."
+        matched_commodity, error = resolve_or_hedge(commodity, cache.commodities, "commodity")
+        if error:
+            return error
 
         matched_vehicle, error = resolve_or_hedge(ship, cache.vehicles, "ship", scorer=fuzz.token_sort_ratio)
         if error:

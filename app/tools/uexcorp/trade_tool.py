@@ -4,7 +4,7 @@ from typing import Any
 
 from rapidfuzz import fuzz
 
-from tools.uexcorp.matching import filter_by_location, match_by_name_or_code
+from tools.uexcorp.matching import filter_by_location, resolve_or_hedge
 from tools.uexcorp.reference_cache import UexReferenceCache
 from tools.uexcorp.trade_data import UEXTradeData
 from tools.uplink_tool import UEXBackedTool
@@ -21,9 +21,9 @@ class TradePriceTool(UEXBackedTool):
                       ) -> dict[str, Any] | str:
         cache = await self.client.get_uex_cache()
 
-        matched = match_by_name_or_code(query, catalog_selector(cache), scorer=scorer)
-        if matched is None:
-            return f"No {not_found_label} matching '{query}' was found."
+        matched, error = resolve_or_hedge(query, catalog_selector(cache), not_found_label, scorer=scorer)
+        if error:
+            return error
 
         rows = [UEXTradeData.model_validate(row) for row in await fetch_prices(matched.id)]
         rows = await filter_by_location(
