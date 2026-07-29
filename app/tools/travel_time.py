@@ -2,7 +2,7 @@ from rapidfuzz import fuzz
 
 from tools.starcitizenwiki.client import StarCitizenWikiClient
 from tools.uexcorp.client import UEXCorpClient
-from tools.uexcorp.matching import LOW_CONFIDENCE_MAX, match_by_name_or_code, match_by_name_or_code_with_score
+from tools.uexcorp.matching import resolve_or_hedge
 
 METERS_PER_GM = 1_000_000_000
 
@@ -23,25 +23,20 @@ async def estimate_travel_time(
     """
     cache = await uex_client.get_uex_cache()
 
-    origin_terminal = match_by_name_or_code(origin_name, cache.terminals)
-    if origin_terminal is None:
-        return f"Couldn't find a location matching '{origin_name}'."
-    destination_terminal = match_by_name_or_code(destination_name, cache.terminals)
-    if destination_terminal is None:
-        return f"Couldn't find a location matching '{destination_name}'."
+    origin_terminal, error = resolve_or_hedge(origin_name, cache.terminals, "location")
+    if error:
+        return error
+
+    destination_terminal, error = resolve_or_hedge(destination_name, cache.terminals, "location")
+    if error:
+        return error
 
     if origin_terminal.star_system_name != destination_terminal.star_system_name:
         return "That route crosses star systems — jump travel time isn't estimated."
 
-    matched_ship = match_by_name_or_code_with_score(ship_name, cache.vehicles, scorer=fuzz.token_sort_ratio)
-    if matched_ship is None:
-        return f"Couldn't find a ship matching '{ship_name}'."
-    vehicle, ship_score = matched_ship
-    if ship_score < LOW_CONFIDENCE_MAX:
-        # Deliberately doesn't name the closest match — naming it gives the model a
-        # ready-made string to just re-submit as the next tool call, treating an
-        # uncertain guess as a confirmed answer instead of actually asking the pilot.
-        return f"Didn't catch which ship you meant by '{ship_name}' clearly enough to be sure — can you say it again?"
+    vehicle, error = resolve_or_hedge(ship_name, cache.vehicles, "ship", scorer=fuzz.token_sort_ratio)
+    if error:
+        return error
 
     ship_speed = await scw_client.get_ship_speed(vehicle.name)
     if ship_speed is None:

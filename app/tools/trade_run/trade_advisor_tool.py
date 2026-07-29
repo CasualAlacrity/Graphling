@@ -12,7 +12,7 @@ from tools.trade_run import resolver
 from tools.trade_run.resolver import AmbiguousRunError
 from tools.travel_time import estimate_travel_time
 from tools.uexcorp.client import UEXCorpClient
-from tools.uexcorp.matching import LOW_CONFIDENCE_MAX, match_by_name_or_code, match_by_name_or_code_with_score
+from tools.uexcorp.matching import match_by_name_or_code, resolve_or_hedge
 from tools.uplink_tool import UplinkTool
 
 
@@ -76,15 +76,9 @@ class TradeAdvisorTool(UplinkTool):
         if matched_commodity is None:
             return f"Couldn't find a commodity matching '{commodity}'."
 
-        matched_ship = match_by_name_or_code_with_score(ship, cache.vehicles, scorer=fuzz.token_sort_ratio)
-        if matched_ship is None:
-            return f"Couldn't find a ship matching '{ship}' in the UEX vehicle catalog."
-        matched_vehicle, ship_score = matched_ship
-        if ship_score < LOW_CONFIDENCE_MAX:
-            # Deliberately doesn't name the closest match — naming it gives the model a
-            # ready-made string to just re-submit as the next tool call, treating an
-            # uncertain guess as a confirmed answer instead of actually asking the pilot.
-            return f"Didn't catch which ship you meant by '{ship}' clearly enough to be sure — can you say it again?"
+        matched_vehicle, error = resolve_or_hedge(ship, cache.vehicles, "ship", scorer=fuzz.token_sort_ratio)
+        if error:
+            return error
 
         acquisition_leg = next((leg for leg in run.legs if leg.leg_type == LegType.ACQUISITION), None)
         sale_leg = next((leg for leg in run.legs if leg.leg_type == LegType.SALE), None)

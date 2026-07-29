@@ -8,7 +8,7 @@ from tools.starcitizenwiki.client import StarCitizenWikiClient
 from tools.trade_run import resolver
 from tools.trade_run.resolver import AmbiguousRunError
 from tools.uexcorp.client import UEXCorpClient
-from tools.uexcorp.matching import LOW_CONFIDENCE_MAX, match_by_name_or_code, match_by_name_or_code_with_score
+from tools.uexcorp.matching import match_by_name_or_code, resolve_or_hedge
 from tools.uplink_tool import UplinkTool
 
 
@@ -78,19 +78,13 @@ class BestRouteTool(UplinkTool):
     ) -> str:
         cache = await self.uex_client.get_uex_cache()
 
-        origin_terminal = match_by_name_or_code(origin, cache.terminals)
-        if origin_terminal is None:
-            return f"Couldn't find a location matching '{origin}'."
+        origin_terminal, error = resolve_or_hedge(origin, cache.terminals, "location")
+        if error:
+            return error
 
-        matched_ship = match_by_name_or_code_with_score(ship, cache.vehicles, scorer=fuzz.token_sort_ratio)
-        if matched_ship is None:
-            return f"Couldn't find a ship matching '{ship}' in the UEX vehicle catalog."
-        vehicle, ship_score = matched_ship
-        if ship_score < LOW_CONFIDENCE_MAX:
-            # Deliberately doesn't name the closest match — naming it gives the model a
-            # ready-made string to just re-submit as the next tool call, treating an
-            # uncertain guess as a confirmed answer instead of actually asking the pilot.
-            return f"Didn't catch which ship you meant by '{ship}' clearly enough to be sure — can you say it again?"
+        vehicle, error = resolve_or_hedge(ship, cache.vehicles, "ship", scorer=fuzz.token_sort_ratio)
+        if error:
+            return error
 
         commodity_id = None
         if commodity is not None:

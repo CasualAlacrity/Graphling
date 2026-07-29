@@ -72,6 +72,32 @@ def match_by_name_or_code_with_score(
     return lookup[match[2]], match[1]
 
 
+def resolve_or_hedge(
+        query: str, items: list[_HasNameAndCode], label: str, score_cutoff: int = 60, scorer: Any = fuzz.WRatio,
+) -> tuple[_HasNameAndCode | None, str | None]:
+    """Match + confidence-check + standard error wording, in one place — every tool that
+    resolves a pilot-spoken name (ship, location, ...) needs the same three things: fail
+    plainly if nothing matches, hedge instead of silently committing if the match is
+    low-confidence, and never name the low-confidence guess (naming it just hands the
+    model a ready-made string to resubmit as fact instead of actually asking the pilot).
+
+    A missing confidence check on terminal matching (only ship matching had it) let a
+    live trace commit to a completely wrong location — this exists so that gap can't
+    recur silently at some future call site the way it did here.
+
+    Returns (item, None) on a confident match, or (None, message) otherwise — callers
+    should `return` the message directly on failure, same as every other tool error.
+    """
+    matched = match_by_name_or_code_with_score(query, items, score_cutoff=score_cutoff, scorer=scorer)
+    if matched is None:
+        return None, f"Couldn't find a {label} matching '{query}'."
+    item, score = matched
+    if score < LOW_CONFIDENCE_MAX:
+        message = f"Didn't catch which {label} you meant by '{query}' clearly enough to be sure — can you say it again?"
+        return None, message
+    return item, None
+
+
 def filter_by_match(rows, query, candidates, attr):
     if not query:
         return rows
