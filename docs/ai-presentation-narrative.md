@@ -94,52 +94,151 @@ from gone. Slide numbers are provisional; expect reordering once this goes into 
    strategies provided. **Graphling: 17 tools, no selection logic, past every threshold cited.**
    The diagnosed failures so far were persona-framing bugs, not volume-confusion bugs — hasn't
    visibly bitten yet, but it's the next lever to pull, not a hypothetical one.
-8. **War story #1 — a good tool description still didn't fire.** `mark_arrived`'s description
-   almost verbatim matched what the pilot said. Verified via LangSmith trace, not a guess, that
-   the tool schema itself was clean. Root cause: the persona prompt's overall framing never
-   established that *acting* on the pilot's behalf was in scope at all — it read as an
-   information-lookup assistant. Fix was in the persona, not the tool: "when the pilot reports a
-   milestone has happened... call the matching tool rather than answering from memory." Lesson:
-   tool selection isn't just a function of the tool's own description — it's gated by whether the
-   system prompt's self-concept for the agent includes that class of action at all.
-9. **War story #2 — the hallucinated destination.** "Cargo's loaded, what's my destination"
-   produced "Admin at GrimHEX, in orbit around Yela" — fabricated; the real destination was a
-   different star system entirely. Traced the text back to its source: lifted verbatim from the
-   persona prompt's own *worked examples* (illustrative format samples, never real data), because
-   no tool existed that could answer "what's the current destination," so the model pattern-matched
-   to the nearest thing in its own context window. Fix was two-part: built `trade_run_status` so
-   there was a real source of truth, and tightened the persona ("never assume or invent a trade
-   run's current state," examples "describe format and phrasing only, never real data"). Lesson:
-   hallucination isn't always fabrication from nothing — sometimes the model retrieves from the
-   wrong place in its own context, and a system prompt's few-shot examples can themselves be the
-   leak vector.
-10. **War story #3 — trust one data point, get burned twice.** Built travel-time estimation on an
-    undocumented API (`star-citizen.wiki`'s `locations/positions` endpoint, found by watching
-    network requests on the wiki's own route-planner tool — not in any published docs). First
-    validation: one route ("Seraphim to Orison, 0.8 Gm") seemed to confirm a kilometers-based unit
-    conversion. It was wrong by exactly 1000x — meters, not km — and only surfaced once a *second*
-    reference route (two exact figures from a screenshot) was cross-checked against it. Fixed the
-    conversion, then hit a second, independent bug in the same feature: a jump-point lookup that
-    assumed Stanton→Nyx had no direct connector, because the search only matched `type="Anomaly"`
-    entries containing the literal phrase "Jump Point" — the real connector, "Nyx Gateway," is
-    tagged `type="Manmade"` and doesn't contain that phrase at all. Caught only because the user
-    knew the game world well enough to say "that's wrong" on stage-adjacent live testing. Widening
-    the fix then exposed a *third*, adjacent bug proactively: naive substring matching on system
-    names would have matched "Onyx Facility" (120+ entries) as if it were "Nyx." Lesson: "verify
-    against live data" isn't a slogan — a single successful-looking match is not verification, and
-    even a well-formed API response can encode game-world quirks (an object literally named
-    "Gateway" instead of "Jump Point") no amount of schema-reading alone would catch.
-11. **Making voice actually work: STT/TTS in practice.**
-    - STT: Whisper has no built-in notion that "Railen" is a real word — without help it renders it
-      as the nearest common English word, "railing." Fixed with `initial_prompt`
-      ([voice/__init__.py:36-42](../app/voice/__init__.py)), seeded once at startup from the
-      already-cached UEX ship catalog (comma-joined names), not rebuilt per utterance — biases
+**Suggested slide template for all three war stories below** — one consistent layout makes them
+fast to build and easy for the audience to pattern-match across: **Trace → Wrong First Guess (where
+there was one) → Root Cause → Fix → Lesson**, one per slide or split across two if the trace needs
+room to breathe. The trace quotes are real, pulled from actual LangSmith runs / recorded testing
+sessions, not reconstructed after the fact — worth showing verbatim on screen (a monospace block)
+rather than paraphrasing, since "here's the literal broken output" is more convincing to a technical
+audience than a description of it.
+
+8. **War story #1 — a good tool description still didn't fire.**
+   - **Setup:** a real trade run active (Seraphim → Pyro, hauling RMC, in a Railen). Pilot reports
+     arrival in plain speech, the way `mark_arrived` is designed to be triggered.
+   - **Trace:**
+     > **Pilot:** "Just docking in the Seraphim station now."
+     > **ALICE:** *(pure conversational reply — no tool call, `tool_calls: []`)*
+
+     Same result on a second, independent phrasing in an earlier test: "I've just landed at
+     Orison" also produced `tool_calls: []`.
+   - **The near-miss that makes this one sting:** `mark_arrived`'s own tool description reads
+     *"call this when they report arriving somewhere in transit — 'I'm here', 'just landed at
+     Area18'"* — almost the pilot's exact words. Verified via the LangSmith trace, not a guess,
+     that the tool schema itself was clean (`convert_to_openai_tool` showed a well-formed schema) —
+     ruling out an args/schema bug before looking anywhere else.
+   - **Wrong first guess:** first instinct was that the persona prompt needed an explicit,
+     per-tool list of trigger phrases, duplicating each tool's own description. The user pushed
+     back — *"Shouldn't it know from the tool names and descriptions in the code? It seems
+     incredibly error prone if I need to always manually add them"* — and that was the right
+     objection: `bind_tools()` already sends every tool's name and description to the model on
+     **every single turn**, automatically. Duplicating it in the persona would've been a second
+     place to keep in sync, exactly the kind of drift this project has been allergic to all along.
+   - **Root cause:** the persona prompt's overall framing never established that *acting* on the
+     pilot's behalf was in scope at all — every section (Identity, Instruction Priority, Answer
+     Discipline) frames ALICE purely as a question-answering assistant over trade data. A smaller
+     model (`gpt-4o-mini`) leans more on explicit role-framing than a frontier model would; without
+     ever being told that acting is even part of the job, it defaults to treating everything as
+     something to respond to, no matter how well any individual tool is described.
+   - **Fix** — one generic paragraph in the persona, not a per-tool list:
+     > "You also have tools that update the pilot's live trade run (arrival, purchases, sales,
+     > loading/unloading confirmations). When the pilot reports one of these has actually
+     > happened, call the matching tool — do not just acknowledge it conversationally. Trust each
+     > tool's own description for exactly when it applies; do not wait for a specific phrasing."
+   - **Lesson:** tool selection isn't just a function of the tool's own description — it's gated
+     by whether the system prompt's self-concept for the agent includes that class of action at
+     all. (Worth keeping the wrong first guess in the story, not editing it out — it's the more
+     instructive version, and it's the audience's own likely first instinct too.)
+9. **War story #2 — the hallucinated destination.**
+   - **Setup:** mid-run, pilot sends a compound message — a milestone report and a question,
+     stacked in one utterance.
+   - **Trace:**
+     > **Pilot:** "Cargo's loaded. Heading out. What's my destination?"
+     > **ALICE:** *(answers the destination question fluently and confidently — and wrong. No tool
+     > call for the milestone either: `tool_calls: []`.)*
+
+     Fabricated answer: **"Admin at GrimHEX, in orbit around Yela."** The real destination on that
+     run was Seer's Canyon — a different terminal, confirmed later against the actual database row
+     once `trade_run_status` existed to check it.
+   - **The tell — this wasn't a generic guess.** Traced the fabricated sentence back to its exact
+     source: the persona prompt's own worked example for how to phrase a commodity price —
+     *"Admin at GrimHEX, in orbit around Yela, is buying Iron for 2,700 aUEC per SCU"* — a
+     formatting sample about Iron pricing that has nothing to do with destinations at all. With no
+     tool able to answer "what's my destination," the model pattern-matched to the nearest
+     fluent-sounding, correctly-formatted sentence sitting in its own context window and repurposed
+     it wholesale.
+   - **Compounding failure, same trace:** the milestone half of the message ("Cargo's loaded") also
+     never fired `confirm_cargo_loaded` — with a question sitting right there, the model answered
+     it and silently dropped the action. Same *shape* of bug as war story #1 (acting lost out to
+     answering), different trigger — one utterance, two independent failures.
+   - **Fix, two-part:**
+     1. Built `trade_run_status` so there was a real source of truth to call — reused existing
+        `current_leg`/`next_unset_field` functions already in `trade_run_store.py`, verified live
+        against a real run to confirm it reported the correct sale-leg terminal, not just the
+        current one.
+     2. Tightened the persona: "never assume or invent a trade run's current state," plus an
+        explicit note that its own worked examples "describe format and phrasing only, never real
+        data" — closing off the leak vector directly, not just patching the symptom.
+   - **Lesson:** hallucination isn't always fabrication from nothing — sometimes the model is
+     retrieving from the *wrong place* in its own context, and a system prompt's own few-shot
+     examples can be the leak vector if nothing else is available to answer from.
+10. **War story #3 — trust one data point, get burned twice.**
+    - **Setup:** built travel-time estimation on an undocumented API
+      (`star-citizen.wiki`'s `locations/positions` endpoint) — found by watching network requests
+      on the wiki's own route-planner tool, not from any published documentation.
+    - **Bug #1 — the unit conversion.** First validation used a single route: "Seraphim to Orison,
+      0.8 Gm," which seemed to confirm a kilometers-based conversion (`/1,000,000`). It was wrong
+      by exactly **1000x** — the real unit is meters (`/1,000,000,000`) — and the error only
+      surfaced once a *second*, independent reference route (two exact figures pulled from a user
+      screenshot) was cross-checked against it. The first "successful" match was a coincidence, not
+      confirmation.
+      > **Lesson so far:** one matching data point isn't verification — it's an unfalsified guess.
+    - **Bug #2 — the missing jump point.** After fixing the units, a jump-point lookup for
+      Stanton→Nyx returned nothing, because the search only matched entries tagged
+      `type="Anomaly"` that literally contained the phrase "Jump Point." The real connector, **"Nyx
+      Gateway,"** is tagged `type="Manmade"` and doesn't contain that phrase at all — so the
+      honest-sounding conclusion "no direct connector exists" was itself wrong. Caught only because
+      the user knows the game world well enough to say, flatly, "Stanton absolutely has a Nyx Jump
+      point" — a domain-knowledge correction no amount of re-reading the API response would have
+      produced alone.
+    - **Bug #3 — found proactively while fixing #2.** Widening the type filter to catch
+      "Gateway"-style connectors meant searching system names as substrings — which would have
+      silently matched "**Onyx** Facility" (120+ unrelated entries) as if it were "Nyx." Caught and
+      fixed (word-boundary matching) before it ever shipped, by noticing the risk while touching
+      the code, not from a bug report.
+    - **Lesson:** "verify against live data" isn't a slogan — a single successful-looking match is
+      not verification, and even a well-formed API response can encode game-world quirks (an object
+      literally *named* "Gateway" instead of "Jump Point") that no amount of schema-reading alone
+      would catch. Three independent bugs in one feature, each caught a different way — a second
+      data point, a domain expert's correction, and proactive suspicion while editing — which is
+      itself the more useful lesson than any single fix.
+11. **Making voice actually work: STT/TTS in practice.** Three linked fixes, landed together
+    once the real failure was traced (`3c5ff88`) — the takeaway is that "the mic didn't hear it
+    right" turned out to be three separate problems stacked on top of each other, not one:
+    - **Problem 1 — Whisper mis-hears domain vocabulary.** Whisper has no built-in notion that
+      "Railen" is a real word; without help it renders an unusual proper noun as the nearest
+      common English word instead — a live trace showed "Railen" transcribed as "railing." Fixed
+      with `initial_prompt` ([voice/__init__.py:36-42](../app/voice/__init__.py)): the full UEX
+      ship-name catalog, comma-joined, built once from the already-cached data at voice-loop
+      startup — not rebuilt per utterance — and passed straight into Whisper's decoder. Biases
       recognition toward the right proper nouns without forcing them into the output.
-    - TTS: ElevenLabs (`eleven_turbo_v2_5`) live-mispronounced a 7-digit comma-grouped aUEC figure
-      — misread as starting "three thousand." Fixed at the source, not the voice layer: profit/hour
-      rounds to the nearest 1,000 before it's ever handed to the model to say
-      ([route_ranking.py:12-19](../app/tools/route_ranking.py)). A reminder that TTS failure modes
-      are often about the shape of the text, not the audio engine.
+    - **Problem 2 — the hint helps, but doesn't guarantee a fix, so the fuzzy matcher needs its
+      own safety net.** Even with the vocabulary hint, a near-miss transcription can still slip
+      through — so ship-name matching (`travel_time`/`trade_advisor`) was changed from a plain
+      "take the best match" (`match_by_name_or_code`) to a confidence-scored variant
+      (`match_by_name_or_code_with_score`, `tools/uexcorp/matching.py`) that can tell a
+      barely-passing match from a real one. Concretely: a mis-transcribed "railing" matched
+      "Railen" at a score of exactly 60 — one point above the 60-point cutoff, zero margin. Below
+      `LOW_CONFIDENCE_MAX = 80`, the tool now hedges out loud ("not sure which ship you meant —
+      closest match is the Railen, confirm?") instead of silently committing to a guess that
+      happened to clear the bar by luck. This is the same `resolve_or_hedge` pattern generalized
+      later in the session (slide 12) — first built here, for this exact failure.
+    - **Problem 3 — a real bug hiding behind the other two.** Fixing the vocabulary hint and the
+      confidence gate exposed a third, unrelated bug underneath: even a *correct* fuzzy match
+      (e.g. "Railen" matched confidently) was still failing to fetch ship-speed data, because the
+      code queried the wiki API with the pilot's raw, misspelled input string instead of the
+      matched item's canonical name. Fixed by resolving to `vehicle.name` first, then querying
+      speed data with that — a reminder that a passing fuzzy match is only half the pipeline; every
+      downstream lookup needs the *resolved* name, not the original utterance.
+    - **TTS:** ElevenLabs (`eleven_turbo_v2_5`) live-mispronounced a real profit/hour figure —
+      "3,547,877 aUEC/hour" was read starting with "three thousand," not the real value; a 7-digit
+      comma-grouped number apparently trips up the model's number normalization. Fixed at the
+      source, not the voice layer, and for two reasons at once: profit/hour is already an
+      extrapolation (this exact trade repeated continuously for an hour), so reporting it to the
+      exact aUEC was false precision regardless of TTS. `profit_per_hour()`
+      ([route_ranking.py:12-19](../app/tools/route_ranking.py)) rounds to the nearest 1,000 before
+      the figure is ever handed to the model to say, applied everywhere `best_route`/`trade_advisor`
+      report a rate (`d6eadc9`). Lesson: the TTS failure mode here wasn't audio quality — it was
+      the shape of the text being spoken.
 12. **Confidence, not certainty — connecting multiple APIs into one trustworthy answer.**
     - Fuzzy name matching on pilot speech ("Seraphim," "Railen") is necessary and imperfect;
       `resolve_or_hedge` (`tools/uexcorp/matching.py`) hedges below a confidence threshold instead
