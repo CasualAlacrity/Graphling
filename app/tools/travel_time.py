@@ -36,10 +36,10 @@ async def estimate_travel_time(
         return f"Couldn't find a ship matching '{ship_name}'."
     vehicle, ship_score = matched_ship
     if ship_score < LOW_CONFIDENCE_MAX:
-        return (
-            f"Not sure which ship you meant by '{ship_name}' — closest match is the "
-            f"{vehicle.name}. Confirm and I'll check again."
-        )
+        # Deliberately doesn't name the closest match — naming it gives the model a
+        # ready-made string to just re-submit as the next tool call, treating an
+        # uncertain guess as a confirmed answer instead of actually asking the pilot.
+        return f"Didn't catch which ship you meant by '{ship_name}' clearly enough to be sure — can you say it again?"
 
     ship_speed = await scw_client.get_ship_speed(vehicle.name)
     if ship_speed is None:

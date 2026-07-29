@@ -86,10 +86,10 @@ class BestRouteTool(UplinkTool):
             return f"Couldn't find a ship matching '{ship}' in the UEX vehicle catalog."
         vehicle, ship_score = matched_ship
         if ship_score < LOW_CONFIDENCE_MAX:
-            return (
-                f"Not sure which ship you meant by '{ship}' — closest match is the "
-                f"{vehicle.name}. Confirm and I'll check again."
-            )
+            # Deliberately doesn't name the closest match — naming it gives the model a
+            # ready-made string to just re-submit as the next tool call, treating an
+            # uncertain guess as a confirmed answer instead of actually asking the pilot.
+            return f"Didn't catch which ship you meant by '{ship}' clearly enough to be sure — can you say it again?"
 
         commodity_id = None
         if commodity is not None:
