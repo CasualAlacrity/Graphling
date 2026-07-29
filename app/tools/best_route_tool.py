@@ -106,10 +106,16 @@ class BestRouteTool(UplinkTool):
             suffix = f" ({', '.join(qualifiers)})" if qualifiers else ""
             return f"No usable in-system route turned up from {origin_terminal.name}{suffix}."
 
-        best, score, scu = result
+        best, score, scu, runner_up, runner_up_score = result
         terminal_kind = "a ground station" if best.is_on_ground_destination else "an orbital/space station"
-        return (
+        message = (
             f"Best from {origin_terminal.name} in the {vehicle.name}: {scu:.0f} SCU of "
             f"{best.commodity_name} to {best.destination_terminal_name} — about "
             f"{profit_per_hour(score):,} aUEC/hour. It's {terminal_kind}."
         )
+        if runner_up is not None:
+            message += (
+                f" Next best was {runner_up.commodity_name} to {runner_up.destination_terminal_name} "
+                f"at about {profit_per_hour(runner_up_score):,} aUEC/hour."
+            )
+        return message

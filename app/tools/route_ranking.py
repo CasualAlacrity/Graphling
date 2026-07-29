@@ -30,14 +30,23 @@ async def find_best_route(
         uex_client, scw_client, origin_terminal_id: int, ship: str, ship_scu: float, cache, *,
         commodity_id: int | None = None, exclude_destination_terminal_name: str | None = None,
         exclude_ground: bool = False, require_autoload: bool = False,
-) -> tuple[UEXTradeRoute, float, int] | None:
+) -> tuple[UEXTradeRoute, float, int, UEXTradeRoute | None, float | None] | None:
     """Searches commodity routes from origin_terminal_id — narrowed to one commodity if
     commodity_id is given, otherwise every commodity sellable from there — and ranks by
-    profit per hour. Returns the best (route, score, scu) — scu is the reachable SCU
-    amount the score was actually computed from, since profit per hour is meaningless to
-    report without the load size it assumes. Returns None if nothing qualifies (e.g.
-    every candidate turned out cross-system, none reach a usable SCU amount, or the
-    ground/autoload filters excluded everything that was left).
+    profit per hour. Returns (best_route, best_score, best_scu, runner_up_route,
+    runner_up_score) — scu is the reachable SCU amount the score was actually computed
+    from, since profit per hour is meaningless to report without the load size it
+    assumes. runner_up is None if only one candidate qualified.
+
+    The runner-up isn't a nice-to-have — without it, "why is this the best route" has no
+    real answer to give: a live trace showed the model inventing an unsupported "beats
+    alternatives" claim when the only route ever kept was the winner, with every other
+    candidate discarded. Reporting the runner-up gives that question a real, computed
+    answer instead of a guess, and doesn't require an active run to ask it.
+
+    Returns None if nothing qualifies at all (e.g. every candidate turned out
+    cross-system, none reach a usable SCU amount, or the ground/autoload filters
+    excluded everything that was left).
 
     exclude_ground and require_autoload only ever constrain the destination — the origin
     is always the pilot's own pinned starting point here (unlike the overlay's filter
@@ -56,6 +65,8 @@ async def find_best_route(
     best: UEXTradeRoute | None = None
     best_score = None
     best_scu = None
+    runner_up: UEXTradeRoute | None = None
+    runner_up_score = None
     for route in candidates:
         if exclude_destination_terminal_name and route.destination_terminal_name == exclude_destination_terminal_name:
             continue
@@ -85,6 +96,11 @@ async def find_best_route(
         score = estimated_profit(route, scu) / total_time
 
         if best_score is None or score > best_score:
+            runner_up, runner_up_score = best, best_score
             best, best_score, best_scu = route, score, scu
+        elif runner_up_score is None or score > runner_up_score:
+            runner_up, runner_up_score = route, score
 
-    return (best, best_score, best_scu) if best is not None else None
+    if best is None:
+        return None
+    return best, best_score, best_scu, runner_up, runner_up_score

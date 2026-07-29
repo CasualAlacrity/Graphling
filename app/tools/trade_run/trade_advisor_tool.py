@@ -106,7 +106,10 @@ class TradeAdvisorTool(UplinkTool):
             self.uex_client, self.scw_client, acquisition_leg.terminal_id, ship, matched_vehicle.scu, cache,
             commodity_id=matched_commodity.id, exclude_destination_terminal_name=sale_leg.terminal_name,
         )
-        best_alt, best_alt_score, best_alt_scu = result if result is not None else (None, None, None)
+        if result is None:
+            best_alt, best_alt_score, best_alt_scu = None, None, None
+        else:
+            best_alt, best_alt_score, best_alt_scu, _, _ = result
 
         if committed_score is None:
             if best_alt is None:
