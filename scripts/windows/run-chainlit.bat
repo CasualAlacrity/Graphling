@@ -1,8 +1,8 @@
 @echo off
 REM Launch the Chainlit chat UI in a browser tab.
-REM Requires win-setup.bat to have been run first.
+REM Requires scripts\windows\setup.bat to have been run first.
 
-cd /d "%~dp0"
+cd /d "%~dp0..\.."
 
 if not exist .venv\Scripts\python.exe (
     echo No virtualenv found. Run win-setup.bat first.

@@ -21,7 +21,10 @@ build/
 # LangSmith / LangChain local cache
 .langchain/
 .cache/
-prompts/.prompt_cache.json
+# prompts/.prompt_cache.json is intentionally committed, not ignored — it's the only
+# copy of the persona/classifier prompt text in the repo (see prompt_loader.py's
+# fallback) and a fresh clone has no other way to get it without hitting the owner's
+# private LangSmith Hub account.
 
 # Chainlit auto-generated local state (was previously only excluding translations/,
 # but that pattern is anchored to the repo root and never matched app/.chainlit/)

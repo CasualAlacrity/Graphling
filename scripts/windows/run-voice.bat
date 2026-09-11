@@ -1,8 +1,8 @@
 @echo off
 REM Launch the push-to-talk voice loop. Hold PTT_HOTKEY (see .env) to speak.
-REM Requires win-setup.bat to have been run first.
+REM Requires scripts\windows\setup.bat to have been run first.
 
-cd /d "%~dp0"
+cd /d "%~dp0..\.."
 
 if not exist .venv\Scripts\python.exe (
     echo No virtualenv found. Run win-setup.bat first.

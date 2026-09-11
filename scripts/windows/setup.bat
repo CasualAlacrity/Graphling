@@ -1,9 +1,9 @@
 @echo off
 REM One-time setup for Graphling/Uplink on Windows.
 REM Creates a Python 3.11 virtualenv and installs dependencies.
-REM Just double-click this, or run `win-setup.bat` from a terminal.
+REM Just double-click this, or run `scripts\windows\setup.bat` from a terminal.
 
-cd /d "%~dp0"
+cd /d "%~dp0..\.."
 
 if not exist .venv\Scripts\python.exe (
     echo Creating virtualenv with Python 3.11...
@@ -57,5 +57,5 @@ if errorlevel 1 (
 echo.
 echo Setup complete.
 echo Make sure a .env file with your API keys exists in this folder before running.
-echo Run win-run-voice.bat for push-to-talk, or win-run-chainlit.bat for the chat UI.
+echo Run scripts\windows\run-voice.bat for push-to-talk, or scripts\windows\run-chainlit.bat for the chat UI.
 pause
