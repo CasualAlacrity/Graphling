@@ -2,12 +2,23 @@
 
 ## Purpose
 
-A portfolio piece and a learning project for LangChain, LangGraph, LangSmith, and Pydantic. The
-project is an AI companion — a persistent chat agent with a real memory system, not a toy chatbot.
+Started as a portfolio piece and a learning project for LangChain, LangGraph, LangSmith, and
+Pydantic. As of 2026-09, also being taken seriously as a **prospective product / side hustle**:
+ALICE is a voice copilot for Star Citizen whose real moat is a crowd-sourced, to-the-minute trade
+data pool — pilots run ALICE, ALICE captures station buy/sell prices as they trade (OCR of the
+commodity kiosk, planned), and that data is pooled server-side and shared to every ALICE user
+instantly. UEX/StarHead impose a structural 24–48h trust-gated delay on new data, so ALICE can
+contribute upstream freely while its users keep the freshness edge. Revenue comes from **selling
+access to advanced ALICE features, not the data** — a subscription covering LLM/DB/service costs.
+The learning-project framing still holds — the AI engineering is real and still the point — but
+"complete, demoable application" is now also "something people could pay to use." See the
+`project-product-thesis` memory for the go-to-market detail.
 
-v1 scope is intentionally narrow: one fixed persona, no multi-tenancy. The priority is a complete,
-demoable application over breadth of features. Depth (a second persona, richer memory behavior)
-is a "later, maybe" — don't build for it preemptively.
+**Scope has widened accordingly.** Multi-tenancy is on the roadmap (it's the data-pool
+foundation, not infra for two people — see `docs/todo.md` and the `project-multi-tenancy-scope`
+memory). One fixed ALICE persona still holds; a second persona is still "later, maybe". Richer
+per-value provenance/trust on the ledger is designed but **shelved until community features
+(leaderboards) need it** — see `docs/ledger-trust-and-corrections.md`.
 
 **Current active feature: the trade route tracker** (see `docs/trade-route-tracker.md`) — a
 structured ledger of trade runs (buy/sell legs, milestones, profit), not the generic memory system
@@ -25,8 +36,11 @@ is meant to be the foundation richer memory could build on later, not a replacem
   `UplinkTool` pattern), not new graph nodes — see `docs/trade-route-tracker.md`.
 - **LangSmith** — tracing/observability across the pipeline
 - **Pydantic** — schemas for structured LLM output and tool args
-- **Chainlit** — chat interface. Chosen over Streamlit/Gradio because it's built for LLM chat
-  apps specifically and handles async streaming and LangChain callbacks natively.
+- **Chainlit** — secondary/legacy chat interface, kept working and documented but no longer the
+  primary way to run the app. Chosen originally over Streamlit/Gradio because it's built for LLM
+  chat apps specifically and handles async streaming and LangChain callbacks natively. The voice
+  push-to-talk loop plus its `PTT_MODE=text` terminal-prompt fallback (see `app/voice/__init__.py`)
+  is the primary interface now — it covers the same graph without a browser tab.
 - **PySide6** — overlay UI for the trade route tracker (manual entry first, AI-assisted later).
   Chosen over PyQt6 for licensing (LGPL vs. GPL/commercial) and over tkinter for layout/styling
   power. See `docs/trade-route-tracker.md` for the full reasoning, including why click-through —

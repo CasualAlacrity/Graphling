@@ -136,6 +136,53 @@ that combination scores higher.
    explicitly deferred** — add after the core loop works, not blocking this.
    Ties to the pseudo-datarunner idea already logged in memory.
 
+## Architecture: a workflow without graph nodes
+
+**The trade run *is* an AI workflow — buy → load → travel → sell → finalize — deliberately
+implemented as a state machine + guarded tools, not as LangGraph nodes/edges.** Worth
+naming explicitly (2026-09-11), since "should this be a LangGraph workflow" is a natural
+question to re-ask as the feature grows, and the answer holds for concrete reasons, not
+just because CLAUDE.md says so:
+
+1. **The steps span real gameplay time, not conversation turns.** A leg takes minutes to
+   hours, with unrelated turns in between (a price lookup, a timer). LangGraph's checkpoint
+   resets to `classify_topic → respond` every turn — there's no natural place for the graph
+   to sit "paused" mid-workflow-node across all that.
+2. **Multiple concurrent, interleavable runs.** A pilot can have two active runs and jump
+   between them by what they say. `resolver.py`'s fuzzy matching + disambiguation-by-asking
+   handles "which of several workflows does this mean" far more naturally than a single
+   graph would.
+3. **Compound utterances.** "Landed at Orison and unloaded the cargo" advances two
+   milestones from one utterance — ordinary `bind_tools` fan-out handles this for free; a
+   graph-node workflow would need explicit multi-edge handling for the same thing.
+4. **Soft constraints, not hard edges** (see `docs/ledger-trust-and-corrections.md`) — a
+   tool that says "I don't have a record of X, force it anyway?" is a conversation, not a
+   routing decision. Graph edges are naturally binary; a tool return value can hedge.
+
+**The four layers that make it a workflow anyway:**
+1. **State machine as data, not code-path** — `TradeRun` → `TradeLeg`, each with a
+   milestone sequence (`LegMilestone`, `_ACQUISITION_SEQUENCE` / `_SALE_*_SEQUENCE` in
+   `trade_run_store.py`). `next_unset_field()` computes "what's next" from pure data — this
+   *is* the workflow definition (Implementation principle 1, above).
+2. **One tool per valid transition, guarded** — `mark_arrived` → `REACHED_AT`,
+   `record_purchase`/`mark_cargo_acquired` → `TRANSACTION_COMPLETED_AT`, `start_trade_run`
+   (designed, not built — `docs/start-route-tool.md`) → creates the run. Each tool checks
+   `next_unset_field` and refuses (soon: soft-constrains) an out-of-order attempt.
+3. **Resolution instead of routing** — Implementation principle 2, above: a tool that can't
+   unambiguously resolve which leg/run an utterance means asks, rather than a graph deciding
+   which node to enter.
+4. **The graph is stateless with respect to the workflow.** The checkpointer holds chat
+   history for coreference ("it," "that leg"), never workflow position. Postgres is the only
+   source of truth; the graph's job each turn is just "pick the right tool."
+
+A fifth layer, designed not built: the **presence layer** (`docs/presence-layer.md`) is a
+*view* onto layer 1 — it renders `next_unset_field`/`current_step_title` and never becomes a
+second source of truth.
+
+The one place graph nodes would be the right tool: if the parked SC-vs-general router ever
+needs to *restrict which tools the model can see* per turn. That's a domain-routing concern,
+already scoped separately — not trade-run workflow modeling.
+
 ## Build plan
 
 1. **Schema** — Postgres via async SQLAlchemy + Alembic. Infrastructure
@@ -172,6 +219,17 @@ then improvised by calling `start_timer`, which only starts a countdown, not an
 actual trade run. Needs a tool (e.g. `start_route`) that takes a chosen
 `UEXTradeRoute` + quantity + ship and calls `create_run_from_route`, following
 the Build plan's AI-integration pattern below (`mark_cargo_acquired` etc.).
+
+**High priority — the "commit to this route" tool now has a full design:**
+`docs/start-route-tool.md` (stateless `start_trade_run`). Build it in roadmap Phase 1.
+
+**Designed, not built — ledger trust, corrections, recoverability.**
+`docs/ledger-trust-and-corrections.md` captures four interrelated additions from an
+HCI-course design session: per-value provenance + confidence (not just a run-level
+number), a force-complete / graceful-degradation path with "ask, never accuse" phrasing
+for missing prerequisites, and voice-driven post-hoc corrections (pre-finalize only).
+Provenance columns should be decided before Phase 2's `user_id` migration so they ride the
+same pass.
 
 **Minor — `best_route`/Trade Advisor scoring isn't self-documenting to the
 model.** `find_best_route` (`app/tools/route_ranking.py`) already includes
