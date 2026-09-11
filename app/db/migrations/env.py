@@ -30,9 +30,10 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-# TRADE_DB_URL from .env overrides whatever's in alembic.ini. Deliberately not named
-# DATABASE_URL — Chainlit auto-detects that exact env var name and silently wires up
-# its own (unrelated, unconfigured) Postgres persistence layer if it finds it.
+# TRADE_DB_URL from .env overrides whatever's in alembic.ini. Historically not named
+# DATABASE_URL because Chainlit (since removed) auto-detected that exact env var name
+# and silently wired up its own unrelated Postgres persistence layer if it found it —
+# kept as TRADE_DB_URL now on its own merits, not worth renaming back.
 database_url = os.getenv("TRADE_DB_URL", "").replace("postgresql://", "postgresql+asyncpg://")
 config.set_main_option("sqlalchemy.url", database_url)
 

@@ -57,5 +57,5 @@ if errorlevel 1 (
 echo.
 echo Setup complete.
 echo Make sure a .env file with your API keys exists in this folder before running.
-echo Run scripts\windows\run-voice.bat for push-to-talk, or scripts\windows\run-chainlit.bat for the chat UI.
+echo Run scripts\windows\run-overlay.bat to start ALICE (voice + overlay together).
 pause

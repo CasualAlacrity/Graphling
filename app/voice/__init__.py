@@ -1,6 +1,7 @@
 """
-Push-to-talk voice loop for Uplink — runs standalone, alongside (not through)
-the Chainlit app. Hold the PTT key, speak, release; Uplink replies out loud.
+Push-to-talk voice loop for ALICE. Hold the PTT key, speak, release; ALICE replies out
+loud. Normally started alongside the overlay by overlay_app.py (the "just ALICE"
+package) — this standalone entry point is for quick voice-only debugging only.
 
 Usage: uplink-voice   (after `pip install -e .`)
 On macOS: scripts/mac/run-voice.sh

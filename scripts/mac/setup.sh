@@ -49,4 +49,4 @@ fi
 echo
 echo "Setup complete."
 echo "Make sure a .env file with your API keys exists in this folder before running."
-echo "Run scripts/mac/run-voice.sh for push-to-talk, or scripts/mac/run-chainlit.sh for the chat UI."
+echo "Run scripts/mac/run-overlay.sh to start ALICE (voice + overlay together)."

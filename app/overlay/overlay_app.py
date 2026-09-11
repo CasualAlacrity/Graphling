@@ -71,23 +71,22 @@ def main():
     canvas_x = screen_geometry.x() + (screen_geometry.width() - panel_width) // 2
     canvas.move(canvas_x, screen_geometry.y() + top_margin)
 
-    # Voice pulls in the full LangGraph/LLM/TTS stack (graph.py -> llm.py, ElevenLabs,
-    # Whisper), which the trade overlay itself doesn't need. On by default to match
-    # the existing workflow; set UPLINK_VOICE=0 to run the overlay standalone without
-    # that stack configured.
-    if os.getenv("UPLINK_VOICE", "1") != "0":
-        print("Starting voice module...", flush=True)
-        from voice import run as voice_run
-        threading.Thread(target=lambda: asyncio.run(voice_run()), daemon=True).start()
+    # "Just ALICE" — voice + overlay always run together as one package now (Chainlit
+    # and the old voice-optional/UPLINK_VOICE=0 path are both gone). Voice pulls in the
+    # full LangGraph/LLM/TTS stack (graph.py -> llm.py, ElevenLabs, Whisper) on its own
+    # daemon thread so the Qt event loop below stays on the main thread.
+    print("Starting voice module...", flush=True)
+    from voice import run as voice_run
+    threading.Thread(target=lambda: asyncio.run(voice_run()), daemon=True).start()
 
     def _toggle_canvas():
         showing = not canvas.isVisible()
         canvas.setVisible(showing)
         if showing:
             # Data may have changed while the overlay was hidden (e.g. an AI trade-run
-            # tool ran from Chainlit/voice, a separate process) — refresh on reopen
-            # rather than showing stale state. Only on open, not close — no point
-            # refreshing a tab nobody's about to look at.
+            # tool ran on the voice loop's own thread while this window was closed) —
+            # refresh on reopen rather than showing stale state. Only on open, not
+            # close — no point refreshing a tab nobody's about to look at.
             canvas.refresh()
 
     bridge.toggle_requested.connect(_toggle_canvas)

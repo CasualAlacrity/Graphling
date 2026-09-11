@@ -15,8 +15,8 @@ def _async_url(url: str) -> str:
 
 # Engine + sessionmaker are created ONCE at import and reused for the app's lifetime, but
 # NullPool means no underlying connection is ever kept alive between checkouts. Required
-# here (not just a perf choice): this app runs three independent event loops against this
-# same engine — Chainlit's loop, the overlay's qasync loop, and the voice loop's own
+# here (not just a perf choice): this app runs two independent event loops against this
+# same engine — the overlay's qasync loop (main thread) and the voice loop's own
 # asyncio.run() in a dedicated background thread (overlay_app.py) — and an asyncpg
 # connection is bound to whichever loop created it. A pooled connection checked out from a
 # different loop than the one that opened it fails with "attached to a different loop."

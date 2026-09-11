@@ -23,9 +23,8 @@
   * Natural-language duration ("15 minutes", "in 15 minutes")
   * Needs a proactive-notification path — the tool call returns immediately, but the actual
     notification fires later, outside the request/response turn that started it. Straightforward
-    in the push-to-talk voice loop (just speak when the timer fires); needs more thought in
-    Chainlit, which doesn't have an obvious way to push a new message into a session from a
-    background task without holding onto that session's context.
+    in the push-to-talk voice loop (just speak when the timer fires) — the only interface now
+    that Chainlit's gone, so this is no longer an open question.
   * Query remaining time mid-wait ("how much longer until the cargo is loaded?") — returns a
     formatted mm:ss countdown. Ordinary request/response, no proactive-notification problem to
     solve — just needs the timer's start time + duration held somewhere queryable.
@@ -41,7 +40,7 @@ Where can I mine Iron in Stanton? (Minable)(Planet, Belt)
 Can I find Copper on Lyria? (Minable, Harvestable)(Planet, Orbit, System)
 
 # To Do
-Start a timer for 15 minutes. (Timer)(Notify — voice required, Chainlit nice-to-have)
-Notify me in 15 minutes. (Timer)(Notify — voice required, Chainlit nice-to-have)
+Start a timer for 15 minutes. (Timer)(Notify)
+Notify me in 15 minutes. (Timer)(Notify)
 "They're loading the cargo, it'll take 15 minutes. Let me know when it's done." (Timer)(Notify, spoken proactively when it fires)
 How much longer until the cargo is loaded? (Timer)(Query remaining time — mm:ss, ordinary request/response)

@@ -36,11 +36,11 @@ is meant to be the foundation richer memory could build on later, not a replacem
   `UplinkTool` pattern), not new graph nodes — see `docs/trade-route-tracker.md`.
 - **LangSmith** — tracing/observability across the pipeline
 - **Pydantic** — schemas for structured LLM output and tool args
-- **Chainlit** — secondary/legacy chat interface, kept working and documented but no longer the
-  primary way to run the app. Chosen originally over Streamlit/Gradio because it's built for LLM
-  chat apps specifically and handles async streaming and LangChain callbacks natively. The voice
-  push-to-talk loop plus its `PTT_MODE=text` terminal-prompt fallback (see `app/voice/__init__.py`)
-  is the primary interface now — it covers the same graph without a browser tab.
+- **Chainlit is gone.** It was the original chat interface (chosen over Streamlit/Gradio for
+  native async streaming + LangChain callbacks), then demoted to secondary, then removed entirely
+  (2026-09) — "just ALICE" is the one supported package now: the voice push-to-talk loop plus its
+  `PTT_MODE=text` terminal-prompt fallback (see `app/voice/__init__.py`), always running together
+  with the PySide6 overlay in one process. No chat-only, no voice-without-UI, no UI-without-voice.
 - **PySide6** — overlay UI for the trade route tracker (manual entry first, AI-assisted later).
   Chosen over PyQt6 for licensing (LGPL vs. GPL/commercial) and over tkinter for layout/styling
   power. See `docs/trade-route-tracker.md` for the full reasoning, including why click-through —

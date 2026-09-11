@@ -22,8 +22,6 @@ Pydantic — not a toy chatbot.
 - **Swappable LLM backend** — OpenAI, Anthropic, or fully local via Ollama, one env var.
 - **Full LangSmith tracing**, with the persona and classifier prompts themselves versioned in the
   LangSmith Hub rather than hardcoded strings.
-- **Chainlit browser chat UI** — kept working as a secondary/legacy interface (see
-  [Current work](#current-work)).
 
 ## Architecture
 
@@ -31,7 +29,7 @@ Pydantic — not a toy chatbot.
  User (voice PTT or PTT_MODE=text)
         │
         ▼
- speech → text (local Whisper)         [voice path only]
+ speech → text (local Whisper)
         │
         ▼
  ┌─────────────────┐
@@ -54,7 +52,7 @@ Pydantic — not a toy chatbot.
  └───────────────────────────────────────────┘
         │
         ▼
- text → speech (ElevenLabs)             [voice path only]
+ text → speech (ElevenLabs)
         │
         ▼
    spoken / printed reply
@@ -75,7 +73,6 @@ prompt doing both jobs — see [app/graph.py](app/graph.py).
 | Trade-run storage | PostgreSQL + SQLAlchemy + Alembic | Durable, queryable ledger — not a semantic-retrieval problem |
 | Desktop overlay | PySide6 | LGPL licensing (vs. PyQt6) and real layout/styling power (vs. tkinter) |
 | Voice | Whisper (local) + ElevenLabs | Free/local STT, natural-sounding TTS |
-| Legacy chat UI | Chainlit | Built for LLM chat apps specifically; async streaming + LangChain callbacks native |
 | Local infra | Docker Compose | One-command Postgres for the trade-run store |
 
 ## Demo
@@ -96,9 +93,9 @@ the overlay._
   install
 - A [UEX Corp](https://uexcorp.space) API key + bearer token — required at startup for every
   entry point (`graph.py` constructs the client eagerly), not just the price-lookup tools
-- An [ElevenLabs](https://elevenlabs.io) key — required for the voice loop and for the overlay's
-  default `UPLINK_VOICE=1` mode, since spoken replies aren't conditional on `PTT_MODE`. Only
-  skippable if you run Chainlit alone, or the overlay with `UPLINK_VOICE=0`
+- An [ElevenLabs](https://elevenlabs.io) key — required. Voice and the overlay always run
+  together as one package now, and spoken replies aren't conditional on `PTT_MODE`
+  (that only swaps the input side for typed text)
 
 **Install**
 
@@ -123,16 +120,19 @@ running — starts Postgres and applies migrations.
 
 **Run**
 
-| | macOS | Windows |
-|---|---|---|
-| Voice (primary) | `./scripts/mac/run-voice.sh` | `scripts\windows\run-voice.bat` |
-| Overlay | `./scripts/mac/run-overlay.sh` | `scripts\windows\run-overlay.bat` |
-| Chainlit (legacy) | `./scripts/mac/run-chainlit.sh` | `scripts\windows\run-chainlit.bat` |
+One package, one command — voice and the overlay always run together:
 
-Hold `PTT_HOTKEY` (default `shift_r`) to talk. macOS needs Microphone and Accessibility
-permissions granted to whichever terminal app runs the script on first use — see the comments at
-the top of `run-voice.sh` if the hotkey doesn't respond. No mic set up yet? Set `PTT_MODE=text`
-in `.env` and type instead; everything downstream runs identically.
+| macOS | Windows |
+|---|---|
+| `./scripts/mac/run-overlay.sh` | `scripts\windows\run-overlay.bat` |
+
+Hold `PTT_HOTKEY` (default `shift_r`) to talk, and `OVERLAY_HOTKEY` (default `F3`) to
+toggle the trade-run overlay. macOS needs Microphone and Accessibility permissions
+granted to whichever terminal app runs the script on first use — see the comments at the
+top of `run-overlay.sh` if a hotkey doesn't respond. No mic set up yet? Set
+`PTT_MODE=text` in `.env` and type instead; everything downstream, including spoken
+replies, runs identically. (`run-voice.sh` also exists — voice alone, no overlay — for
+quick debugging only, not a supported run mode.)
 
 **Tests**
 
@@ -177,5 +177,3 @@ Being upfront about what's next, not just what's built:
   `pilot-preference-memory` branch): it optimized suggestions but never felt like the AI knowing
   the pilot specifically. The trade-run tracker is meant to be the foundation richer memory could
   build on later, not a replacement for the idea.
-- **Chainlit** is kept working and documented as a secondary interface; voice + terminal-prompt
-  is the primary, actively developed path.

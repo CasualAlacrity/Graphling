@@ -12,8 +12,8 @@ from voice.audio_output import play_audio
 from voice.tts import synthesize
 
 # Simple in-memory, single-process state — this only ever runs inside the voice loop's
-# own process, never Chainlit, so there's no reason for DB persistence: timers are
-# short-lived (minutes) and losing one on a restart just means restating the duration.
+# own process, so there's no reason for DB persistence: timers are short-lived (minutes)
+# and losing one on a restart just means restating the duration.
 _timers: dict[str, dict] = {}
 
 
