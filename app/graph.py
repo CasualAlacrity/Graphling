@@ -67,6 +67,7 @@ vehicle_purchase_tool = VehiclePurchaseTool(client=uex_client)
 vehicle_rental_tool = VehicleRentalTool(client=uex_client)
 refinery_yield_tool = RefineryYieldTool(client=uex_client)
 mining_location_tool = MiningLocationTool(client=uex_client)
+
 uex_backed_tools = [commodity_price_tool, item_price_tool, vehicle_purchase_tool, vehicle_rental_tool,
                     refinery_yield_tool, mining_location_tool]
 
@@ -78,14 +79,9 @@ confirm_cargo_loaded_tool = ConfirmCargoLoadedTool()
 confirm_cargo_unloaded_tool = ConfirmCargoUnloadedTool()
 trade_run_status_tool = TradeRunStatusTool()
 cargo_packing_tool = CargoPackingTool(client=uex_client)
-# TradeAdvisorTool ("is my committed run still the best call") is parked, not deleted —
-# best_route below covers the question pilots actually ask ("what's the best route from
-# here"); the committed-vs-alternatives framing wasn't judged worth keeping in the tool
-# list. Code stays intact in case that changes.
 
-trade_run_tools = [mark_arrived_tool, mark_cargo_acquired_tool, mark_cargo_sold_tool,
-                   confirm_cargo_loaded_tool, confirm_cargo_unloaded_tool, trade_run_status_tool,
-                   cargo_packing_tool]
+trade_run_tools = [mark_arrived_tool, mark_cargo_acquired_tool, mark_cargo_sold_tool, confirm_cargo_loaded_tool,
+                   confirm_cargo_unloaded_tool, trade_run_status_tool, cargo_packing_tool]
 
 # General Tools
 timer_tool = StartTimerTool()
