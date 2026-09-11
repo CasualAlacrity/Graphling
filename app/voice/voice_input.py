@@ -36,40 +36,60 @@ def _parse_hotkey(hotkey_str: str) -> keyboard.Key | keyboard.KeyCode:
         return keyboard.KeyCode.from_char(hotkey_str)
 
 
+_target_key: keyboard.Key | keyboard.KeyCode | None = None
+_pressed = threading.Event()
+_released = threading.Event()
+_listener: keyboard.Listener | None = None
+
+
+def _on_press(k):
+    if k == _target_key and not _pressed.is_set():
+        _pressed.set()
+
+
+def _on_release(k):
+    if k == _target_key:
+        _released.set()
+
+
+def _ensure_listener() -> None:
+    # One Listener for the whole process lifetime, not one per press/release cycle —
+    # recreating a pynput Listener on a background thread every utterance, alongside
+    # the overlay's own separate GlobalHotKeys listener running on the main Qt thread,
+    # crashed with SIGTRAP the moment a second Listener got created. Two independent
+    # low-level macOS event taps in one process, one of them repeatedly torn down and
+    # rebuilt, is what tripped it — a single long-lived listener sidesteps that
+    # entirely, and is the normal pynput usage pattern anyway.
+    global _listener
+    if _listener is None:
+        _listener = keyboard.Listener(on_press=_on_press, on_release=_on_release)
+        _listener.start()
+
+
 def record_until_release(hotkey: str | None = None) -> np.ndarray:
     """
     Blocks until the PTT key is pressed, records while held, stops on release.
     Returns raw audio as a float32 numpy array at 16kHz.
     """
+    global _target_key
     key_str = hotkey or os.getenv("PTT_HOTKEY", "shift_r")
-    target_key = _parse_hotkey(key_str)
+    _target_key = _parse_hotkey(key_str)
+    _pressed.clear()
+    _released.clear()
 
-    pressed = threading.Event()
-    released = threading.Event()
-
-    def on_press(k):
-        if k == target_key and not pressed.is_set():
-            pressed.set()
-
-    def on_release(k):
-        if k == target_key:
-            released.set()
+    _ensure_listener()
 
     print(f"[Voice] Waiting for PTT key ({key_str})...")
 
     frames: list[np.ndarray] = []
 
-    # Single listener stays open for the entire press→release cycle
-    with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
-        pressed.wait()
-        print("[Voice] Recording...")
+    _pressed.wait()
+    print("[Voice] Recording...")
 
-        with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="float32") as stream:
-            while not released.is_set():
-                chunk, _ = stream.read(1024)
-                frames.append(chunk)
-
-        listener.stop()
+    with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="float32") as stream:
+        while not _released.is_set():
+            chunk, _ = stream.read(1024)
+            frames.append(chunk)
 
     print("[Voice] Recording stopped")
     if not frames:
