@@ -5,7 +5,7 @@ from rapidfuzz import fuzz
 
 from tools.route_ranking import find_best_route, profit_per_hour
 from tools.starcitizenwiki.client import StarCitizenWikiClient
-from tools.trade_run import resolver
+from tools.trade_run import resolver, route_cache
 from tools.trade_run.resolver import AmbiguousRunError
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.matching import resolve_or_hedge
@@ -48,7 +48,9 @@ class BestRouteTool(UplinkTool):
         "by profit per hour, and reports the best one found. The profit/hour figure "
         "already accounts for estimated travel time and cargo transfer time, not just "
         "the raw trade margin — if asked whether travel time factors in, the answer is "
-        "yes."
+        "yes. If the pilot then commits to this route ('yes', 'let's do it', 'start "
+        "that run'), call start_trade_run with the route_token this reply carries — "
+        "never re-describe the route by name yourself."
     )
     args_schema: type[BaseModel] = BestRouteArgs
     progress_label: str = "Searching routes from your location."
@@ -121,4 +123,11 @@ class BestRouteTool(UplinkTool):
                 f" Next best was {runner_up.commodity_name} to {runner_up.destination_terminal_name} "
                 f"at about {profit_per_hour(runner_up_score):,} aUEC/hour."
             )
+
+        # Stashed so a follow-up "let's do it" can hand this exact route to
+        # start_trade_run without re-resolving origin/commodity/ship by name a second
+        # time. Not meant to be spoken — phrased as an aside so the persona reads it as
+        # bookkeeping, not part of the answer.
+        token = route_cache.stash(best, int(scu), vehicle.name)
+        message += f" (Internal note, don't say this part aloud: route_token={token}.)"
         return message

@@ -103,4 +103,21 @@ async def find_best_route(
 
     if best is None:
         return None
+
+    # is_auto_load_origin/destination aren't in the commodities_routes payload UEXTradeRoute
+    # was validated from above — they default to 0/False — so callers that hand this route
+    # straight to create_run_from_route (start_trade_run) would silently get MANUAL on both
+    # legs even for an autoload-capable terminal. Patch here, once, for every caller of
+    # find_best_route, rather than relying on each caller to remember to do it.
+    best = _patch_auto_load(best, cache)
+    if runner_up is not None:
+        runner_up = _patch_auto_load(runner_up, cache)
+
     return best, best_score, best_scu, runner_up, runner_up_score
+
+
+def _patch_auto_load(route: UEXTradeRoute, cache) -> UEXTradeRoute:
+    return route.model_copy(update={
+        "is_auto_load_origin": _terminal_is_auto_load(cache, route.origin_terminal_id),
+        "is_auto_load_destination": _terminal_is_auto_load(cache, route.destination_terminal_id),
+    })
