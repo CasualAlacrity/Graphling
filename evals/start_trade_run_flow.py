@@ -35,7 +35,10 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage  # noqa
 
 from graph import State, graph  # noqa: E402
 
-ORIGIN = "Orison"
+ORIGIN = "Crusader"   # a system/planet name, so "near X" is a real phrase — "near
+                      # Orison" doesn't test anything, since Orison is itself a specific
+                      # terminal cluster, not an area near something else (caught live,
+                      # 2026-09-11: it resolved straight to "Orison Municipal Services").
 SHIP = "Railen"
 
 TOKEN_RE = re.compile(r"route_token=([0-9a-f]{8})")
