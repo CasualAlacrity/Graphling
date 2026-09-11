@@ -207,21 +207,16 @@ already scoped separately — not trade-run workflow modeling.
    substantial piece of this step — not just tools that log what already
    happened, but ranking what to do next.
 
-## Known gaps (live-testing, 2026-07-29)
+## Known gaps
 
-**High priority — missing "commit to this route" tool.** `create_run_from_route`
-(`app/db/trade_run_store.py`) already exists and is exactly what's needed — it's
-what the overlay's manual UI calls (`overlay_canvas.py`) — but nothing wraps it
-as an `UplinkTool`. Live trace: pilot asked `best_route`, got a recommendation,
-said "yes" to "want to proceed with this one?" — with no commit tool available,
-the model re-ran `best_route` (redundant restatement of info already given) and
-then improvised by calling `start_timer`, which only starts a countdown, not an
-actual trade run. Needs a tool (e.g. `start_route`) that takes a chosen
-`UEXTradeRoute` + quantity + ship and calls `create_run_from_route`, following
-the Build plan's AI-integration pattern below (`mark_cargo_acquired` etc.).
-
-**High priority — the "commit to this route" tool now has a full design:**
-`docs/start-route-tool.md` (stateless `start_trade_run`). Build it in roadmap Phase 1.
+**Closed 2026-09-11 — "commit to this route" tool.** `start_trade_run` is built —
+`docs/start-route-tool.md`. Not the originally-sketched resolve-by-name design: it takes
+a `route_token` that `best_route`/`trade_advisor` stash when they report a recommendation
+(`app/tools/trade_run/route_cache.py`), so committing never re-resolves or re-fetches
+anything `best_route` already found. Building it also surfaced and fixed a real bug:
+`find_best_route` was never patching `is_auto_load_origin/destination` on its returned
+routes, so anything built straight from one would've silently gotten `MANUAL` on both
+legs — fixed at the source in `route_ranking.py`, so every caller benefits.
 
 **Designed, not built — ledger trust, corrections, recoverability.**
 `docs/ledger-trust-and-corrections.md` captures four interrelated additions from an
@@ -289,6 +284,71 @@ Cap detour search to **one additional stop** within the existing Gm radius —
 avoid open-ended multi-hop pathfinding; that's a harder problem to defer,
 not solve here.
 
+**Sharpened 2026-09-11 (discussed while designing `start_trade_run`) — option 2's shape,
+gotten wrong once already:** the candidate detour terminal is near the **original
+acquisition origin**, not the destination — "I'm going to Rod's Fuel anyway, might as
+well fill up" fixes the *destination*; the open question is where to make a second stop
+*on the way there*. This needs a travel-time computation that doesn't exist anywhere
+yet: `estimate_travel_time`/`find_best_route` only ever compute a two-point
+origin→destination leg. Option 2 needs a **three-point path**
+(original_origin → candidate_pickup → destination) so the detour's added time can be
+weighed against its added profit before it's even a candidate. Reusable pieces: the
+profit/time formula, `estimate_travel_time` as a primitive (called an extra time, for the
+detour leg), the cargo-packing helpers. New: enumerating candidate terminals near the
+*original origin* that sell something deliverable to the fixed destination, composing
+the three-point time, and scoring "detour" against "partial fill, go anyway" for the
+*whole* run.
+
+**Tool question raised alongside this: does a generic `search_for_routes_tool` belong
+here, as a flexible primitive underneath `best_route`/option 2/etc.?** Decided no — every
+tool in this codebase answers one specific pilot question (`best_route` = "best from
+here", `trade_advisor` = "still the best call"); a flexible multi-filter search tool
+would blur which one the model should pick, working against the tool-selection-accuracy
+goal rather than for it. Two named affordances instead, both Phase 4 candidates, neither
+built yet:
+- **"What to buy at the destination for a return trip"** — not a new tool at all, just
+  `best_route` called with `origin` = wherever the pilot currently is (the active run's
+  destination). Worth a small ergonomic default (infer "here"/"for the way back" the same
+  way `ship` already falls back to the active run's ship) — free, not new engineering.
+- **The corrected option-2 shape above** — a new, narrowly-named tool (e.g.
+  `find_detour_pickup`), not a parameter on `find_best_route`. The computation is too
+  different to share a tool with it.
+
+**Interaction shape for `find_detour_pickup`, sketched 2026-09-11:**
+- **Trigger:** the acquisition leg's transaction-completed transition (right when
+  `mark_cargo_acquired`/`record_purchase` fires) — not a generic poller. Compare ship
+  capacity against what actually got recorded.
+- **Gate:** only proceed if there's no *other* in-progress run that would explain the
+  shortfall (a pilot who already planned their own multi-pickup strategy across two
+  separate runs shouldn't get an unwanted offer).
+- **Search, then a two-part disclosure, not a dump of info:** a short teaser ("I found a
+  detour to fill the cargo... want to hear it?") offered on demand, full breakdown (added
+  time vs. added profit, framed against the whole run) only if asked — same
+  explanation-on-demand rule as `best_route`'s runner-up.
+- **Committing the detour reuses `start_trade_run` as-is** — the found detour route gets
+  its own `route_token` same as any other search result; "add it" is just
+  `start_trade_run(route_token=...)` called a second time. No new commit-side code.
+- **Needs the original search's constraints preserved, not just its winning route** —
+  `route_cache` today only stashes `(route, scu, vehicle_name)`; this needs the filters
+  that were active on the original `best_route` call (autoload/space-only/etc.) carried
+  alongside it so the detour search can reuse them instead of re-asking.
+- **Must speak in ALICE's actual persona voice, not a raw templated string** — unlike
+  `voice/timer_tool.py`'s `_notify_when_done` (a background thread that calls `_speak()`
+  directly, bypassing the graph/persona entirely), this needs the LLM to actually
+  generate the line. Real, new plumbing: nothing today injects a message into the graph
+  from outside the pilot's own turn — the background job needs a way to trigger a graph
+  turn with a synthetic prompt, speak the real response, and fold it into the thread's
+  history so a follow-up "tell me"/"add it" has context. Ties naturally to the presence
+  layer's display-intent bus (`docs/presence-layer.md`) as a second real consumer of that
+  channel, once it exists — not solving it here.
+- **A "second in-progress trade run" for now is a pragmatic choice, not a schema
+  limitation.** The flat, unordered Acquisitions/Sales collections above were designed to
+  support a second acquisition leg on the *same* run ("just more legs in the same flat
+  collections") — but no store function creates that path today (`create_run_from_route`
+  always builds exactly one Acquisition + one Sale). Two independent runs reuses
+  everything that exists; adding a leg to an existing run would be new code. Revisit if a
+  true single-run detour ever matters enough to justify that function.
+
 Architecturally, this operates on *candidate* routes, not committed ones —
 the same `GameTradeRoute` (suggestion) vs. `TradeRun` (committed) split
 already adopted from Arkanis. The Advisor scores hypothetical legs (including
@@ -324,6 +384,15 @@ stale.
 - Gm radius, autoload-required — supplied per-query (by pilot or agent
   context), not a standing preference.
 
+**Extended 2026-09-11 to `best_route`'s own arg defaults, not just Trade Advisor's
+comparison logic.** When the pilot asks for a route without naming ship/origin/
+constraints, infer them from recent finalized runs (`get_finalized_runs` already exists)
+— e.g. the last 3 runs were a Railen, from Orison, autoload/space-station only, so default
+to that instead of asking. Same ask-don't-guess rule as everywhere else in the resolver
+pattern: clarify rather than silently pick when the ledger's signal conflicts with what
+the pilot said, or is itself ambiguous (no clear majority). Not built yet — this is the
+concrete consumer the query-time-parameters idea above was designed for but didn't have.
+
 **Still open / not yet scoped** (real, but not designed):
 - `legality_tolerance{legal_only, gray_market, contraband}` — a real SC
   mechanic, distinct from general trade risk.
@@ -334,6 +403,12 @@ stale.
   should even suggest.
 - `commodity_affinity` — loyalty to specific goods vs. pure profit-chasing;
   likely inferred from ledger pattern, not set directly.
+- **Hangar-size / ship-landing constraints** (2026-09-11, backlogged) — some ships need
+  an XL hangar to land; not every station/outpost has one, so a ship with that
+  requirement needs an additional origin *and* destination filter (`best_route` today
+  only has `exclude_ground_stations`/`require_autoload`). Same category: the MISC Hull C
+  has a unique cargo-handling mechanic (external pod loading, not a standard hold) not
+  supported at every station either. Both are future search constraints, not designed.
 
 ### Schema note for stored fields
 

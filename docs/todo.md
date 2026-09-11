@@ -51,21 +51,15 @@ directly.
 
 ## Phase 1 — Finish the trade route tracker (close the AI loop)
 
-- [ ] **`start_route` commit tool** (high priority — the known gap in
-      `trade-route-tracker.md`). `create_run_from_route` already exists in
-      `app/db/trade_run_store.py` and the overlay calls it; nothing wraps it as an
-      `UplinkTool`. Without it, a pilot who says "yes, do that route" after `best_route`
-      gets the model re-running `best_route` or improvising with `start_timer`.
-    - Design decision to make first: how the tool gets the route to commit.
-      - Option A (recommended): stateless — tool takes origin terminal, destination
-        terminal, commodity, quantity SCU, ship; resolves each via `resolve_or_hedge`;
-        rebuilds / looks up the `UEXTradeRoute`; calls `create_run_from_route`. Matches
-        the resolver pattern already used everywhere, and testable without session state.
-        `best_route`'s reply already names the destination terminal and commodity.
-      - Option B: `best_route` stashes its last recommendation in thread-keyed state and
-        `start_route` with no args picks it up. Less typing for the model, adds
-        graph/session state and a staleness question.
-    - Update `trade-route-tracker.md` "Known gaps" once this lands.
+- [x] **`start_trade_run` commit tool** — built 2026-09-11. Not the stateless
+      resolve-by-name design originally sketched here: `best_route` stashes its resolved
+      route in `app/tools/trade_run/route_cache.py` and returns a token; `start_trade_run`
+      just looks it up and commits, no re-resolution. See `docs/start-route-tool.md`.
+      Also fixed a real bug this surfaced: `find_best_route` wasn't patching
+      `is_auto_load_origin/destination` on its returned routes (`route_ranking.py`).
+    - [ ] Tests still needed — see `docs/start-route-tool.md` "Tests still to add".
+    - [ ] Docs said "done" but this hasn't been run live yet — first real voice test of
+          best_route → start_trade_run → mark_arrived → ... → finalize is still ahead.
 - [ ] **Decide Trade Advisor's fate.** `app/tools/trade_run/trade_advisor_tool.py` is
       built but parked out of `graph.py`'s tool list (commit `9f246c4`). Re-add as-is
       (cheap, it works) — recommended — vs. leave parked vs. build the fuller
@@ -112,23 +106,21 @@ ops/leaderboard feature itself (only the schema hook for it lands now).
 
 ## Near-term — Cut Chainlit, collapse to one package
 
-Mechanical, non-AI — Claude can do it. Best done before the presence-layer restructuring
-so there's less to keep working. Bundle with "land the uncommitted batch".
+**Done 2026-09-11.** Mechanical, non-AI — Claude did it.
 
-- [ ] Delete `app/main.py`, `chainlit.md`, `app/chainlit.md`, `.chainlit/`,
+- [x] Delete `app/main.py`, `chainlit.md`, `app/chainlit.md`, `.chainlit/`,
       `app/.chainlit/`, `scripts/{mac,windows}/run-chainlit.*`.
-- [ ] `requirements.txt` — drop the `chainlit>=2.0` "Front end" section.
-- [ ] `pyproject.toml` — drop `main` from `py-modules`; rewrite `name`/`description`
-      (no "Chainlit"); decide the single entry point (`overlay.overlay_app:main` already
-      spawns voice — make it *the* script, e.g. `alice = ...`; keep `voice:main`
-      callable for quick voice-only debugging).
-- [ ] `overlay_app.py` — remove the `UPLINK_VOICE != "0"` conditional; voice always starts.
-- [ ] README — remove Chainlit sections, collapse the run-modes table to one line, drop
+- [x] `requirements.txt` — drop the `chainlit>=2.0` "Front end" section.
+- [x] `pyproject.toml` — drop `main` from `py-modules`; rewrite `name`/`description`
+      (no "Chainlit"); single entry point is `overlay.overlay_app:main` (already spawns
+      voice); `voice:main` kept callable for quick voice-only debugging.
+- [x] `overlay_app.py` — remove the `UPLINK_VOICE != "0"` conditional; voice always starts.
+- [x] README — remove Chainlit sections, collapse the run-modes table to one line, drop
       `[voice path only]` caveats from the architecture diagram (it's the only path now).
-- [ ] CLAUDE.md — remove the Chainlit stack bullet; pair with the multi-tenancy scope edit.
-- [ ] Update lingering "alongside the Chainlit app" comments in `voice/`, `db/session.py`
+- [x] CLAUDE.md — remove the Chainlit stack bullet; pair with the multi-tenancy scope edit.
+- [x] Update lingering "alongside the Chainlit app" comments in `voice/`, `db/session.py`
       (the three-event-loop note loses one loop), `db/migrations/env.py`.
-- [ ] Leave the `TRADE_DB_URL` name as-is (was renamed off `DATABASE_URL` for a Chainlit
+- [x] Leave the `TRADE_DB_URL` name as-is (was renamed off `DATABASE_URL` for a Chainlit
       collision — reverting is churn across `.env`/`alembic.ini`/`session.py` for no gain).
 
 ## Phase 3 — Tool-selection test harness (before the tool surface grows)
@@ -143,7 +135,17 @@ outputs stay consistent.
 - [ ] **Dataset of representative pilot utterances → expected tool call(s) + args.**
       Seed from real LangSmith traces plus tricky cases from git history (RMC matching,
       "is travel time included", cross-system routes, ambiguous ship names, compound
-      "loaded it, what's the ETA").
+      "loaded it, what's the ETA"). Two concrete seed cases from designing `start_trade_run`
+      (2026-09-11):
+      1. `best_route` → `route_token` stashed → "Let's do it." → `start_trade_run` with
+         *that exact token*, not just any token. First cross-turn dependency in the tool
+         surface — the regression this guards is a model paraphrasing/dropping the token
+         instead of copying it.
+      2. The fuller `find_detour_pickup` script (best_route → start → shortfall detected →
+         proactive offer → "Tell me." → "Add it." → second `start_trade_run` call) — a
+         third dimension, a turn ALICE initiates rather than reacts to. Not runnable until
+         `find_detour_pickup` and the graph-injection plumbing exist (Phase 4/backlog), but
+         worth keeping as the target shape.
 - [ ] **Evaluators:** (a) correct tool selected, (b) args resolved to the right
       entities, (c) no spurious extra tool calls, (d) output snapshot / consistency
       check so drift between models is visible.
@@ -168,6 +170,23 @@ Parked:
       full trust model.
 - [ ] Verify + test **multi-milestone single utterance** ("landed and unloaded" → 2
       transitions) — good Phase 3 harness case.
+- [ ] **Return-trip default on `best_route`** — infer `origin` from the active run's
+      destination when the pilot says "here"/"for the way back", same pattern as `ship`
+      already falling back to the active run. Free, no new tool.
+- [ ] **`find_detour_pickup`** — the SCU-shortfall "second pickup stop" case, corrected
+      shape (candidate terminal near the *original* acquisition origin, three-point
+      travel time, detour-vs-partial-fill scoring). See `trade-route-tracker.md`'s
+      SCU-shortfall section. Genuinely new engineering, not a `best_route` parameter.
+      Trigger/gating/voice details sketched there too (2026-09-11) — notably needs
+      graph-injection plumbing for a proactively-initiated turn, which nothing today has.
+- [ ] **Ledger-inferred defaults on `best_route`.** Infer ship/origin/constraints
+      (autoload, space-only) from recent finalized runs when the pilot doesn't name them
+      — "last 3 runs were a Railen from Orison, autoload/space-only." Ask, don't guess, on
+      conflict or ambiguity. Extends the already-designed-but-unconsumed "query-time
+      parameters" idea in `trade-route-tracker.md` to `best_route` itself, not just
+      Trade Advisor. `get_finalized_runs` already exists; needs the aggregation + wiring.
+- [ ] **Hangar-size / Hull-C landing constraints** — backlogged, see
+      `trade-route-tracker.md`'s "still open / not yet scoped" list.
 
 ## Phase 5 — Tool-selection improvements (informed by Phase 3)
 
