@@ -146,30 +146,38 @@ async def filter_by_location(rows, cache, client, star_system=None, orbit=None, 
     return rows
 
 
+def resolve_near_anchor(near: str, cache) -> tuple[int, int, str] | None:
+    """Resolves a name (orbit, moon, or terminal) to (orbit_id, star_system_id,
+    orbit_name) — the anchor point 'near X' radius searches are computed from. Tries an
+    orbit match first, then a moon (using its own orbit directly), then falls back to a
+    terminal's own orbit. Returns None if nothing resolves.
+
+    Shared by filter_by_distance and best_route's region search (docs/trade-route-
+    tracker.md's "Known gaps" — best_route was the one location-taking tool that hadn't
+    adopted this resolution order) — this is the exact chain both need, extracted so
+    there's one copy of it, not two drifting independently."""
+    orbit = match_by_name_or_code(near, cache.orbits)
+    if orbit:
+        return orbit.id, orbit.id_star_system, orbit.name
+
+    moon = match_by_name_or_code(near, cache.moons)
+    if moon:
+        return moon.id_orbit, moon.id_star_system, moon.orbit_name
+
+    terminal = match_by_name_or_code(near, cache.terminals)
+    if terminal and terminal.orbit_name:
+        matched_orbit = _find_orbit_by_name(cache, terminal.orbit_name)
+        if matched_orbit:
+            return matched_orbit.id, matched_orbit.id_star_system, matched_orbit.name
+
+    return None
+
+
 async def filter_by_distance(rows, near, max_distance, cache, client):
-    origin = match_by_name_or_code(near, cache.orbits)
-    if origin:
-        origin_id = origin.id
-        origin_system_id = origin.id_star_system
-        origin_name = origin.name
-    else:
-        moon = match_by_name_or_code(near, cache.moons)
-        if moon:
-            origin_id = moon.id_orbit
-            origin_system_id = moon.id_star_system
-            origin_name = moon.orbit_name
-        else:
-            terminal = match_by_name_or_code(near, cache.terminals)
-            if not terminal or not terminal.orbit_name:
-                return rows
-
-            matched_orbit = _find_orbit_by_name(cache, terminal.orbit_name)
-            if not matched_orbit:
-                return rows
-
-            origin_id = matched_orbit.id
-            origin_system_id = matched_orbit.id_star_system
-            origin_name = matched_orbit.name
+    anchor = resolve_near_anchor(near, cache)
+    if anchor is None:
+        return rows
+    origin_id, origin_system_id, origin_name = anchor
 
     distances = await client.get_orbit_distances(origin_id, origin_system_id)
 
@@ -187,3 +195,38 @@ async def filter_by_distance(rows, near, max_distance, cache, client):
         if r.orbit_name in lookup and lookup[r.orbit_name] <= max_distance:
             result.append(r)
     return result
+
+
+async def terminals_near(near: str, cache, client, max_distance: int = DEFAULT_NEAR_DISTANCE) -> list | None:
+    """Every terminal within max_distance Gm of a resolved orbit/moon/terminal anchor —
+    the "near X" radius mode — sorted closest-first so a caller that wants to cap a
+    fan-out search can just slice the front of the list. Returns None if `near` doesn't
+    resolve to anything at all (caller should hedge); an empty list is a real "nothing
+    in range" answer, distinct from "couldn't even find X"."""
+    anchor = resolve_near_anchor(near, cache)
+    if anchor is None:
+        return None
+    origin_id, origin_system_id, origin_name = anchor
+
+    distances = await client.get_orbit_distances(origin_id, origin_system_id)
+    parsed = [OrbitDistance.model_validate(d) for d in distances]
+    lookup = {d.orbit_destination_name: d.distance for d in parsed}
+    lookup[origin_name] = 0
+
+    in_range = [t for t in cache.terminals if t.orbit_name in lookup and lookup[t.orbit_name] <= max_distance]
+    return sorted(in_range, key=lambda t: lookup[t.orbit_name])
+
+
+def terminals_within(region: str, cache) -> list | None:
+    """Every terminal exactly inside a named orbit or star system — the "in X"/"on X"/
+    "within X" containment mode, no radius/distance computation at all. Returns None if
+    `region` doesn't resolve to either."""
+    orbit = match_by_name_or_code(region, cache.orbits)
+    if orbit:
+        return [t for t in cache.terminals if t.orbit_name == orbit.name]
+
+    system = match_by_name_or_code(region, cache.star_systems)
+    if system:
+        return [t for t in cache.terminals if t.star_system_name == system.name]
+
+    return None

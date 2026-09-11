@@ -1,3 +1,5 @@
+import asyncio
+
 from tools.cargo_packing import (
     best_container_mix,
     estimate_transfer_time,
@@ -7,6 +9,13 @@ from tools.cargo_packing import (
 )
 from tools.travel_time import estimate_travel_time
 from tools.uexcorp.trade_data import UEXTradeRoute
+
+# Fanning out get_commodity_routes + per-candidate travel-time estimates across every
+# terminal in a region multiplies API calls by however many terminals qualify — cap it
+# rather than search open-endedly. terminals_near/terminals_within
+# (app/tools/uexcorp/matching.py) return closest/all-matching terminals; callers building
+# a region search should slice to this many before passing origin_terminal_ids in.
+MAX_ORIGIN_CANDIDATES = 8
 
 
 def profit_per_hour(score: float) -> int:
@@ -27,16 +36,25 @@ def _terminal_is_auto_load(cache, terminal_id: int) -> bool:
 
 
 async def find_best_route(
-        uex_client, scw_client, origin_terminal_id: int, ship: str, ship_scu: float, cache, *,
+        uex_client, scw_client, origin_terminal_ids: list[int], ship: str, ship_scu: float, cache, *,
         commodity_id: int | None = None, exclude_destination_terminal_name: str | None = None,
         exclude_ground: bool = False, require_autoload: bool = False,
+        destination_terminal_ids: set[int] | None = None,
 ) -> tuple[UEXTradeRoute, float, int, UEXTradeRoute | None, float | None] | None:
-    """Searches commodity routes from origin_terminal_id — narrowed to one commodity if
-    commodity_id is given, otherwise every commodity sellable from there — and ranks by
-    profit per hour. Returns (best_route, best_score, best_scu, runner_up_route,
-    runner_up_score) — scu is the reachable SCU amount the score was actually computed
-    from, since profit per hour is meaningless to report without the load size it
-    assumes. runner_up is None if only one candidate qualified.
+    """Searches commodity routes from every terminal in origin_terminal_ids and ranks
+    the union by profit per hour — narrowed to one commodity if commodity_id is given,
+    otherwise every commodity sellable from any of them. A single-pinned-terminal search
+    (the original, still-common case) is just origin_terminal_ids=[that one id]; a
+    region search ("near Crusader"/"in Crusader") passes every candidate terminal in
+    that region instead (see app/tools/uexcorp/matching.py's terminals_near/
+    terminals_within, and cap to MAX_ORIGIN_CANDIDATES before calling this — fanning out
+    unboundedly multiplies API calls per terminal in the region).
+
+    Returns (best_route, best_score, best_scu, runner_up_route, runner_up_score) — scu is
+    the reachable SCU amount the score was actually computed from, since profit per hour
+    is meaningless to report without the load size it assumes. runner_up is None if only
+    one candidate qualified, and is tracked across the WHOLE union when searching a
+    region, not per-origin-terminal — it's still "the second-best option overall."
 
     The runner-up isn't a nice-to-have — without it, "why is this the best route" has no
     real answer to give: a live trace showed the model inventing an unsupported "beats
@@ -49,18 +67,26 @@ async def find_best_route(
     excluded everything that was left).
 
     exclude_ground and require_autoload only ever constrain the destination — the origin
-    is always the pilot's own pinned starting point here (unlike the overlay's filter
+    is always the pilot's own pinned starting point(s) here (unlike the overlay's filter
     panel, where either end can be open), so filtering it by its own ground/autoload
     status would wrongly exclude routes just because of where the pilot already is.
+    destination_terminal_ids is the analogous containment constraint for a bare "in X"/
+    "on X" request where BOTH ends stay in the named region — None means destination is
+    open, same as before this existed.
 
     Shared by trade_advisor (comparing against a committed leg, hence
     exclude_destination_terminal_name to skip the committed choice itself) and any tool
     that just wants "the best option from here" with no active run involved.
     """
-    raw_routes = await uex_client.get_commodity_routes(
-        commodity_id=commodity_id, origin_terminal_id=origin_terminal_id,
-    )
-    candidates = [UEXTradeRoute.model_validate(row) for row in raw_routes]
+    raw_routes_by_origin = await asyncio.gather(*[
+        uex_client.get_commodity_routes(commodity_id=commodity_id, origin_terminal_id=origin_id)
+        for origin_id in origin_terminal_ids
+    ])
+    candidates = [
+        UEXTradeRoute.model_validate(row)
+        for raw_routes in raw_routes_by_origin
+        for row in raw_routes
+    ]
 
     best: UEXTradeRoute | None = None
     best_score = None
@@ -69,6 +95,8 @@ async def find_best_route(
     runner_up_score = None
     for route in candidates:
         if exclude_destination_terminal_name and route.destination_terminal_name == exclude_destination_terminal_name:
+            continue
+        if destination_terminal_ids is not None and route.destination_terminal_id not in destination_terminal_ids:
             continue
         if exclude_ground and route.is_on_ground_destination:
             continue

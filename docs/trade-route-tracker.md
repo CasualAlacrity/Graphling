@@ -218,6 +218,46 @@ anything `best_route` already found. Building it also surfaced and fixed a real 
 routes, so anything built straight from one would've silently gotten `MANUAL` on both
 legs — fixed at the source in `route_ranking.py`, so every caller benefits.
 
+**Reopened 2026-09-11, live-testing `start_trade_run`/`best_route` — region-based
+origin/destination resolution.** `best_route`'s `origin` only ever resolves against
+`cache.terminals` (an exact terminal name) — "near Crusader" fuzzy-matched to one
+specific terminal that happened to contain "Crusader" in its name, instead of searching
+the region. This is a real gap in a tool otherwise marked done, and the **proper** fix is
+systemic, not a `best_route`-local patch:
+
+- `best_route` is the only location-taking tool in the app that doesn't use
+  `app/tools/uexcorp/matching.py`'s shared `filter_by_location`/`filter_by_distance`
+  (used by every UEX price/rental/yield/mining tool). Fix: extract the orbit→moon→
+  terminal's-own-orbit resolution chain `filter_by_distance` already has into a reusable
+  function, and give `best_route` the same `star_system`/`orbit`/`moon`/`near`+
+  `max_distance` shape every other tool already has, instead of a single flat
+  `origin: str`. Reuse `DEFAULT_NEAR_DISTANCE = 25` (Gm) — a candidate route that's
+  genuinely far away is already penalized by profit/hour scoring (added travel time), so
+  there's no need for a tighter cutoff than the rest of the app uses.
+- **"Near X" vs. "in X"/"on X" are different modes, not the same thing with different
+  words** — confirmed 2026-09-11, and this maps exactly onto the two filter shapes
+  `filter_by_location` already has:
+  - *"Near X"* → radius search around a resolved anchor (orbit/moon, or a terminal's own
+    orbit) — `filter_by_distance`'s existing behavior.
+  - *"In X" / "on X" / "within X"* → exact containment, no radius — `filter_by_match`
+    against `cache.orbits`/`cache.star_systems`, plain equality.
+- **Origin/destination scope — the genuinely new wrinkle a two-ended route introduces**
+  (every other UEX tool's location filter applies to one thing; a route has two).
+  Resolved by parsing the preposition, not by defaulting or by asking every time:
+  - Bare **"in X" / "within X" / "on X"** (no directional verb) → **both ends**
+    constrained to X — an intra-region loop ("I don't want to leave Crusader").
+  - **"starting in X" / "from X" / "out of X"** → **origin only**, destination open.
+  - **"ending in X" / "to X" / "selling in X"** → **destination only**, origin open.
+  - Only phrasing that matches none of these should trigger a clarifying question
+    ("did you want to stay within X, or just start/end there?") — not every mention of a
+    region.
+- **The rule belongs in `BestRouteTool`'s description, in plain language, not just in
+  code.** Two jobs at once: it steers the model's own parsing consistently instead of an
+  ad-hoc per-call judgment, and it gives ALICE the material to explain the distinction if
+  a pilot asks "what's the difference between those two?" — standing principle for any
+  tool whose argument-inference has a non-obvious rule (applies to the ledger-inferred
+  `best_route` defaults above too).
+
 **Designed, not built — ledger trust, corrections, recoverability.**
 `docs/ledger-trust-and-corrections.md` captures four interrelated additions from an
 HCI-course design session: per-value provenance + confidence (not just a run-level
