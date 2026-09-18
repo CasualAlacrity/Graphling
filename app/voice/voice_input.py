@@ -19,6 +19,16 @@ _model: whisper.Whisper | None = None
 
 SAMPLE_RATE = 16000  # Whisper expects 16kHz
 
+# Whisper does not return an empty string for silence — given a near-silent or very short
+# buffer it falls back on its language prior and emits confident nonsense. A stray PTT tap,
+# or holding the key while typing, produces a hallucinated instruction rather than nothing,
+# and ALICE then acts on it. These two gates reject that audio before it reaches the model.
+#
+# Both thresholds are mic-dependent — transcribe() prints the measured duration and RMS on
+# every capture so they can be tuned against real hardware rather than guessed at.
+MIN_SPEECH_SECONDS = 0.35
+SILENCE_RMS_THRESHOLD = 0.005
+
 
 def load_whisper(model_size: str = "base") -> None:
     """Load Whisper model into memory. Call once at startup."""
@@ -109,6 +119,18 @@ def transcribe(audio: np.ndarray, initial_prompt: str | None = None) -> str:
         raise RuntimeError("Whisper model not loaded — call load_whisper() at startup")
 
     if len(audio) == 0:
+        return ""
+
+    duration_seconds = len(audio) / SAMPLE_RATE
+    rms = float(np.sqrt(np.mean(np.square(audio))))
+    print(f"[Voice] Captured {duration_seconds:.2f}s, rms {rms:.4f}")
+
+    if duration_seconds < MIN_SPEECH_SECONDS:
+        print(f"[Voice] Ignored — shorter than {MIN_SPEECH_SECONDS}s")
+        return ""
+
+    if rms < SILENCE_RMS_THRESHOLD:
+        print(f"[Voice] Ignored — quieter than {SILENCE_RMS_THRESHOLD}")
         return ""
 
     result = _model.transcribe(audio, fp16=False, language="en", initial_prompt=initial_prompt)
