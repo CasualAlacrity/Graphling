@@ -7,7 +7,7 @@ from db.models import LegType
 from tools.cargo_packing import best_container_mix, parse_container_sizes
 from tools.trade_run import resolver
 from tools.trade_run.resolver import AmbiguousRunError
-from tools.uexcorp.matching import resolve_or_hedge
+from tools.uexcorp.matching import cargo_capable_vehicles, resolve_or_hedge
 from tools.uexcorp.reference_cache import UexReferenceCache
 from tools.uplink_tool import UEXBackedTool
 
@@ -48,7 +48,9 @@ class CargoPackingTool(UEXBackedTool):
         if not isinstance(cache_result, UexReferenceCache):
             return cache_result
 
-        matched_vehicle, error = resolve_or_hedge(run.ship, cache_result.vehicles, "ship", scorer=fuzz.token_sort_ratio)
+        matched_vehicle, error = resolve_or_hedge(
+            run.ship, cargo_capable_vehicles(cache_result), "ship", scorer=fuzz.token_sort_ratio
+        )
         if error:
             return error
 

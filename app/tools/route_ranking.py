@@ -1,5 +1,10 @@
 import asyncio
+import os
+from typing import NamedTuple
 
+from dotenv import load_dotenv
+
+from db.session import SessionLocal
 from tools.cargo_packing import (
     best_container_mix,
     estimate_transfer_time,
@@ -8,14 +13,68 @@ from tools.cargo_packing import (
     usable_container_sizes,
 )
 from tools.travel_time import estimate_travel_time
+from tools.uexcorp.price_cache import cached_routes_from_terminal, fetch_routes_from_terminal
 from tools.uexcorp.trade_data import UEXTradeRoute
 
-# Fanning out get_commodity_routes + per-candidate travel-time estimates across every
-# terminal in a region multiplies API calls by however many terminals qualify — cap it
-# rather than search open-endedly. terminals_near/terminals_within
-# (app/tools/uexcorp/matching.py) return closest/all-matching terminals; callers building
-# a region search should slice to this many before passing origin_terminal_ids in.
-MAX_ORIGIN_CANDIDATES = 8
+# How many origin terminals a single search may fetch *live* from UEX. Everything already
+# cached is used for free on top of this, so a region search warms progressively: the
+# first search of Stanton fetches 8 and caches them, the next reuses those 8 and fetches 8
+# more. Coverage compounds across searches while the per-search API cost stays flat.
+#
+# This bounds live calls, not terminals considered — the previous version sliced the
+# candidate list itself, so a 117-terminal system was permanently a search of 8.
+#
+# Env-configurable because the right value depends on UEX's rate limit and on how many
+# pilots are searching at once, neither of which is known yet. Tuning it live should be a
+# restart, not a deployment. Read at import, so a change needs the process restarted.
+load_dotenv()
+MAX_LIVE_ROUTE_FETCHES = int(os.getenv("MAX_LIVE_ROUTE_FETCHES", "8"))
+
+
+class RouteSearch(NamedTuple):
+    """find_best_route's result. origins_searched vs origins_available is what lets a
+    caller say "best of the 16 I could see" instead of implying it searched everything —
+    a region can hold far more terminals than one search is allowed to fetch live."""
+    best: UEXTradeRoute
+    best_score: float
+    best_scu: int
+    runner_up: UEXTradeRoute | None
+    runner_up_score: float | None
+    runner_up_scu: int | None
+    origins_searched: int
+    origins_available: int
+
+
+async def _route_rows_for(uex_client, origin_terminal_ids: list[int]) -> tuple[list[dict], int]:
+    """Route rows for as many origins as the budget allows, preferring cached ones.
+
+    Cached origins cost nothing, so they're all used. Whatever's left gets up to
+    MAX_LIVE_ROUTE_FETCHES live calls; the remainder is skipped this time and will be
+    picked up by a later search, since the ones fetched now are cached for next time.
+    """
+    cached_rows: list[dict] = []
+    uncached: list[int] = []
+
+    async with SessionLocal() as session:
+        for origin_id in origin_terminal_ids:
+            rows = await cached_routes_from_terminal(session, origin_id)
+            if rows is None:
+                uncached.append(origin_id)
+            else:
+                cached_rows.extend(rows)
+
+    to_fetch = uncached[:MAX_LIVE_ROUTE_FETCHES]
+
+    async def fetch(origin_id: int) -> list[dict]:
+        async with SessionLocal() as session:
+            return await fetch_routes_from_terminal(uex_client, session, origin_id)
+
+    fetched = await asyncio.gather(*[fetch(origin_id) for origin_id in to_fetch])
+    for rows in fetched:
+        cached_rows.extend(rows)
+
+    searched = len(origin_terminal_ids) - len(uncached) + len(to_fetch)
+    return cached_rows, searched
 
 
 def profit_per_hour(score: float) -> int:
@@ -40,18 +99,18 @@ async def find_best_route(
         commodity_id: int | None = None, exclude_destination_terminal_name: str | None = None,
         exclude_ground: bool = False, require_autoload: bool = False,
         destination_terminal_ids: set[int] | None = None,
-) -> tuple[UEXTradeRoute, float, int, UEXTradeRoute | None, float | None, int | None] | None:
+) -> RouteSearch | None:
     """Searches commodity routes from every terminal in origin_terminal_ids and ranks
     the union by profit per hour — narrowed to one commodity if commodity_id is given,
     otherwise every commodity sellable from any of them. A single-pinned-terminal search
     (the original, still-common case) is just origin_terminal_ids=[that one id]; a
     region search ("near Crusader"/"in Crusader") passes every candidate terminal in
     that region instead (see app/tools/uexcorp/matching.py's terminals_near/
-    terminals_within, and cap to MAX_ORIGIN_CANDIDATES before calling this — fanning out
-    unboundedly multiplies API calls per terminal in the region).
+    terminals_within). Pass *every* candidate — do not pre-slice. Live API calls are
+    budgeted internally by MAX_LIVE_ROUTE_FETCHES, and anything already cached is searched
+    for free on top of that, so slicing beforehand would discard warm origins.
 
-    Returns (best_route, best_score, best_scu, runner_up_route, runner_up_score,
-    runner_up_scu) — scu is the reachable SCU amount the score was actually computed from,
+    Returns a RouteSearch — scu is the reachable SCU amount the score was actually computed from,
     since profit per hour is meaningless to report without the load size it assumes.
     runner_up is None if only one candidate qualified, and is tracked across the WHOLE
     union when searching a region, not per-origin-terminal — it's still "the second-best
@@ -84,15 +143,16 @@ async def find_best_route(
     exclude_destination_terminal_name to skip the committed choice itself) and any tool
     that just wants "the best option from here" with no active run involved.
     """
-    raw_routes_by_origin = await asyncio.gather(*[
-        uex_client.get_commodity_routes(commodity_id=commodity_id, origin_terminal_id=origin_id)
-        for origin_id in origin_terminal_ids
-    ])
-    candidates = [
-        UEXTradeRoute.model_validate(row)
-        for raw_routes in raw_routes_by_origin
-        for row in raw_routes
-    ]
+    raw_rows, origins_searched = await _route_rows_for(uex_client, origin_terminal_ids)
+
+    # Cached rows are unfiltered by commodity on purpose (one cache entry serves every
+    # commodity out of that terminal), so narrowing happens here rather than server-side.
+    candidates = []
+    for row in raw_rows:
+        route = UEXTradeRoute.model_validate(row)
+        if commodity_id is not None and route.commodity_id != commodity_id:
+            continue
+        candidates.append(route)
 
     best: UEXTradeRoute | None = None
     best_score = None
@@ -148,7 +208,10 @@ async def find_best_route(
     if runner_up is not None:
         runner_up = _patch_auto_load(runner_up, cache)
 
-    return best, best_score, best_scu, runner_up, runner_up_score, runner_up_scu
+    return RouteSearch(
+        best, best_score, best_scu, runner_up, runner_up_score, runner_up_scu,
+        origins_searched, len(origin_terminal_ids),
+    )
 
 
 def _patch_auto_load(route: UEXTradeRoute, cache) -> UEXTradeRoute:

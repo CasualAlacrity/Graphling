@@ -7,7 +7,7 @@ best_scu meant the second route was describable but not startable.
 """
 from types import SimpleNamespace
 
-from tools.route_ranking import find_best_route
+from tools.route_ranking import _route_rows_for, find_best_route
 
 FIXED_TRAVEL_SECONDS = 100.0
 
@@ -66,7 +66,13 @@ async def _rank(monkeypatch, rows, ship_scu=200):
     async def _fixed_travel(*args, **kwargs):
         return FIXED_TRAVEL_SECONDS
 
+    async def _rows_for(_client, origin_terminal_ids):
+        return rows, len(origin_terminal_ids)
+
     monkeypatch.setattr("tools.route_ranking.estimate_travel_time", _fixed_travel)
+    # These cover ranking. The cache/fetch budgeting has its own tests below, and leaving
+    # it in the path here would drag a live Postgres session into every ranking assertion.
+    monkeypatch.setattr("tools.route_ranking._route_rows_for", _rows_for)
     return await find_best_route(
         _FakeUexClient(rows), None, [100], "Railen", ship_scu, _cache(), commodity_id=1,
     )
@@ -74,24 +80,24 @@ async def _rank(monkeypatch, rows, ship_scu=200):
 
 async def test_runner_up_carries_its_own_scu(monkeypatch):
     """Winner seen first — the runner-up is assigned in the elif branch."""
-    best, _, best_scu, runner_up, _, runner_up_scu = await _rank(monkeypatch, [WINNER, RUNNER_UP])
+    result = await _rank(monkeypatch, [WINNER, RUNNER_UP])
 
-    assert best.commodity_name == "Titanium"
-    assert runner_up.commodity_name == "Aluminium"
-    assert best_scu == 64
-    assert runner_up_scu == 32
+    assert result.best.commodity_name == "Titanium"
+    assert result.runner_up.commodity_name == "Aluminium"
+    assert result.best_scu == 64
+    assert result.runner_up_scu == 32
 
 
 async def test_runner_up_scu_survives_being_demoted(monkeypatch):
     """Runner-up seen first, so it is briefly the best and then demoted. This is the
     branch that dropped the scu: the demoted route's load has to move across with it
     before best_scu is overwritten by the new winner's."""
-    best, _, best_scu, runner_up, _, runner_up_scu = await _rank(monkeypatch, [RUNNER_UP, WINNER])
+    result = await _rank(monkeypatch, [RUNNER_UP, WINNER])
 
-    assert best.commodity_name == "Titanium"
-    assert runner_up.commodity_name == "Aluminium"
-    assert best_scu == 64
-    assert runner_up_scu == 32
+    assert result.best.commodity_name == "Titanium"
+    assert result.runner_up.commodity_name == "Aluminium"
+    assert result.best_scu == 64
+    assert result.runner_up_scu == 32
 
 
 async def test_equal_scu_is_reported_for_both(monkeypatch):
@@ -99,32 +105,106 @@ async def test_equal_scu_is_reported_for_both(monkeypatch):
     on the same load. Nothing about ranking requires the two to differ — a full Railen of
     Iron and a full Railen of Aluminium are both valid options, and each is committable at
     that same 96."""
-    best, _, best_scu, runner_up, _, runner_up_scu = await _rank(
+    result = await _rank(
         monkeypatch, [FILLS_SHIP_RICH, FILLS_SHIP_LEAN], ship_scu=RAILEN_SCU,
     )
 
-    assert best.commodity_name == "Iron"
-    assert runner_up.commodity_name == "Aluminium"
-    assert best_scu == RAILEN_SCU
-    assert runner_up_scu == RAILEN_SCU
+    assert result.best.commodity_name == "Iron"
+    assert result.runner_up.commodity_name == "Aluminium"
+    assert result.best_scu == RAILEN_SCU
+    assert result.runner_up_scu == RAILEN_SCU
 
 
 async def test_single_candidate_has_no_runner_up(monkeypatch):
-    best, _, best_scu, runner_up, runner_up_score, runner_up_scu = await _rank(monkeypatch, [WINNER])
+    result = await _rank(monkeypatch, [WINNER])
 
-    assert best.commodity_name == "Titanium"
-    assert best_scu == 64
-    assert runner_up is None
-    assert runner_up_score is None
-    assert runner_up_scu is None
+    assert result.best.commodity_name == "Titanium"
+    assert result.best_scu == 64
+    assert result.runner_up is None
+    assert result.runner_up_score is None
+    assert result.runner_up_scu is None
 
 
 async def test_autoload_is_patched_onto_both_routes(monkeypatch):
     """Guards the other latent bug this area had: is_auto_load_* aren't in the routes
     payload, so they default to 0 until find_best_route patches them from the terminal
     cache. Destination 200 is autoload-capable, 201 isn't."""
-    best, _, _, runner_up, _, _ = await _rank(monkeypatch, [WINNER, RUNNER_UP])
+    result = await _rank(monkeypatch, [WINNER, RUNNER_UP])
 
-    assert best.is_auto_load_origin == 1
-    assert best.is_auto_load_destination == 1
-    assert runner_up.is_auto_load_destination == 0
+    assert result.best.is_auto_load_origin == 1
+    assert result.best.is_auto_load_destination == 1
+    assert result.runner_up.is_auto_load_destination == 0
+
+
+# --- live-fetch budgeting / lazy cache population ----------------------------
+
+class _FakeSession:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+
+TEST_BUDGET = 8
+
+
+def _budget_env(monkeypatch, cached_ids):
+    """Patches the cache layer so no Postgres is involved, and pins the budget so these
+    don't depend on whatever MAX_LIVE_ROUTE_FETCHES is set to locally. Returns the list
+    recording which origins were fetched live."""
+    fetched = []
+
+    monkeypatch.setattr("tools.route_ranking.MAX_LIVE_ROUTE_FETCHES", TEST_BUDGET)
+
+    async def _cached(_session, terminal_id):
+        if terminal_id in cached_ids:
+            return [{"origin": terminal_id, "source": "cache"}]
+        return None
+
+    async def _fetch(_client, _session, terminal_id):
+        fetched.append(terminal_id)
+        return [{"origin": terminal_id, "source": "live"}]
+
+    monkeypatch.setattr("tools.route_ranking.SessionLocal", _FakeSession)
+    monkeypatch.setattr("tools.route_ranking.cached_routes_from_terminal", _cached)
+    monkeypatch.setattr("tools.route_ranking.fetch_routes_from_terminal", _fetch)
+    return fetched
+
+
+async def test_live_fetches_are_capped_but_cached_origins_are_free(monkeypatch):
+    """The point of the budget: it limits calls to UEX, not terminals considered. 20
+    origins with 10 already warm should search all 10 cached plus 8 fetched — 18 — while
+    only paying for 8."""
+    origins = list(range(20))
+    cached_ids = set(range(10))
+    fetched = _budget_env(monkeypatch, cached_ids)
+
+    rows, searched = await _route_rows_for(object(), origins)
+
+    assert len(fetched) == TEST_BUDGET
+    assert searched == len(cached_ids) + TEST_BUDGET
+    assert len(rows) == searched
+
+
+async def test_only_uncached_origins_consume_the_budget(monkeypatch):
+    """Warm origins must not be re-fetched — that's what makes coverage compound across
+    searches instead of resetting."""
+    origins = list(range(12))
+    fetched = _budget_env(monkeypatch, cached_ids=set(range(12)))
+
+    rows, searched = await _route_rows_for(object(), origins)
+
+    assert fetched == []
+    assert searched == 12
+    assert all(row["source"] == "cache" for row in rows)
+
+
+async def test_everything_is_searched_when_it_fits_in_the_budget(monkeypatch):
+    origins = [1, 2, 3]
+    fetched = _budget_env(monkeypatch, cached_ids=set())
+
+    _rows, searched = await _route_rows_for(object(), origins)
+
+    assert sorted(fetched) == origins
+    assert searched == 3

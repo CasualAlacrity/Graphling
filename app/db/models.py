@@ -92,7 +92,11 @@ class TradeLeg(Base):
 class UexCacheKind(enum.StrEnum):
     COMMODITY = "commodity"
     TERMINAL = "terminal"
+    # Every route for one commodity, any origin — what the overlay's filter panel wants.
     ROUTE = "route"
+    # Every route out of one terminal, any commodity — what best_route wants, since a
+    # pilot asking "best route from Orison" usually names no commodity.
+    ROUTE_BY_ORIGIN = "route_by_origin"
 
 
 class UexPriceCache(Base):

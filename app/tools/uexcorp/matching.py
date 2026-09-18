@@ -1,7 +1,13 @@
+from types import SimpleNamespace
 from typing import Any, TypeVar
 
+import jellyfish
 from pydantic import BaseModel
 from rapidfuzz import fuzz, process
+from rapidfuzz.utils import default_process
+
+from tools.uexcorp.aliases import canonicalize
+from tools.uexcorp.reference_cache import TerminalType
 
 _HasNameAndCode = TypeVar("_HasNameAndCode")
 
@@ -12,6 +18,10 @@ DEFAULT_NEAR_DISTANCE = 25  # gm — used when 'near' is set without an explicit
 # one point above the cutoff, with zero margin. Only meaningful to callers using
 # match_by_name_or_code_with_score; match_by_name_or_code's plain callers are unaffected.
 LOW_CONFIDENCE_MAX = 80
+
+# How close two phonetic encodings must be before the fallback will commit. Measured
+# against real mishearings: "railing" -> Railen scores 86 here, "Raelin" -> Railen 100.
+PHONETIC_MIN = 85
 
 
 class OrbitDistance(BaseModel):
@@ -40,6 +50,17 @@ def _choices_and_lookup(items: list[_HasNameAndCode]) -> tuple[list[str], list[_
         if name_full:
             choices.append(name_full)
             lookup.append(item)
+
+        # Terminals carry a short human nickname ("ARC-L1", "ArcCorp 045", "Everus
+        # Harbor") alongside the long official name ("Admin - ARC-L1", "ArcCorp Mining
+        # Area 045"). The nickname is what a pilot actually says, and the overlay already
+        # matches on it — leaving it out meant the spoken form only ever matched the
+        # official name by partial credit. Additive: another way to reach the same item,
+        # so it can't restrict any workflow.
+        nickname = getattr(item, "nickname", None)
+        if nickname:
+            choices.append(nickname)
+            lookup.append(item)
     return choices, lookup
 
 
@@ -47,7 +68,9 @@ def match_by_name_or_code(
         query: str, items: list[_HasNameAndCode], score_cutoff: int = 60, scorer: Any = fuzz.WRatio,
 ) -> _HasNameAndCode | None:
     choices, lookup = _choices_and_lookup(items)
-    match = process.extractOne(query, choices, score_cutoff=score_cutoff, scorer=scorer)
+    match = process.extractOne(
+        query, choices, score_cutoff=score_cutoff, scorer=scorer, processor=default_process
+    )
     return lookup[match[2]] if match else None
 
 
@@ -64,12 +87,92 @@ def match_by_name_or_code_with_score(
     rewards a query matching a substring/fragment of the choice. Vehicle name matching
     wants the opposite: fuzz.token_sort_ratio, a whole-string comparison — WRatio's
     substring credit is what let unrelated short names like "600i Touring" outscore the
-    actually-closest "Railen" for a garbled query like "railing"."""
+    actually-closest "Railen" for a garbled query like "railing".
+
+    default_process lowercases and strips punctuation before comparing. Without it
+    rapidfuzz compares raw strings, so a lowercase query lost a whole character of
+    similarity against a capitalised catalog name — "caranite" tied with "Laranite" and
+    "Taranite" at 88 against the real "Caranite", and extractOne returned the first of
+    them. That was a silent wrong commodity, above the confidence threshold, no hedge."""
     choices, lookup = _choices_and_lookup(items)
-    match = process.extractOne(query, choices, score_cutoff=score_cutoff, scorer=scorer)
+    match = process.extractOne(
+        query, choices, score_cutoff=score_cutoff, scorer=scorer, processor=default_process
+    )
     if not match:
         return None
     return lookup[match[2]], match[1]
+
+
+def _top_matches(
+        query: str, items: list[_HasNameAndCode], score_cutoff: int, scorer: Any,
+) -> tuple[list[_HasNameAndCode], float]:
+    """Every distinct item tied at the best score, and that score.
+
+    Returning the tie rather than one winner is what lets resolve_or_hedge tell "this is
+    the answer" from "several answers fit equally". extractOne silently returns whichever
+    tied candidate it saw first, which is fine when names are distinct and dangerous when
+    they differ only by a number — "ArcCorp Mining Area 045/048/141" score identically
+    against a query with no number in it."""
+    choices, lookup = _choices_and_lookup(items)
+    results = process.extract(
+        query, choices, scorer=scorer, processor=default_process,
+        score_cutoff=score_cutoff, limit=None,
+    )
+    if not results:
+        return [], 0.0
+
+    best_score = results[0][1]
+    winners = []
+    for _choice, score, index in results:
+        if score < best_score:
+            break
+        item = lookup[index]
+        # One item contributes several choices (name, code, name_full) — those aren't a tie.
+        if item not in winners:
+            winners.append(item)
+    return winners, best_score
+
+
+def _phonetic_key(text: str) -> str:
+    """Metaphone encoding, per word. Encodes how a name *sounds* rather than how it's
+    spelled, which is the right question for speech input: "Railen" and "Raelin" both
+    encode to RLN, while "Javelin" — which outscores Railen on letter-distance — is JFLN."""
+    parts = []
+    for word in text.split():
+        parts.append(jellyfish.metaphone(word))
+    return " ".join(parts)
+
+
+def _phonetic_match(query: str, items: list[_HasNameAndCode]) -> _HasNameAndCode | None:
+    """Best phonetic match, but only when it's unambiguous.
+
+    Metaphone discards digits, so whole families of catalog names collapse onto one key —
+    every "ArcCorp Mining Area NNN" encodes identically, as do "Admin - HUR-L1".."L5" and
+    "M50"/"M80". Committing to the top scorer would confidently send a pilot to the wrong
+    mining area. So a tie between distinct items is treated as no answer, and the caller
+    hedges exactly as it would have before."""
+    query_key = _phonetic_key(query)
+    if not query_key.strip():
+        return None
+
+    choices, lookup = _choices_and_lookup(items)
+
+    best_score = 0.0
+    winners = []
+    for index, choice in enumerate(choices):
+        score = fuzz.token_sort_ratio(query_key, _phonetic_key(choice))
+        if score < PHONETIC_MIN:
+            continue
+        item = lookup[index]
+        if score > best_score:
+            best_score = score
+            winners = [item]
+        elif score == best_score and item not in winners:
+            winners.append(item)
+
+    if len(winners) != 1:
+        return None
+    return winners[0]
 
 
 def resolve_or_hedge(
@@ -87,15 +190,35 @@ def resolve_or_hedge(
 
     Returns (item, None) on a confident match, or (None, message) otherwise — callers
     should `return` the message directly on failure, same as every other tool error.
+
+    Three layers, each only reached when the previous one didn't settle it:
+
+    1. Alias rewrite for known pilot slang ("connie" -> Constellation). A closed set, so
+       a lookup is correct by construction — see tools/uexcorp/aliases.py.
+    2. Fuzzy string match, which must land on a single best candidate. A tie is treated as
+       not knowing: several names scoring identically means the query didn't contain
+       whatever distinguishes them, and picking one would be inventing that detail.
+    3. Phonetic fallback, for mishearings string distance can't see. This only ever
+       converts a hedge into a match, and abstains on ties for the same reason.
     """
-    matched = match_by_name_or_code_with_score(query, items, score_cutoff=score_cutoff, scorer=scorer)
-    if matched is None:
-        return None, f"Couldn't find a {label} matching '{query}'."
-    item, score = matched
-    if score < LOW_CONFIDENCE_MAX:
-        message = f"Didn't catch which {label} you meant by '{query}' clearly enough to be sure — can you say it again?"
-        return None, message
-    return item, None
+    # Messages always quote what the pilot actually said, never the alias-rewritten form —
+    # being told ALICE didn't catch "Constellation" when you said "connie" is baffling.
+    spoken = query
+    query = canonicalize(query, label)
+
+    winners, score = _top_matches(query, items, score_cutoff, scorer)
+    if len(winners) == 1 and score >= LOW_CONFIDENCE_MAX:
+        return winners[0], None
+
+    sounds_like = _phonetic_match(query, items)
+    if sounds_like is not None:
+        return sounds_like, None
+
+    if not winners:
+        return None, f"Couldn't find a {label} matching '{spoken}'."
+
+    message = f"Didn't catch which {label} you meant by '{spoken}' clearly enough to be sure — can you say it again?"
+    return None, message
 
 
 def filter_by_match(rows, query, candidates, attr):
@@ -197,7 +320,62 @@ async def filter_by_distance(rows, near, max_distance, cache, client):
     return result
 
 
-async def terminals_near(near: str, cache, client, max_distance: int = DEFAULT_NEAR_DISTANCE) -> list | None:
+def trade_terminals(cache) -> list:
+    """Only the terminals that can actually be an end of a commodity trade route.
+
+    **This is a caller-side filter, for hauling tools only.** It is deliberately NOT
+    applied inside terminals_near/terminals_within — those answer "what is in this
+    region", and what counts as a valid terminal is the workflow's decision, not theirs.
+    A mining tool, or "where can I buy Trawler Scraping Modules", wants a different pool
+    entirely, and would be silently broken by a shared restriction.
+
+    826 terminals in the catalog; 161 are COMMODITY. The rest are clothing shops, pizza
+    counters, pharmacies, fuel, rentals and refineries — 481 `item` terminals alone. They
+    can't buy or sell cargo, so including them in a trade-route search is never right, and
+    it caused real wrong answers: "Port Tressler" resolved to *Pizza - Port Tressler*, and
+    "Everus" to *Pizza - Everus Harbor*, both confidently.
+
+    COMMODITY_RAW is deliberately excluded rather than overlooked — those are the
+    "Refinery Ore Sales" terminals, and UEX returns **zero** commodity routes with any of
+    them as origin, so they'd be pure wasted fan-out. Verified against the live API
+    2026-09-18.
+
+    This mirrors what the overlay already does (uex_lookup.py builds its terminal dropdown
+    from COMMODITY only) — the two paths had diverged, same as the autoload patch had.
+    """
+    result = []
+    for terminal in cache.terminals:
+        if terminal.type == TerminalType.COMMODITY:
+            result.append(terminal)
+    return result
+
+
+def cargo_capable_vehicles(cache) -> list:
+    """Vehicles that can actually haul — the pool a trading workflow should match against.
+
+    **Caller-side filter, like trade_terminals.** Do NOT push this into resolve_or_hedge:
+    travel_time, vehicle_rental and vehicle_purchase all legitimately want the full
+    catalog, and a fighter's ETA or rental price is a perfectly good question.
+
+    Excludes two groups that can never be a trade run's ship, and whose presence actively
+    hurt matching: 47 concept vehicles that aren't flyable in-game at all, and 146 with no
+    cargo capacity. Javelin is both — scu=0, is_concept=1 — and it was outscoring Railen
+    at 77 for a misheard "Raelin", competing for a slot it could never legitimately fill.
+    280 names drop to 112.
+    """
+    result = []
+    for vehicle in cache.vehicles:
+        if vehicle.is_concept:
+            continue
+        if not vehicle.scu or vehicle.scu < 1:
+            continue
+        result.append(vehicle)
+    return result
+
+
+async def terminals_near(
+        near: str, terminals: list, cache, client, max_distance: int = DEFAULT_NEAR_DISTANCE,
+) -> list | None:
     """Every terminal within max_distance Gm of a resolved orbit/moon/terminal anchor —
     the "near X" radius mode — sorted closest-first so a caller that wants to cap a
     fan-out search can just slice the front of the list. Returns None if `near` doesn't
@@ -213,20 +391,102 @@ async def terminals_near(near: str, cache, client, max_distance: int = DEFAULT_N
     lookup = {d.orbit_destination_name: d.distance for d in parsed}
     lookup[origin_name] = 0
 
-    in_range = [t for t in cache.terminals if t.orbit_name in lookup and lookup[t.orbit_name] <= max_distance]
+    in_range = [t for t in terminals if t.orbit_name in lookup and lookup[t.orbit_name] <= max_distance]
     return sorted(in_range, key=lambda t: lookup[t.orbit_name])
 
 
-def terminals_within(region: str, cache) -> list | None:
-    """Every terminal exactly inside a named orbit or star system — the "in X"/"on X"/
-    "within X" containment mode, no radius/distance computation at all. Returns None if
-    `region` doesn't resolve to either."""
-    orbit = match_by_name_or_code(region, cache.orbits)
-    if orbit:
-        return [t for t in cache.terminals if t.orbit_name == orbit.name]
+def _places_in(pool: list) -> dict[str, list]:
+    """Trade terminals grouped by the station, city or outpost they sit at.
 
-    system = match_by_name_or_code(region, cache.star_systems)
+    A place is neither an orbit nor a terminal, and without this grouping it fell between
+    the two: a pilot asking for a route from Orison names somewhere with *three* commodity
+    terminals (TDD at Cloudview Center, Orison Municipal Services at Providence Platform,
+    and Admin - Seraphim), so exact-terminal matching could only hedge. "A route from
+    Orison" plainly means any of them — deciding which is the search's job, not the
+    pilot's."""
+    places: dict[str, list] = {}
+    for terminal in pool:
+        for place_name in (terminal.space_station_name, terminal.city_name, terminal.outpost_name):
+            if not place_name:
+                continue
+            if place_name not in places:
+                places[place_name] = []
+            places[place_name].append(terminal)
+    return places
+
+
+def _exact_name(region: str, names) -> str | None:
+    wanted = region.strip().casefold()
+    for name in names:
+        if name and name.casefold() == wanted:
+            return name
+    return None
+
+
+def _fuzzy_name(region: str, names) -> str | None:
+    # Whole-string comparison, never WRatio. WRatio's substring credit scored "Stanton" at
+    # 90 against the station "Terra Gateway (Stanton)", and matched "GrimHEX" to the orbit
+    # "Xi" — short names inflate it badly. You either named the place or you didn't.
+    candidates = []
+    for name in names:
+        if name:
+            candidates.append(SimpleNamespace(name=name))
+
+    match = match_by_name_or_code(region, candidates, scorer=fuzz.token_sort_ratio)
+    if match is None:
+        return None
+    return match.name
+
+
+def terminals_within(region: str, terminals: list, cache) -> list | None:
+    """Every terminal from `terminals` inside a named place, orbit or star system — the
+    "in X"/"on X"/"within X" containment mode, no radius/distance computation at all.
+    Returns None if `region` doesn't resolve to any of them.
+
+    The caller supplies the pool, deliberately. This function answers "what is in this
+    region"; which terminals are *valid* is the workflow's decision — hauling wants
+    commodity terminals, an item-price lookup wants shops, mining wants something else
+    again.
+
+    **Every exact match beats every fuzzy one**, and only then is the narrower scope
+    preferred. Ordering by scope alone got this wrong twice: "Stanton" fuzzy-matched the
+    station "Ruin Station" (Stanton and Station are one letter apart) and returned a
+    single terminal instead of the system's 117; "Pyro" fuzzy-matched the orbit "Pyro I"
+    and returned 2 instead of 35. Both are exact names of star systems, and an exact name
+    is what the pilot said.
+
+    Within one confidence tier, most-specific wins — "Orison" is a city inside the
+    Crusader orbit, and answering with all 23 Crusader terminals when they named one city
+    would be ignoring what they said."""
+    region = canonicalize(region, "location")
+    pool = terminals
+
+    places = _places_in(pool)
+    orbit_names = [o.name for o in cache.orbits]
+    system_names = [s.name for s in cache.star_systems]
+
+    place = _exact_name(region, places)
+    if place:
+        return places[place]
+
+    orbit = _exact_name(region, orbit_names)
+    if orbit:
+        return [t for t in pool if t.orbit_name == orbit]
+
+    system = _exact_name(region, system_names)
     if system:
-        return [t for t in cache.terminals if t.star_system_name == system.name]
+        return [t for t in pool if t.star_system_name == system]
+
+    place = _fuzzy_name(region, places)
+    if place:
+        return places[place]
+
+    orbit = _fuzzy_name(region, orbit_names)
+    if orbit:
+        return [t for t in pool if t.orbit_name == orbit]
+
+    system = _fuzzy_name(region, system_names)
+    if system:
+        return [t for t in pool if t.star_system_name == system]
 
     return None

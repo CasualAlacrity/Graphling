@@ -3,12 +3,19 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
-from tools.route_ranking import MAX_ORIGIN_CANDIDATES, find_best_route, profit_per_hour
+from tools.route_ranking import find_best_route, profit_per_hour
 from tools.starcitizenwiki.client import StarCitizenWikiClient
 from tools.trade_run import resolver, route_cache
 from tools.trade_run.resolver import AmbiguousRunError
 from tools.uexcorp.client import UEXCorpClient
-from tools.uexcorp.matching import DEFAULT_NEAR_DISTANCE, resolve_or_hedge, terminals_near, terminals_within
+from tools.uexcorp.matching import (
+    DEFAULT_NEAR_DISTANCE,
+    cargo_capable_vehicles,
+    resolve_or_hedge,
+    terminals_near,
+    terminals_within,
+    trade_terminals,
+)
 from tools.uplink_tool import UplinkTool
 
 
@@ -120,29 +127,38 @@ class BestRouteTool(UplinkTool):
 
     async def _resolve_origin(self, origin: str, origin_mode: str, cache) -> tuple[list, str, str | None]:
         """Returns (candidate_terminals, label_for_messages, error_message) — exactly
-        one of (candidates, label) vs. error is meaningful. candidates is capped to
-        MAX_ORIGIN_CANDIDATES for 'near'/'within' (closest-first for 'near'), since
-        find_best_route fans a real search out across every one of them."""
+        one of (candidates, label) vs. error is meaningful.
+
+        Every candidate is returned, uncapped. find_best_route budgets its own live API
+        calls and searches cached origins for free, so slicing here would throw away warm
+        terminals it could have used at no cost."""
+        # Hauling searches only ever want terminals that can trade commodities — the
+        # full catalog is 81% shops, pizza counters and fuel points, and matching against
+        # it resolved "Port Tressler" to a pizza counter. Applied here rather than inside
+        # the shared region helpers: what counts as a valid terminal is this workflow's
+        # decision, and an item or mining tool needs a different pool entirely.
+        pool = trade_terminals(cache)
+
         if origin_mode == "exact":
-            origin_terminal, error = resolve_or_hedge(origin, cache.terminals, "location")
+            origin_terminal, error = resolve_or_hedge(origin, pool, "location")
             if error:
                 return [], "", error
             return [origin_terminal], origin_terminal.name, None
 
         if origin_mode == "near":
-            candidates = await terminals_near(origin, cache, self.uex_client)
+            candidates = await terminals_near(origin, pool, cache, self.uex_client)
             if candidates is None:
                 return [], "", f"Couldn't find a location matching '{origin}'."
             if not candidates:
                 return [], "", f"No terminals found within {DEFAULT_NEAR_DISTANCE} Gm of {origin}."
-            return candidates[:MAX_ORIGIN_CANDIDATES], f"near {origin}", None
+            return candidates, f"near {origin}", None
 
-        candidates = terminals_within(origin, cache)
+        candidates = terminals_within(origin, pool, cache)
         if candidates is None:
             return [], "", f"Couldn't find a location matching '{origin}'."
         if not candidates:
             return [], "", f"No terminals found in {origin}."
-        return candidates[:MAX_ORIGIN_CANDIDATES], f"in {origin}", None
+        return candidates, f"in {origin}", None
 
     async def _find_and_report(
             self, origin: str, origin_mode: str, ship: str, commodity: str | None, destination_region: str | None,
@@ -150,7 +166,11 @@ class BestRouteTool(UplinkTool):
     ) -> str:
         cache = await self.uex_client.get_uex_cache()
 
-        vehicle, error = resolve_or_hedge(ship, cache.vehicles, "ship", scorer=fuzz.token_sort_ratio)
+        # Hauling: only ships that can carry cargo are candidates. See
+        # cargo_capable_vehicles() for why this is here and not in resolve_or_hedge.
+        vehicle, error = resolve_or_hedge(
+            ship, cargo_capable_vehicles(cache), "ship", scorer=fuzz.token_sort_ratio
+        )
         if error:
             return error
 
@@ -167,7 +187,7 @@ class BestRouteTool(UplinkTool):
 
         destination_terminal_ids = None
         if destination_region is not None:
-            destination_terminals = terminals_within(destination_region, cache)
+            destination_terminals = terminals_within(destination_region, trade_terminals(cache), cache)
             if destination_terminals is None:
                 return f"Couldn't find a location matching '{destination_region}'."
             if not destination_terminals:
@@ -190,13 +210,25 @@ class BestRouteTool(UplinkTool):
             suffix = f" ({', '.join(qualifiers)})" if qualifiers else ""
             return f"No usable in-system route turned up from {origin_label}{suffix}."
 
-        best, score, scu, runner_up, runner_up_score, runner_up_scu = result
+        best, score, scu = result.best, result.best_score, result.best_scu
+        runner_up, runner_up_score, runner_up_scu = result.runner_up, result.runner_up_score, result.runner_up_scu
         terminal_kind = "a ground station" if best.is_on_ground_destination else "an orbital/space station"
         message = (
             f"Best from {best.origin_terminal_name} in the {vehicle.name}: {scu:.0f} SCU of "
             f"{best.commodity_name} to {best.destination_terminal_name} — about "
             f"{profit_per_hour(score):,} aUEC/hour. It's {terminal_kind}."
         )
+
+        # A region can hold far more terminals than one search may fetch live, so say so
+        # rather than letting "best in Stanton" imply all 117 were checked. Asking again
+        # genuinely does widen it — the terminals fetched this time are now cached, so the
+        # next search reuses them for free and spends its budget on new ones.
+        if result.origins_searched < result.origins_available:
+            message += (
+                f" That's the best of {result.origins_searched} terminals I checked "
+                f"{origin_label}, out of {result.origins_available} — ask again and I'll "
+                "widen the search."
+            )
 
         # Stashed so a follow-up "let's do it" can hand this exact route to
         # start_trade_run without re-resolving origin/commodity/ship by name a second

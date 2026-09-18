@@ -16,6 +16,9 @@ python-dotenv>=1.0
 
 requests
 rapidfuzz
+# Metaphone encoding for the phonetic fallback in tools/uexcorp/matching.py — speech
+# mishearings are a sound problem, and string distance can't see them.
+jellyfish
 
 # Voice (push-to-talk + TTS)
 sounddevice==0.5.5

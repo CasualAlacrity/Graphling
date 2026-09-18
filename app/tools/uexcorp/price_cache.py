@@ -79,3 +79,26 @@ async def get_commodity_route_rows(
     rows = await client.get_commodity_routes(commodity_id=commodity_id)
     await _store_rows(session, UexCacheKind.ROUTE, commodity_id, rows)
     return rows
+
+
+# Split into a read and a fetch, unlike the get_*_rows helpers above, because best_route
+# needs to know *which* origins are already warm before deciding what to spend its live
+# call budget on. A single get-or-fetch helper can't express "use everything cached, then
+# fetch only a few of the rest".
+async def cached_routes_from_terminal(session: AsyncSession, terminal_id: int) -> list[dict] | None:
+    """Routes out of this terminal if they're cached and fresh, else None. Never calls UEX."""
+    return await _get_cached_rows(session, UexCacheKind.ROUTE_BY_ORIGIN, terminal_id)
+
+
+async def fetch_routes_from_terminal(
+    client: UEXCorpClient, session: AsyncSession, terminal_id: int
+) -> list[dict]:
+    """Live fetch of every route out of this terminal, stored for next time.
+
+    Deliberately unfiltered by commodity even when the caller only wants one: the whole
+    set is what gets cached, so a commodity-specific search also warms the general case,
+    and the caller filters locally for free.
+    """
+    rows = await client.get_commodity_routes(origin_terminal_id=terminal_id)
+    await _store_rows(session, UexCacheKind.ROUTE_BY_ORIGIN, terminal_id, rows)
+    return rows

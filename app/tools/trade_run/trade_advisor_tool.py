@@ -12,7 +12,7 @@ from tools.trade_run import resolver
 from tools.trade_run.resolver import AmbiguousRunError
 from tools.travel_time import estimate_travel_time
 from tools.uexcorp.client import UEXCorpClient
-from tools.uexcorp.matching import resolve_or_hedge
+from tools.uexcorp.matching import cargo_capable_vehicles, resolve_or_hedge
 from tools.uplink_tool import UplinkTool
 
 
@@ -76,7 +76,9 @@ class TradeAdvisorTool(UplinkTool):
         if error:
             return error
 
-        matched_vehicle, error = resolve_or_hedge(ship, cache.vehicles, "ship", scorer=fuzz.token_sort_ratio)
+        matched_vehicle, error = resolve_or_hedge(
+            ship, cargo_capable_vehicles(cache), "ship", scorer=fuzz.token_sort_ratio
+        )
         if error:
             return error
 
@@ -109,7 +111,7 @@ class TradeAdvisorTool(UplinkTool):
         if result is None:
             best_alt, best_alt_score, best_alt_scu = None, None, None
         else:
-            best_alt, best_alt_score, best_alt_scu, _, _, _ = result
+            best_alt, best_alt_score, best_alt_scu = result.best, result.best_score, result.best_scu
 
         if committed_score is None:
             if best_alt is None:
