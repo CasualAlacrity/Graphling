@@ -143,7 +143,7 @@ class BestRouteTool(UplinkTool):
             origin_terminal, error = resolve_or_hedge(origin, pool, "location")
             if error:
                 return [], "", error
-            return [origin_terminal], origin_terminal.name, None
+            return [origin_terminal], f"from {origin_terminal.name}", None
 
         if origin_mode == "near":
             candidates = await terminals_near(origin, pool, cache, self.uex_client)
@@ -176,9 +176,26 @@ class BestRouteTool(UplinkTool):
 
         commodity_id = None
         if commodity is not None:
+            # Matched against the full catalog on purpose. Restricting the pool to
+            # buyable commodities is what the overlay does, but that's a dropdown — not
+            # offering a choice is a fine way for a UI to say "unavailable". A pilot can
+            # say any word out loud, so the useful move is to resolve it and explain.
             matched_commodity, error = resolve_or_hedge(commodity, cache.commodities, "commodity")
             if error:
                 return error
+
+            # No terminal sells these — they're mined, salvaged or mission-derived, and a
+            # hauling route needs a buy price at the origin, so UEX returns zero routes
+            # for every one of them. Without this the search just comes back empty and
+            # reports it like a market condition ("nothing good right now"), sending the
+            # pilot off to try other stations for something that can never work.
+            if not matched_commodity.is_buyable:
+                return (
+                    f"{matched_commodity.name} isn't sold at any terminal — it has to be "
+                    "mined or salvaged, so there's no buy-and-haul route for it. I can "
+                    "help with where to sell it once you've got some."
+                )
+
             commodity_id = matched_commodity.id
 
         origin_terminals, origin_label, error = await self._resolve_origin(origin, origin_mode, cache)
@@ -208,7 +225,7 @@ class BestRouteTool(UplinkTool):
             if destination_region is not None:
                 qualifiers.append(f"staying within {destination_region}")
             suffix = f" ({', '.join(qualifiers)})" if qualifiers else ""
-            return f"No usable in-system route turned up from {origin_label}{suffix}."
+            return f"No usable in-system route turned up {origin_label}{suffix}."
 
         best, score, scu = result.best, result.best_score, result.best_scu
         runner_up, runner_up_score, runner_up_scu = result.runner_up, result.runner_up_score, result.runner_up_scu
