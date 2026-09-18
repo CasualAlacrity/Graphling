@@ -59,8 +59,17 @@ Missing phases, as named by Jeff:
 
 ## Constraints
 
-- **Approximate is fine; systematically biased is not.** The point is that two routes rank
-  correctly against each other, not that either number is exact to the second.
+- **Approximate is fine; systematically biased is not.** Profit/hour is an estimate and
+  always will be — it assumes plenty that pilot skill can negate, so no amount of
+  modelling makes it exact for a given person. It only has to be good enough for an
+  apples-to-apples comparison between routes.
+
+- **Therefore: only model phases that differ between candidates.** A phase every route
+  pays equally cancels out of the ranking and can be ignored entirely, however real it is
+  in the cockpit. That's the test for whether each of the four below is worth the effort —
+  surface→orbit matters because only surface origins pay it, and jump transit matters
+  because only cross-system routes do. A hangar approach every destination requires is
+  a constant, and constants don't change which route wins.
 - Phase durations are likely ship-dependent (mass, quantum drive, atmospheric handling),
   so a single constant per phase may not survive contact with a Hull C versus a Cutlass.
 - Whatever lands must keep the `float | str` contract — callers treat a string as "can't
