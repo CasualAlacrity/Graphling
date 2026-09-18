@@ -1,10 +1,11 @@
 # Ledger trust, corrections & recoverability — design notes
 
-**Status:** design intent captured 2026-09-10, nothing built. Sources: an HCI-course
-working session (ChatGPT transcript Jeff brought back) plus
-`~/Documents/ALICE-design-rationale-and-HCI-specifications.docx`
-([[reference-alice-hci-design-doc]]). Jeff's flag: "I don't think we have the ability to
-do that yet — we should make sure we accommodate these."
+**Status:** design intent captured 2026-09-10, nothing built. Sources, both held outside
+this repo (see "Where documents live" in `docs/intent/README.md`): an HCI-course working
+session transcript, and *ALICE — design rationale and HCI specifications*. Everything
+load-bearing from them is restated here rather than referenced. Flagged at the time: "I
+don't think we have the ability to do that yet — we should make sure we accommodate
+these."
 
 Grepped 2026-09-10: no `source` / `confidence` / `provenance` / `estimate` / `override` /
 correction concept exists anywhere in `app/db/` or `app/tools/trade_run/`. All net-new.
@@ -111,4 +112,4 @@ freedom. Already how the tools work implicitly — naming it so future tools kee
   Revisit later.
 - **Formal HCI lenses** — mixed initiative, trust calibration, automation bias, appropriate
   reliance, explainability, the two gulfs, Norman's seven-stage cycle. Evaluation
-  frameworks for design reviews / the course capstone. Apply later, not now.
+  frameworks for design reviews. Apply later, not now.

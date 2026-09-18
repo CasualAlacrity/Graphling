@@ -10,7 +10,7 @@ Pydantic — not a toy chatbot.
 - **Voice-first interaction** — push-to-talk speech-to-text (local Whisper) and spoken replies
   (ElevenLabs TTS). No mic or hotkey permissions yet? `PTT_MODE=text` swaps in a terminal prompt,
   same graph underneath.
-- **17 tools on one agent** — live commodity/item/vehicle prices, refinery yields, mining
+- **18 tools on one agent** — live commodity/item/vehicle prices, refinery yields, mining
   locations, best-route and travel-time planning, and full trade-run tracking (buy/sell legs,
   milestones, profit).
 - **Persistent trade-run tracker** — buy/sell legs, milestones, and profit, backed by Postgres.
@@ -146,7 +146,7 @@ pytest
 - **Guardrails as a graph node, not a prompt instruction** — `classify_topic` runs a structured-
   output LLM call before `respond` ever sees the message, so an off-topic request is refused
   deterministically rather than hoping the system prompt holds.
-- **Tool calling at real scale** — 17 tools bound to one model via `bind_tools`, spanning
+- **Tool calling at real scale** — 18 tools bound to one model via `bind_tools`, spanning
   read-only lookups (prices, routes) and stateful writes (mark cargo acquired/sold, confirm
   loaded/unloaded) against a real Postgres-backed domain model.
 - **Two deliberately separate persistence layers** — LangGraph's `MemorySaver` checkpointer

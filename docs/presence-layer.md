@@ -52,9 +52,10 @@ signal. Cross-client events (group ops) ride the shared Postgres later.
 
 ## From the HCI design-rationale doc (2026-09-10)
 
-`~/Documents/ALICE-design-rationale-and-HCI-specifications.docx` — an HCI-course writeup
-that specifies the mini-modal interaction more tightly than the tiers below originally
-did. Folded in:
+Source: *ALICE — design rationale and HCI specifications*, an HCI-course writeup held
+outside this repo (see "Where documents live" in `docs/intent/README.md`). It specifies
+the mini-modal interaction more tightly than the tiers below originally did. Everything
+load-bearing is folded in below, so the external doc is provenance, not a dependency:
 
 - **The interaction is a three-beat loop, not just a step label:**
   1. *Before the pilot acts* — show the next step **and** a speaking tip tied to that
@@ -108,6 +109,91 @@ did. Folded in:
   `principle`) — applies to this layer: the presence layer *shows* state and *suggests*,
   it never advances a run or commits a route on its own.
 
+## Option sets, and the producer model (2026-09-18)
+
+### The layer isn't only a tracker
+
+ALICE offering two routes and the pilot answering "go with option 1" is the same
+architecture as the mini tracker, but it changes what the layer is *for*: a general
+surface for making feedback between pilot and ALICE unambiguous, not just a leg display.
+
+This is not polish. `project-information-not-decisions-principle` — "ALICE presents
+information and options; the pilot chooses" — is currently implemented **orally**, which
+is the weakest available channel for comparison. Two routes with four figures each, read
+aloud, to someone who is flying: nobody holds that well enough to genuinely choose. They
+take whichever they heard last, or whichever sounded more confident. A visual comparison
+is what turns the stated principle into a real one.
+
+### No new plumbing — the data is already structured
+
+The tools already produce `UEXTradeRoute` objects; the UI consumes the same objects the
+tool emitted. Nothing parses prose, and there is no extra resolution step. An earlier
+concern that the spoken ordering and the displayed ordering could disagree was unfounded:
+display order and stash order both come from one tool call, so "option 1" resolves
+deterministically regardless of how ALICE narrates it.
+
+The token work from 2026-09-18 (`docs/start-route-tool.md`) already supplies the
+selection half — every route named aloud now carries its own `route_token`, so picking the
+alternative resolves the same way "let's do it" does.
+
+### The producer set is tools *and* the loop
+
+The mechanism above says "tools emit display intents." That's insufficient on its own:
+display intents fire when a **tool runs**, but nothing has run yet between the pilot
+finishing their utterance and the model deciding what to call. If inference is slow — a
+saturated local model, a provider fallback — the pilot gets silence *and* a resting
+screen, which is indistinguishable from ALICE never having heard them.
+
+So the **voice loop is also a producer**: it pushes a `request_received` intent as soon as
+`listen_once()` returns, cleared when the response plays. Still deterministic, still no
+prose parsing — the producer set is just wider than tools alone. Cheap now, an awkward
+retrofit once the bus has a tool-shaped API.
+
+Related gap, same seam: the loop is strictly sequential (`listen_once` → `ainvoke` →
+play), so nothing listens while ALICE is thinking or speaking. A pilot asking "what's
+taking so long" isn't queued or ignored — they're never captured, and there's no barge-in
+to interrupt a wrong answer. Same missing plumbing as `find_detour_pickup`'s
+proactively-initiated turn, and `voice/timer_tool.py`'s `_notify_when_done` is the
+existing hacky precedent (speaks from a background thread, bypassing graph and persona).
+Three consumers, one seam — worth building once, deliberately.
+
+### What an option card shows, and in what order
+
+Two routes differ, in descending order of salience, by **source, destination, commodity,
+and price-per-unit**. SCU is *not* a choice dimension — it falls out of stock levels and
+hold size once a route is picked, and two routes will commonly reach the same load anyway
+(a full Railen of Iron and a full Railen of Aluminium are both ordinary outcomes).
+
+More SCU is not better. `find_best_route` ranks purely on profit per unit time; SCU enters
+only as an input to profit. Which creates a UI constraint: **showing SCU at the same
+visual weight as profit/hour implicitly tells the pilot it's a decision factor.** A bigger
+number reads as better whether or not that was intended, so it would quietly argue against
+the ranking. Profit/hour is the dominant element, with the delta between options legible —
+that delta is also what makes the runner-up *answer* "why is this the best route" rather
+than merely sitting there.
+
+### Card layout mirrors the utterance
+
+The spoken form ends on the total: *"96 SCU of Iron to Y — about N aUEC/hour."*
+Itemization first, sum last. That ordering is correct and shouldn't be
+"improved" by leading with the headline figure — it's the receipt/invoice pattern, and it
+is *stronger* in speech than on screen. On a page the eye can jump to the total and back;
+in audio the listener receives it strictly in order, and the last thing said is retained
+best. The detail ahead of it is what gives the number meaning when it lands.
+
+Therefore the card resolves to the profit figure in the same position the sentence does.
+Matching the two channels makes them reinforce each other; diverging makes them compete
+for a pilot who is hearing and seeing the same information at once.
+
+### Keeping the layer bounded
+
+The discipline that stops this becoming a UI framework is the one already stated —
+structured payloads, fixed kinds, nothing parses prose. If every new communication need
+invents a card type it sprawls; a small enumerated set (tracker, timer, option set,
+confirmation) stays tractable. The `feedback-no-scrollbars-in-overlay` rule caps option
+count naturally at two or three, which happily matches what a person can weigh while
+flying.
+
 ## Tiers (with dependencies)
 
 ### Tier 1 — Polish what exists
@@ -122,7 +208,9 @@ Pure animation, no new surfaces. Builds `app/overlay/animations.py` (helpers:
 *Can start anytime — independent of everything else.*
 
 ### Tier 2 — Presence layer foundation
-- the display-intent event bus (tool → queue → Qt consumer)
+- the display-intent event bus (tool *and voice loop* → queue → Qt consumer — see
+  "The producer set is tools *and* the loop" above)
+- `request_received` intent from the loop, so a slow turn doesn't look like a dropped one
 - the **mini tracker** widget: current leg + next step; on advance, the done step gets
   struck through and fades, next step animates in ("Fly to Orison" → "Unload cargo")
 - wire the `mark_*` trade-run tools to push `tracker_advance`
@@ -134,6 +222,9 @@ Reuse Tier 2's bus.
 - timer countdown card ("show me the timer", or auto on `start_timer`)
 - route suggestion: workbench **open** → highlight + pin to top of the results panel
   (already has a `set_routes` slot); workbench **closed** → the non-modal card
+- **option set** — two or three routes side by side, answered with "go with option 1".
+  Selection already resolves via the per-route tokens (`docs/start-route-tool.md`); layout
+  and field priority are specified above
 
 *After Tier 2.*
 
