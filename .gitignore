@@ -28,3 +28,6 @@ build/
 
 # OS
 .DS_Store
+
+# JetBrains IDE config — local editor state, not project config
+.idea/
