@@ -123,14 +123,31 @@ def _top_matches(
 
     best_score = results[0][1]
     winners = []
+    seen_names = set()
     for _choice, score, index in results:
         if score < best_score:
             break
         item = lookup[index]
-        # One item contributes several choices (name, code, name_full) — those aren't a tie.
-        if item not in winners:
-            winners.append(item)
+        # One item contributes several choices (name, code, name_full, nickname) — those
+        # aren't a tie. Neither are two records sharing a display name: UEX ships genuine
+        # duplicates (two "Platinum Bay - Baijini Point" rows), and a pilot cannot mean
+        # one rather than the other, so treating that as ambiguity just refuses to answer.
+        if item in winners:
+            continue
+        if item.name in seen_names:
+            continue
+        seen_names.add(item.name)
+        winners.append(item)
     return winners, best_score
+
+
+def _exact_name_matches(query: str, items: list[_HasNameAndCode]) -> list[_HasNameAndCode]:
+    wanted = query.strip().casefold()
+    hits = []
+    for item in items:
+        if item.name and item.name.casefold() == wanted:
+            hits.append(item)
+    return hits
 
 
 def _phonetic_key(text: str) -> str:
@@ -205,6 +222,16 @@ def resolve_or_hedge(
     # being told ALICE didn't catch "Constellation" when you said "connie" is baffling.
     spoken = query
     query = canonicalize(query, label)
+
+    # An item's own name beats a match on any other field. Nicknames are not unique —
+    # "HDMS-Anderson" is the name of one terminal and the nickname of another ("Landing
+    # Services - HDMS-Anderson") — so without this the exact name tied with the nickname
+    # and the whole thing hedged. 60 of 826 terminals stopped resolving to themselves,
+    # and travel_time treats an unresolved terminal as "can't estimate", which silently
+    # dropped every route touching them out of ranking.
+    exact = _exact_name_matches(query, items)
+    if exact:
+        return exact[0], None
 
     winners, score = _top_matches(query, items, score_cutoff, scorer)
     if len(winners) == 1 and score >= LOW_CONFIDENCE_MAX:
