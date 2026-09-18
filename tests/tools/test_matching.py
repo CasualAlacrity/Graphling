@@ -234,3 +234,21 @@ def test_cargo_capable_pool_excludes_concepts_and_empty_holds():
         SimpleNamespace(name="Odin", scu=6000.0, is_concept=1),
     ])
     assert [v.name for v in cargo_capable_vehicles(cache)] == ["Railen"]
+
+
+def test_substring_credit_does_not_confidently_match_an_unrelated_place():
+    """Found live: a misheard "Orson" resolved to "HDMS-Anderson" — a different planet —
+    because WRatio rewards a query appearing inside a longer name ("Ander*son*"). Worse,
+    committing confidently pre-empted the phonetic fallback, which encodes Orson and
+    Orison identically and would have caught it.
+
+    token_sort_ratio compares whole strings, so it declines instead. Hauling location
+    lookups pass it explicitly."""
+    terminals = [
+        SimpleNamespace(name="HDMS-Anderson", code=None, nickname="HDMS-Anderson"),
+        SimpleNamespace(name="Admin - Seraphim", code=None, nickname="Seraphim"),
+    ]
+    item, error = resolve_or_hedge("Orson", terminals, "location", scorer=fuzz.token_sort_ratio)
+
+    assert item is None, "a misheard city must not commit to an unrelated outpost"
+    assert error is not None

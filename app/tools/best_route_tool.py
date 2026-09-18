@@ -140,10 +140,26 @@ class BestRouteTool(UplinkTool):
         pool = trade_terminals(cache)
 
         if origin_mode == "exact":
-            origin_terminal, error = resolve_or_hedge(origin, pool, "location")
-            if error:
-                return [], "", error
-            return [origin_terminal], f"from {origin_terminal.name}", None
+            # token_sort_ratio, not the WRatio default. WRatio's substring credit matched
+            # a misheard "Orson" to "HDMS-Ander(son)" — confidently, on a different
+            # planet — and a confident wrong match pre-empts the phonetic fallback that
+            # would have caught it (Orson and Orison encode identically). That credit was
+            # there to help short queries reach long official names, which stopped
+            # mattering once terminal nicknames joined the match pool.
+            origin_terminal, error = resolve_or_hedge(
+                origin, pool, "location", scorer=fuzz.token_sort_ratio
+            )
+            if not error:
+                return [origin_terminal], f"from {origin_terminal.name}", None
+
+            # Not one terminal — but it may well be a place. "From Orison" names a city
+            # with three trade terminals, so exact matching can only ever hedge there.
+            # Falling through to the region search answers the question the pilot asked
+            # instead of holding out for a mode the model didn't pick.
+            candidates = terminals_within(origin, pool, cache)
+            if candidates:
+                return candidates, f"in {origin}", None
+            return [], "", error
 
         if origin_mode == "near":
             candidates = await terminals_near(origin, pool, cache, self.uex_client)
