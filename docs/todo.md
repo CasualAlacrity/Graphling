@@ -60,6 +60,12 @@ directly.
     - [ ] Tests still needed — see `docs/start-route-tool.md` "Tests still to add".
     - [ ] Docs said "done" but this hasn't been run live yet — first real voice test of
           best_route → start_trade_run → mark_arrived → ... → finalize is still ahead.
+    - [x] **Unselectable runner-up fixed 2026-09-18.** `best_route` named a second route
+          but stashed only the winner, so "do that one instead" had nothing to resolve to;
+          `find_best_route` also never returned the runner-up's SCU, so it couldn't be
+          committed even with a token. Both fixed — see `docs/start-route-tool.md`.
+          Standing rule that came out of it: any route ALICE mentions aloud must be
+          selectable.
 - [ ] **Decide Trade Advisor's fate.** `app/tools/trade_run/trade_advisor_tool.py` is
       built but parked out of `graph.py`'s tool list (commit `9f246c4`). Re-add as-is
       (cheap, it works) — recommended — vs. leave parked vs. build the fuller

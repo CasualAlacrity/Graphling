@@ -109,7 +109,7 @@ class TradeAdvisorTool(UplinkTool):
         if result is None:
             best_alt, best_alt_score, best_alt_scu = None, None, None
         else:
-            best_alt, best_alt_score, best_alt_scu, _, _ = result
+            best_alt, best_alt_score, best_alt_scu, _, _, _ = result
 
         if committed_score is None:
             if best_alt is None:

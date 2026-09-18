@@ -40,7 +40,7 @@ async def find_best_route(
         commodity_id: int | None = None, exclude_destination_terminal_name: str | None = None,
         exclude_ground: bool = False, require_autoload: bool = False,
         destination_terminal_ids: set[int] | None = None,
-) -> tuple[UEXTradeRoute, float, int, UEXTradeRoute | None, float | None] | None:
+) -> tuple[UEXTradeRoute, float, int, UEXTradeRoute | None, float | None, int | None] | None:
     """Searches commodity routes from every terminal in origin_terminal_ids and ranks
     the union by profit per hour — narrowed to one commodity if commodity_id is given,
     otherwise every commodity sellable from any of them. A single-pinned-terminal search
@@ -50,11 +50,17 @@ async def find_best_route(
     terminals_within, and cap to MAX_ORIGIN_CANDIDATES before calling this — fanning out
     unboundedly multiplies API calls per terminal in the region).
 
-    Returns (best_route, best_score, best_scu, runner_up_route, runner_up_score) — scu is
-    the reachable SCU amount the score was actually computed from, since profit per hour
-    is meaningless to report without the load size it assumes. runner_up is None if only
-    one candidate qualified, and is tracked across the WHOLE union when searching a
-    region, not per-origin-terminal — it's still "the second-best option overall."
+    Returns (best_route, best_score, best_scu, runner_up_route, runner_up_score,
+    runner_up_scu) — scu is the reachable SCU amount the score was actually computed from,
+    since profit per hour is meaningless to report without the load size it assumes.
+    runner_up is None if only one candidate qualified, and is tracked across the WHOLE
+    union when searching a region, not per-origin-terminal — it's still "the second-best
+    option overall."
+
+    runner_up_scu is tracked symmetrically with best_scu, not derivable afterwards: a
+    caller that lets the pilot pick the runner-up needs its load size to commit it, and
+    re-deriving that from the route later would recompute against whatever ship state
+    exists then rather than the one it was ranked for.
 
     The runner-up isn't a nice-to-have — without it, "why is this the best route" has no
     real answer to give: a live trace showed the model inventing an unsupported "beats
@@ -93,6 +99,7 @@ async def find_best_route(
     best_scu = None
     runner_up: UEXTradeRoute | None = None
     runner_up_score = None
+    runner_up_scu = None
     for route in candidates:
         if exclude_destination_terminal_name and route.destination_terminal_name == exclude_destination_terminal_name:
             continue
@@ -124,10 +131,10 @@ async def find_best_route(
         score = estimated_profit(route, scu) / total_time
 
         if best_score is None or score > best_score:
-            runner_up, runner_up_score = best, best_score
+            runner_up, runner_up_score, runner_up_scu = best, best_score, best_scu
             best, best_score, best_scu = route, score, scu
         elif runner_up_score is None or score > runner_up_score:
-            runner_up, runner_up_score = route, score
+            runner_up, runner_up_score, runner_up_scu = route, score, scu
 
     if best is None:
         return None
@@ -141,7 +148,7 @@ async def find_best_route(
     if runner_up is not None:
         runner_up = _patch_auto_load(runner_up, cache)
 
-    return best, best_score, best_scu, runner_up, runner_up_score
+    return best, best_score, best_scu, runner_up, runner_up_score, runner_up_scu
 
 
 def _patch_auto_load(route: UEXTradeRoute, cache) -> UEXTradeRoute:

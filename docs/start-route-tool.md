@@ -37,6 +37,26 @@ my Cat") are **not** handled by `start_trade_run` — the model runs `best_route
 get a token, same as any other commitment. One tool, one job: commit an already-found
 route.
 
+### Every route named out loud gets a token (fixed 2026-09-18)
+
+`best_route` describes a runner-up when it finds one, but originally stashed only the
+winner. ALICE would name a second route the pilot had no way to choose: "do that one
+instead" had nothing to resolve to, because `start_trade_run` can only reach a route that
+was stashed, never one that existed solely in prose.
+
+Two fixes, both required:
+
+- `best_route` now stashes the runner-up as well and carries **both** tokens in its
+  internal note, each paired with its commodity name so the model passes the one the pilot
+  actually picked.
+- `find_best_route` now returns `runner_up_scu` alongside `runner_up`. It previously
+  tracked the load size only for the winner, so even with a token the runner-up couldn't
+  be committed — and re-deriving that figure later would recompute against whatever ship
+  state exists then rather than the one it was ranked for.
+
+**Standing rule:** any route ALICE mentions aloud must be selectable. Describing an option
+without stashing it is offering something the system can't act on.
+
 ## Shape (as built)
 
 ```python
@@ -99,9 +119,24 @@ Tool count: 17 → 18.
 - unknown/expired token → the "isn't available anymore" message, no run created
 - `quantity_scu` override respected vs. the cached `scu_hint` used when unset
 - zero-SCU guard
-- `find_best_route` unit test asserting `is_auto_load_origin/destination` come back
-  patched on both `best` and `runner_up` — there was no test at all for this before
 - `route_cache.stash`/`get` round-trip
+- `best_route` emits two distinct tokens when a runner-up exists, and the runner-up's
+  token resolves to the runner-up route
+
+**Added 2026-09-18** — `tests/tools/test_route_ranking.py`, the first test to touch
+`find_best_route` at all:
+
+- `runner_up_scu` is the runner-up's own reachable load, not the winner's, in both the
+  branch where the runner-up is seen second and the branch where it is seen first and then
+  demoted. Both fail against the pre-fix code (`None` rather than the expected load), which
+  was verified by reverting the fix rather than assumed.
+- **both routes reaching the same load** — the ordinary case, since two routes with stock
+  to spare both fill the ship. Nothing in the ranking requires the loads to differ; the
+  stock-limited fixtures elsewhere in that file exist only to catch a `runner_up_scu =
+  best_scu` shortcut, which would satisfy every equal-load assertion forever.
+- single candidate leaves every runner-up field `None`
+- `is_auto_load_origin/destination` come back patched on both `best` and `runner_up` —
+  retroactive coverage for the autoload bug above, which had none
 
 Ties into the Phase 3 deterministic-external-layer work — this tool (and `best_route`'s
 token production) is a good first customer for it.

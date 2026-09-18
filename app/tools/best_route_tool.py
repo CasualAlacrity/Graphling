@@ -83,10 +83,12 @@ class BestRouteTool(UplinkTool):
         "profit per hour, and reports the best one found. The profit/hour figure already "
         "accounts for estimated travel time and cargo transfer time, not just the raw "
         "trade margin — if asked whether travel time factors in, the answer is yes. If "
-        "the pilot then commits to this route ('yes', 'let's do it', 'start that run'), "
-        "call start_trade_run with the route_token this reply carries — never re-describe "
-        "the route by name yourself, and never call best_route again just to double-check "
-        "a route you already have a token for."
+        "the pilot then commits to a route ('yes', 'let's do it', 'start that run'), "
+        "call start_trade_run with the matching route_token this reply carries — the reply "
+        "may carry two, one for the best route and one for the alternative, so pass the "
+        "token for whichever one the pilot actually chose. Never re-describe the route by "
+        "name yourself, and never call best_route again just to double-check a route you "
+        "already have a token for."
     )
     args_schema: type[BaseModel] = BestRouteArgs
     progress_label: str = "Searching routes from your location."
@@ -188,23 +190,31 @@ class BestRouteTool(UplinkTool):
             suffix = f" ({', '.join(qualifiers)})" if qualifiers else ""
             return f"No usable in-system route turned up from {origin_label}{suffix}."
 
-        best, score, scu, runner_up, runner_up_score = result
+        best, score, scu, runner_up, runner_up_score, runner_up_scu = result
         terminal_kind = "a ground station" if best.is_on_ground_destination else "an orbital/space station"
         message = (
             f"Best from {best.origin_terminal_name} in the {vehicle.name}: {scu:.0f} SCU of "
             f"{best.commodity_name} to {best.destination_terminal_name} — about "
             f"{profit_per_hour(score):,} aUEC/hour. It's {terminal_kind}."
         )
-        if runner_up is not None:
-            message += (
-                f" Next best was {runner_up.commodity_name} to {runner_up.destination_terminal_name} "
-                f"at about {profit_per_hour(runner_up_score):,} aUEC/hour."
-            )
 
         # Stashed so a follow-up "let's do it" can hand this exact route to
         # start_trade_run without re-resolving origin/commodity/ship by name a second
         # time. Not meant to be spoken — phrased as an aside so the persona reads it as
         # bookkeeping, not part of the answer.
         token = route_cache.stash(best, int(scu), vehicle.name)
-        message += f" (Internal note, don't say this part aloud: route_token={token}.)"
+        tokens_note = f"route_token={token} for the {best.commodity_name} run"
+
+        if runner_up is not None:
+            message += (
+                f" Next best was {runner_up.commodity_name} to {runner_up.destination_terminal_name} "
+                f"at about {profit_per_hour(runner_up_score):,} aUEC/hour."
+            )
+            # The runner-up gets its own token because naming it out loud without one
+            # offers the pilot something they can't actually pick — start_trade_run can
+            # only reach a route that was stashed, not one described in prose.
+            runner_up_token = route_cache.stash(runner_up, int(runner_up_scu), vehicle.name)
+            tokens_note += f"; route_token={runner_up_token} for the {runner_up.commodity_name} alternative"
+
+        message += f" (Internal note, don't say this part aloud: {tokens_note}.)"
         return message
