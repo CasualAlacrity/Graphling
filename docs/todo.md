@@ -159,6 +159,16 @@ outputs stay consistent.
       and produces a pass / consistency summary. Decide: LangSmith `evaluate()` over a
       Hub dataset, local pytest, or both.
 
+- [ ] **Travel-time model covers only horizontal distance.** Measured 2026-09-18: Orison
+      TDD to Admin - Seraphim, a climb out of atmosphere, estimates at 0.1 min because
+      both share the Crusader orbit. Missing surface->orbit, orbit->surface, jump-gate
+      transit, and the hydrogen burn from orbit to hangar. This matters more than it
+      looks: profit/hour is the ranking criterion for every recommendation, so a
+      systematic undercount on one kind of flight biases every route ALICE picks toward
+      orbital-to-orbital runs. Also blocks scoring an approach leg. Full write-up and
+      what already exists in `docs/intent/travel-time-model.md`. Numbers are measurable
+      in-game — worth timing a few legs during an op night.
+
 ## Phase 4 — Grow tools / functionality
 
 SC-focused, but each addition weighed against "would this also serve assistant-ALICE
