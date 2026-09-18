@@ -1,5 +1,5 @@
 @echo off
-REM One-time setup for Graphling/Uplink on Windows.
+REM One-time setup for ALICE on Windows.
 REM Creates a Python 3.11 virtualenv and installs dependencies.
 REM Just double-click this, or run `scripts\windows\setup.bat` from a terminal.
 
@@ -22,8 +22,8 @@ if not exist .venv\Scripts\python.exe (
 echo Installing dependencies ^(this can take a few minutes the first time^)...
 .venv\Scripts\python -m pip install --upgrade pip
 REM Editable install of the project itself (pyproject.toml), which also pulls in
-REM everything from requirements.txt and registers the uplink-overlay/uplink-voice
-REM commands used by the run scripts below.
+REM everything from requirements.txt and registers the `alice` command used by the
+REM run script below.
 .venv\Scripts\python -m pip install -e .
 if errorlevel 1 (
     echo.
@@ -57,5 +57,5 @@ if errorlevel 1 (
 echo.
 echo Setup complete.
 echo Make sure a .env file with your API keys exists in this folder before running.
-echo Run scripts\windows\run-overlay.bat to start ALICE (voice + overlay together).
+echo Run scripts\windows\run-alice.bat to start ALICE (voice + overlay together).
 pause

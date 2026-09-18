@@ -4,7 +4,7 @@ from elevenlabs import AsyncElevenLabs
 
 
 async def synthesize(text: str) -> bytes:
-    """Returns mp3 audio bytes for the given text, spoken in Uplink's voice."""
+    """Returns mp3 audio bytes for the given text, spoken in ALICE's voice."""
     client = AsyncElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
     chunks = []
     async for chunk in client.text_to_speech.convert(

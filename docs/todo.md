@@ -223,11 +223,14 @@ structured display intents to a queue the Qt layer renders; nothing parses ALICE
 
 ## Phase 6 — Star Citizen content polish pass
 
-- [ ] **Naming — standardize on ALICE.** The product is ALICE (`heyalice.help` landing
-      page exists); "Uplink" is the in-fiction callsign only. Rename public/config
-      surfaces: `UPLINK_VOICE`/`uplink-voice` → `ALICE_*`/`alice` (lines up with the
-      `ALICE_USER` var planned for multi-tenancy), README product name, docstrings.
-      `UplinkTool` base class can stay (internal). Mostly non-AI.
+- [x] **Naming — user-facing surface standardized on ALICE, 2026-09-18.** Package renamed
+      `uplink` → `alice`; entry points are now `alice` (the one supported command) and
+      `alice-voice` (debug); run scripts consolidated to `run-alice.sh`/`.bat` with the
+      voice-only variants deleted; voice-loop prints and the TTS docstring no longer label
+      ALICE's own replies as Uplink. `UplinkTool`/`UEXBackedTool` deliberately kept — Uplink
+      is the data layer, not a stray name. Full reasoning in `docs/intent/agent-roles.md`.
+      **Note for existing installs:** the rename leaves a stale `uplink` distribution and
+      its old console scripts behind; `pip uninstall uplink` after re-running setup.
 - [ ] **Land the uncommitted batch.** mac run scripts, new README, voice
       singleton-listener fix, `.gitignore` prompt-cache rationale, Windows path fixes,
       deletion of `ai-presentation-narrative.md` + `Vector Tracking Ideas.md`. Group into

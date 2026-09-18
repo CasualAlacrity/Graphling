@@ -1,6 +1,6 @@
 # Graphling
 
-**Uplink** is a voice-first AI companion for Star Citizen — hold a hotkey, ask it something,
+**ALICE** is a voice-first AI companion for Star Citizen — hold a hotkey, ask it something,
 and it answers using live game-economy data, plans routes, and tracks your trade runs end to
 end. Built as a real, demoable application for learning LangChain, LangGraph, LangSmith, and
 Pydantic — not a toy chatbot.
@@ -124,15 +124,15 @@ One package, one command — voice and the overlay always run together:
 
 | macOS | Windows |
 |---|---|
-| `./scripts/mac/run-overlay.sh` | `scripts\windows\run-overlay.bat` |
+| `./scripts/mac/run-alice.sh` | `scripts\windows\run-alice.bat` |
 
 Hold `PTT_HOTKEY` (default `shift_r`) to talk, and `OVERLAY_HOTKEY` (default `F3`) to
 toggle the trade-run overlay. macOS needs Microphone and Accessibility permissions
 granted to whichever terminal app runs the script on first use — see the comments at the
-top of `run-overlay.sh` if a hotkey doesn't respond. No mic set up yet? Set
+top of `run-alice.sh` if a hotkey doesn't respond. No mic set up yet? Set
 `PTT_MODE=text` in `.env` and type instead; everything downstream, including spoken
-replies, runs identically. (`run-voice.sh` also exists — voice alone, no overlay — for
-quick debugging only, not a supported run mode.)
+replies, runs identically. (`alice-voice` runs the voice loop without the overlay — quick
+debugging only, not a supported run mode.)
 
 **Tests**
 

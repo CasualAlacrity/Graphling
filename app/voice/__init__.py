@@ -3,9 +3,9 @@ Push-to-talk voice loop for ALICE. Hold the PTT key, speak, release; ALICE repli
 loud. Normally started alongside the overlay by overlay_app.py (the "just ALICE"
 package) — this standalone entry point is for quick voice-only debugging only.
 
-Usage: uplink-voice   (after `pip install -e .`)
-On macOS: scripts/mac/run-voice.sh
-On Windows: scripts\windows\run-voice.bat
+Usage: alice-voice   (after `pip install -e .`) — debugging only.
+The supported way to run is `alice` (scripts/mac/run-alice.sh,
+scripts/windows/run-alice.bat), which starts this loop alongside the overlay.
 """
 import asyncio
 import uuid
@@ -28,7 +28,7 @@ async def run() -> None:
     from graph import State, graph, uex_client
 
     print("=" * 40)
-    print("  UPLINK — Push to talk")
+    print("  ALICE — Push to talk")
     print("=" * 40)
 
     load_whisper("base")
@@ -43,22 +43,22 @@ async def run() -> None:
     cache = await uex_client.get_uex_cache()
     ship_name_prompt = ", ".join(vehicle.name for vehicle in cache.vehicles)
 
-    print("[Uplink] Ready. Hold PTT key to speak.")
+    print("[ALICE] Ready. Hold PTT key to speak.")
 
     while True:
         text = listen_once(initial_prompt=ship_name_prompt)
 
         if not text:
-            print("[Uplink] Nothing transcribed, listening again...")
+            print("[ALICE] Nothing transcribed, listening again...")
             continue
 
-        print(f"[Uplink] You: {text!r}")
+        print(f"[ALICE] You: {text!r}")
 
         state_input = State(messages=[HumanMessage(content=text)])
         result = await graph.ainvoke(state_input, config=config)
         response_text = result["messages"][-1].content
 
-        print(f"[Uplink] Uplink: {response_text!r}")
+        print(f"[ALICE] ALICE: {response_text!r}")
 
         audio = await synthesize(response_text)
         play_audio(audio)
@@ -68,7 +68,7 @@ def main() -> None:
     try:
         asyncio.run(run())
     except KeyboardInterrupt:
-        print("\n[Uplink] Shutting down.")
+        print("\n[ALICE] Shutting down.")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 #!/bin/bash
-# One-time setup for Graphling/Uplink on macOS.
+# One-time setup for ALICE on macOS.
 # Creates a Python 3.11 virtualenv and installs dependencies.
 
 cd "$(dirname "$0")/../.." || exit 1
@@ -19,8 +19,8 @@ fi
 echo "Installing dependencies (this can take a few minutes the first time)..."
 .venv/bin/python -m pip install --upgrade pip
 # Editable install of the project itself (pyproject.toml), which also pulls in
-# everything from requirements.txt and registers the uplink-overlay/uplink-voice
-# commands used by the run scripts below.
+# everything from requirements.txt and registers the `alice` command used by the
+# run script below.
 if ! .venv/bin/python -m pip install -e .; then
     echo
     echo "ERROR: dependency install failed. Scroll up for the offending package."
@@ -49,4 +49,4 @@ fi
 echo
 echo "Setup complete."
 echo "Make sure a .env file with your API keys exists in this folder before running."
-echo "Run scripts/mac/run-overlay.sh to start ALICE (voice + overlay together)."
+echo "Run scripts/mac/run-alice.sh to start ALICE (voice + overlay together)."

@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "uplink"
+name = "alice"
 version = "0.1.0"
-description = "Uplink — an AI companion and trade route tracker for Star Citizen, built as a LangChain/LangGraph learning project."
+description = "ALICE — a voice copilot and trade route tracker for Star Citizen, built on LangChain/LangGraph."
 requires-python = ">=3.11"
 dynamic = ["dependencies"]
 
@@ -13,8 +13,10 @@ dynamic = ["dependencies"]
 dev = ["ruff>=0.6", "pytest>=8.0", "pytest-asyncio>=0.24"]
 
 [project.scripts]
-uplink-overlay = "overlay.overlay_app:main"
-uplink-voice = "voice:main"
+# One supported entry point: voice + overlay co-resident in one process.
+alice = "overlay.overlay_app:main"
+# Voice only, no overlay — quick debugging, not a supported run mode.
+alice-voice = "voice:main"
 
 # Packages/modules live directly under app/ (e.g. "overlay.filter_panel", "db.session")
 # with no "app." prefix — every import in the codebase is already written that way, so
