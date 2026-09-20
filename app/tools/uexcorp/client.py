@@ -40,7 +40,12 @@ class UEXCorpClient(BaseModel):
     def _is_fresh(self, uex_cache: UexReferenceCache) -> bool:
         return (datetime.now(UTC) - uex_cache.fetched_at) < timedelta(hours=24)
 
-    @traceable(name="uex_get_reference_cache")
+    # NOT traceable. This is a memoized accessor, and estimate_travel_time calls it once
+    # per candidate route — 261 times in a single warm region search, every one of them a
+    # cache hit returning immediately. Tracing the accessor turned one route search into
+    # 261 traced runs of a no-op and burned a month of LangSmith quota in two days. The
+    # actual fetch is traced instead, on _build_uex_cache below, where there's real work
+    # and a real duration worth seeing.
     async def get_uex_cache(self) -> UexReferenceCache:
         uex_cache = self._uex_cache
         if uex_cache and self._is_fresh(uex_cache):
@@ -74,6 +79,7 @@ class UEXCorpClient(BaseModel):
 
             return uex_cache
 
+    @traceable(name="uex_build_reference_cache")
     async def _build_uex_cache(self) -> UexReferenceCache:
         headers = self.get_header()
 

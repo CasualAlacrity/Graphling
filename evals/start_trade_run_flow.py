@@ -23,6 +23,12 @@ Usage:
 Edit ORIGIN / SHIP below to match a ship + starting location your UEX account
 actually has live route data for.
 """
+
+import os
+
+# Diagnostics don't need tracing, and they're expensive in trace quota: one route
+# search alone used to emit hundreds of runs. Set before any langchain import.
+os.environ.setdefault("LANGSMITH_TRACING", "false")
 import asyncio
 import re
 import sys
