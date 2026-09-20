@@ -156,9 +156,9 @@ class BestRouteTool(UplinkTool):
             # with three trade terminals, so exact matching can only ever hedge there.
             # Falling through to the region search answers the question the pilot asked
             # instead of holding out for a mode the model didn't pick.
-            candidates = terminals_within(origin, pool, cache)
-            if candidates:
-                return candidates, f"in {origin}", None
+            region = terminals_within(origin, pool, cache)
+            if region and region.terminals:
+                return region.terminals, f"in {region.name}", None
             return [], "", error
 
         if origin_mode == "near":
@@ -169,12 +169,12 @@ class BestRouteTool(UplinkTool):
                 return [], "", f"No terminals found within {DEFAULT_NEAR_DISTANCE} Gm of {origin}."
             return candidates, f"near {origin}", None
 
-        candidates = terminals_within(origin, pool, cache)
-        if candidates is None:
+        region = terminals_within(origin, pool, cache)
+        if region is None:
             return [], "", f"Couldn't find a location matching '{origin}'."
-        if not candidates:
-            return [], "", f"No terminals found in {origin}."
-        return candidates, f"in {origin}", None
+        if not region.terminals:
+            return [], "", f"No terminals found in {region.name}."
+        return region.terminals, f"in {region.name}", None
 
     async def _find_and_report(
             self, origin: str, origin_mode: str, ship: str, commodity: str | None, destination_region: str | None,
@@ -220,12 +220,14 @@ class BestRouteTool(UplinkTool):
 
         destination_terminal_ids = None
         if destination_region is not None:
-            destination_terminals = terminals_within(destination_region, trade_terminals(cache), cache)
-            if destination_terminals is None:
+            destination = terminals_within(destination_region, trade_terminals(cache), cache)
+            if destination is None:
                 return f"Couldn't find a location matching '{destination_region}'."
-            if not destination_terminals:
-                return f"No terminals found in {destination_region}."
-            destination_terminal_ids = {t.id for t in destination_terminals}
+            if not destination.terminals:
+                return f"No terminals found in {destination.name}."
+            # Resolved spelling, so the reply confirms what was understood.
+            destination_region = destination.name
+            destination_terminal_ids = {t.id for t in destination.terminals}
 
         result = await find_best_route(
             self.uex_client, self.scw_client, [t.id for t in origin_terminals], ship, vehicle.scu, cache,
@@ -246,8 +248,22 @@ class BestRouteTool(UplinkTool):
         best, score, scu = result.best, result.best_score, result.best_scu
         runner_up, runner_up_score, runner_up_scu = result.runner_up, result.runner_up_score, result.runner_up_scu
         terminal_kind = "a ground station" if best.is_on_ground_destination else "an orbital/space station"
+
+        # Lead with what the origin actually resolved to, so the pilot hears the
+        # *correction* rather than their own word played back. Speech-to-text mangles
+        # place names constantly — "Orson" for Orison — and a correct resolution and a
+        # wrong one otherwise produce identical-sounding replies, leaving no way to catch
+        # a bad match. The ship name already works this way ("in the Railen" after the
+        # pilot said "railing"); this gives the location the same treatment.
+        # origin_label is prepositional: "from Admin - Seraphim" / "in Orison" /
+        # "near Crusader", so an exact-terminal search doesn't repeat itself.
+        if origin_label.startswith("from "):
+            opening = f"Best {origin_label}"
+        else:
+            opening = f"Best {origin_label}, from {best.origin_terminal_name}"
+
         message = (
-            f"Best from {best.origin_terminal_name} in the {vehicle.name}: {scu:.0f} SCU of "
+            f"{opening} in the {vehicle.name}: {scu:.0f} SCU of "
             f"{best.commodity_name} to {best.destination_terminal_name} — about "
             f"{profit_per_hour(score):,} aUEC/hour. It's {terminal_kind}."
         )

@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from typing import Any, TypeVar
+from typing import Any, NamedTuple, TypeVar
 
 import jellyfish
 from pydantic import BaseModel
@@ -465,7 +465,18 @@ def _fuzzy_name(region: str, names) -> str | None:
     return match.name
 
 
-def terminals_within(region: str, terminals: list, cache) -> list | None:
+class RegionMatch(NamedTuple):
+    """What a region string resolved to, and the terminals in it.
+
+    `name` is the catalog's own spelling, not the pilot's — speech-to-text mangles place
+    names ("Orson" for Orison), and saying the resolved name back is how a pilot can tell
+    a correct match from a confident wrong one. Without this the caller only had the raw
+    query to echo, which reads identically whether resolution worked or not."""
+    name: str
+    terminals: list
+
+
+def terminals_within(region: str, terminals: list, cache) -> RegionMatch | None:
     """Every terminal from `terminals` inside a named place, orbit or star system — the
     "in X"/"on X"/"within X" containment mode, no radius/distance computation at all.
     Returns None if `region` doesn't resolve to any of them.
@@ -494,26 +505,26 @@ def terminals_within(region: str, terminals: list, cache) -> list | None:
 
     place = _exact_name(region, places)
     if place:
-        return places[place]
+        return RegionMatch(place, places[place])
 
     orbit = _exact_name(region, orbit_names)
     if orbit:
-        return [t for t in pool if t.orbit_name == orbit]
+        return RegionMatch(orbit, [t for t in pool if t.orbit_name == orbit])
 
     system = _exact_name(region, system_names)
     if system:
-        return [t for t in pool if t.star_system_name == system]
+        return RegionMatch(system, [t for t in pool if t.star_system_name == system])
 
     place = _fuzzy_name(region, places)
     if place:
-        return places[place]
+        return RegionMatch(place, places[place])
 
     orbit = _fuzzy_name(region, orbit_names)
     if orbit:
-        return [t for t in pool if t.orbit_name == orbit]
+        return RegionMatch(orbit, [t for t in pool if t.orbit_name == orbit])
 
     system = _fuzzy_name(region, system_names)
     if system:
-        return [t for t in pool if t.star_system_name == system]
+        return RegionMatch(system, [t for t in pool if t.star_system_name == system])
 
     return None

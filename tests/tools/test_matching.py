@@ -163,7 +163,7 @@ CACHE = SimpleNamespace(
 
 def test_place_name_resolves_to_its_terminals():
     """A pilot naming a city means every trade terminal there, not a hedge over which."""
-    found = terminals_within("Orison", trade_terminals(CACHE), CACHE)
+    found = terminals_within("Orison", trade_terminals(CACHE), CACHE).terminals
     assert sorted(t.name for t in found) == [
         "Orison Municipal Services", "TDD - Cloudview Center - Orison",
     ]
@@ -173,8 +173,8 @@ def test_region_helper_does_not_filter_on_its_own():
     """The workflow decides what counts, not the helper. Hauling passes
     trade_terminals(); an item-price or mining lookup needs a different pool, and would
     be silently broken if this filtered for them."""
-    hauling = terminals_within("Orison", trade_terminals(CACHE), CACHE)
-    everything = terminals_within("Orison", CACHE.terminals, CACHE)
+    hauling = terminals_within("Orison", trade_terminals(CACHE), CACHE).terminals
+    everything = terminals_within("Orison", CACHE.terminals, CACHE).terminals
 
     assert all(t.type == TerminalType.COMMODITY for t in hauling)
     assert any(t.type == TerminalType.ITEM for t in everything)
@@ -183,7 +183,7 @@ def test_region_helper_does_not_filter_on_its_own():
 def test_exact_system_beats_fuzzy_place():
     """"Stanton" fuzzy-matches the station "Ruin Station" — the words are one letter
     apart — which returned a single terminal instead of the whole system."""
-    found = terminals_within("Stanton", trade_terminals(CACHE), CACHE)
+    found = terminals_within("Stanton", trade_terminals(CACHE), CACHE).terminals
     assert len(found) == 3
     assert all(t.star_system_name == "Stanton" for t in found)
 
@@ -191,19 +191,19 @@ def test_exact_system_beats_fuzzy_place():
 def test_exact_system_beats_fuzzy_orbit():
     """"Pyro" fuzzy-matches the orbit "Pyro I", which returned one orbit's terminals
     instead of the system's."""
-    found = terminals_within("Pyro", trade_terminals(CACHE), CACHE)
+    found = terminals_within("Pyro", trade_terminals(CACHE), CACHE).terminals
     assert len(found) == 2
     assert all(t.star_system_name == "Pyro" for t in found)
 
 
 def test_orbit_resolves_when_it_is_the_exact_name():
-    found = terminals_within("Crusader", trade_terminals(CACHE), CACHE)
+    found = terminals_within("Crusader", trade_terminals(CACHE), CACHE).terminals
     assert len(found) == 3
 
 
 def test_alias_applies_to_region_lookup():
     """UEX records the station as "Green Imperial Housing Exchange"; nobody says that."""
-    found = terminals_within("GrimHEX", trade_terminals(CACHE), CACHE)
+    found = terminals_within("GrimHEX", trade_terminals(CACHE), CACHE).terminals
     assert [t.name for t in found] == ["Admin - GrimHEX"]
 
 
