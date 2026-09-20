@@ -1,6 +1,8 @@
 import asyncio
 import os
 
+from langsmith import tracing_context
+
 from db.session import SessionLocal, engine
 from tools.starcitizenwiki.client import StarCitizenWikiClient
 from tools.travel_time import estimate_travel_time
@@ -238,6 +240,28 @@ def _filter_by_destination(rows, terminal_id):
 
 
 async def search_routes(
+    commodity_id,
+    source_terminal_id,
+    destination_terminal_id,
+    min_source_code,
+    max_destination_code,
+    space_only,
+    require_autoload,
+) -> list[UEXTradeRoute]:
+    # Tracing off for the whole overlay path. These fetches run from Qt, outside any graph
+    # invocation, so every traced client call becomes its own *root* trace with no
+    # conversational parent — and a destination-only search fans out across every
+    # commodity sold there, so one button press can emit dozens. LangSmith exists here to
+    # show what ALICE did and why; a pilot dragging a filter slider is neither AI
+    # behaviour nor debuggable from a trace, so it's pure quota spend.
+    with tracing_context(enabled=False):
+        return await _search_routes(
+            commodity_id, source_terminal_id, destination_terminal_id,
+            min_source_code, max_destination_code, space_only, require_autoload,
+        )
+
+
+async def _search_routes(
     commodity_id,
     source_terminal_id,
     destination_terminal_id,

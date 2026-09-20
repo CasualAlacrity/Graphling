@@ -240,13 +240,22 @@ class UEXCorpClient(BaseModel):
         response.raise_for_status()
         return response.json()["data"]
 
-    @traceable(name="uex_get_orbit_distances")
+    # Same shape as get_uex_cache: memoized, and travel_time calls it inside the
+    # per-candidate loop whenever wiki coordinates are missing for a terminal. Tracing the
+    # accessor would emit a run per cache hit, which is exactly what burned a month of
+    # quota. The miss path below carries the decorator instead.
     async def get_orbit_distances(self, origin_orbit_id: int, origin_star_system_id: int) -> list[dict]:
         cache_key = (origin_orbit_id, origin_star_system_id)
         cached = self._orbit_distances_cache.get(cache_key)
         if cached is not None:
             return cached
 
+        data = await self._fetch_orbit_distances(origin_orbit_id, origin_star_system_id)
+        self._orbit_distances_cache[cache_key] = data
+        return data
+
+    @traceable(name="uex_fetch_orbit_distances")
+    async def _fetch_orbit_distances(self, origin_orbit_id: int, origin_star_system_id: int) -> list[dict]:
         response = await asyncio.to_thread(
             requests.get,
             self.API_BASE_URL + 'orbits_distances',
@@ -258,9 +267,7 @@ class UEXCorpClient(BaseModel):
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
-        data = response.json()["data"]
-        self._orbit_distances_cache[cache_key] = data
-        return data
+        return response.json()["data"]
 
     def get_header(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.bearer_token}"}
