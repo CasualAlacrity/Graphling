@@ -169,6 +169,12 @@ outputs stay consistent.
       what already exists in `docs/intent/travel-time-model.md`. Numbers are measurable
       in-game — worth timing a few legs during an op night.
 
+- [ ] **Route search ignores the buy-in.** `get_commodity_routes` accepts an `investment`
+      parameter and `find_best_route` never passes it, so ALICE can recommend a run the
+      pilot can't afford to fill. Not currently felt — Jeff trades with ~15M aUEC and has
+      never failed to fill a Railen — but it's fiction for a pilot who's just started or
+      just lost a ship, and per-run profit is the number they'd be judging it by.
+
 ## Phase 4 — Grow tools / functionality
 
 SC-focused, but each addition weighed against "would this also serve assistant-ALICE

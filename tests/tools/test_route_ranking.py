@@ -121,7 +121,7 @@ async def test_single_candidate_has_no_runner_up(monkeypatch):
     assert result.best.commodity_name == "Titanium"
     assert result.best_scu == 64
     assert result.runner_up is None
-    assert result.runner_up_score is None
+    assert result.runner_up_rate is None
     assert result.runner_up_scu is None
 
 

@@ -111,7 +111,9 @@ class TradeAdvisorTool(UplinkTool):
         if result is None:
             best_alt, best_alt_score, best_alt_scu = None, None, None
         else:
-            best_alt, best_alt_score, best_alt_scu = result.best, result.best_score, result.best_scu
+            # Compares against a committed run's own profit-per-second, so the rate
+            # is the comparable measure here, not the per-run figure.
+            best_alt, best_alt_score, best_alt_scu = result.best, result.best_rate, result.best_scu
 
         if committed_score is None:
             if best_alt is None:

@@ -32,14 +32,25 @@ MAX_LIVE_ROUTE_FETCHES = int(os.getenv("MAX_LIVE_ROUTE_FETCHES", "8"))
 
 
 class RouteSearch(NamedTuple):
-    """find_best_route's result. origins_searched vs origins_available is what lets a
-    caller say "best of the 16 I could see" instead of implying it searched everything —
-    a region can hold far more terminals than one search is allowed to fetch live."""
+    """find_best_route's result.
+
+    Both profit measures travel together because they answer different questions and have
+    very different reliability. `profit` is what actually lands in the pilot's account —
+    (sell - buy) x SCU, pure arithmetic on UEX prices. `rate` divides that by an estimated
+    duration whose components are both known-weak (travel time models no atmospheric or
+    approach phases; the per-crate transfer constants are labelled placeholders in
+    cargo_packing). Measured 2026-09-20 on one route: 169,728 per run versus a quoted
+    5,364,000 per hour, because the run was estimated at 1.9 minutes.
+
+    origins_searched vs origins_available lets a caller say "best of the 16 I could see"
+    rather than implying it searched everything."""
     best: UEXTradeRoute
-    best_score: float
+    best_profit: float
+    best_rate: float
     best_scu: int
     runner_up: UEXTradeRoute | None
-    runner_up_score: float | None
+    runner_up_profit: float | None
+    runner_up_rate: float | None
     runner_up_scu: int | None
     origins_searched: int
     origins_available: int
@@ -98,7 +109,7 @@ async def find_best_route(
         uex_client, scw_client, origin_terminal_ids: list[int], ship: str, ship_scu: float, cache, *,
         commodity_id: int | None = None, exclude_destination_terminal_name: str | None = None,
         exclude_ground: bool = False, require_autoload: bool = False,
-        destination_terminal_ids: set[int] | None = None,
+        destination_terminal_ids: set[int] | None = None, rank_by: str = "profit",
 ) -> RouteSearch | None:
     """Searches commodity routes from every terminal in origin_terminal_ids and ranks
     the union by profit per hour — narrowed to one commodity if commodity_id is given,
@@ -156,9 +167,13 @@ async def find_best_route(
 
     best: UEXTradeRoute | None = None
     best_score = None
+    best_profit = None
+    best_rate = None
     best_scu = None
     runner_up: UEXTradeRoute | None = None
     runner_up_score = None
+    runner_up_profit = None
+    runner_up_rate = None
     runner_up_scu = None
     for route in candidates:
         if exclude_destination_terminal_name and route.destination_terminal_name == exclude_destination_terminal_name:
@@ -188,13 +203,22 @@ async def find_best_route(
         total_time = transfer_seconds + travel
         if total_time <= 0:
             continue
-        score = estimated_profit(route, scu) / total_time
+
+        profit = estimated_profit(route, scu)
+        rate = profit / total_time
+        # Ranking by profit ignores the duration estimate entirely, which is why it's the
+        # default: dividing by a known-undercounted time systematically promotes the
+        # shortest hops, whose times are the most wrong.
+        score = rate if rank_by == "per_hour" else profit
 
         if best_score is None or score > best_score:
-            runner_up, runner_up_score, runner_up_scu = best, best_score, best_scu
-            best, best_score, best_scu = route, score, scu
+            runner_up, runner_up_score = best, best_score
+            runner_up_profit, runner_up_rate, runner_up_scu = best_profit, best_rate, best_scu
+            best, best_score = route, score
+            best_profit, best_rate, best_scu = profit, rate, scu
         elif runner_up_score is None or score > runner_up_score:
-            runner_up, runner_up_score, runner_up_scu = route, score, scu
+            runner_up, runner_up_score = route, score
+            runner_up_profit, runner_up_rate, runner_up_scu = profit, rate, scu
 
     if best is None:
         return None
@@ -209,7 +233,8 @@ async def find_best_route(
         runner_up = _patch_auto_load(runner_up, cache)
 
     return RouteSearch(
-        best, best_score, best_scu, runner_up, runner_up_score, runner_up_scu,
+        best, best_profit, best_rate, best_scu,
+        runner_up, runner_up_profit, runner_up_rate, runner_up_scu,
         origins_searched, len(origin_terminal_ids),
     )
 

@@ -63,6 +63,19 @@ class BestRouteArgs(BaseModel):
                     "set this without necessarily constraining origin the same way). "
                     "Leave unset for the ordinary case of an open destination."
     )
+    rank_by: Literal["profit", "per_hour"] = Field(
+        default="profit",
+        description="Which measure to pick the best route by, driven by the pilot's "
+                    "wording:\n"
+                    "- 'profit' (default) — the most aUEC for this one run. Use this for "
+                    "an ordinary request: 'give me a run from Orison in my Railen', "
+                    "'what should I haul', 'best route from here'.\n"
+                    "- 'per_hour' — only when the pilot explicitly asks about rate or "
+                    "efficiency: 'best per hour run from Orison', 'what's most profitable "
+                    "per hour', 'what earns fastest'.\n"
+                    "Both figures are reported either way; this only changes which one "
+                    "the search optimises for."
+    )
     exclude_ground_stations: bool = Field(
         default=False,
         description="Set true if the pilot asks to exclude, skip, or avoid ground "
@@ -104,8 +117,9 @@ class BestRouteTool(UplinkTool):
 
     async def _arun(
             self, origin: str, origin_mode: str = "exact", ship: str | None = None, commodity: str | None = None,
-            destination_region: str | None = None, exclude_ground_stations: bool = False,
-            require_autoload: bool = False, *args: Any, **kwargs: Any,
+            destination_region: str | None = None, rank_by: str = "profit",
+            exclude_ground_stations: bool = False, require_autoload: bool = False,
+            *args: Any, **kwargs: Any,
     ) -> Any:
         if ship is None:
             try:
@@ -120,7 +134,7 @@ class BestRouteTool(UplinkTool):
 
         return await self._safe_run(
             self._find_and_report(
-                origin, origin_mode, ship, commodity, destination_region,
+                origin, origin_mode, ship, commodity, destination_region, rank_by,
                 exclude_ground_stations, require_autoload,
             )
         )
@@ -178,7 +192,7 @@ class BestRouteTool(UplinkTool):
 
     async def _find_and_report(
             self, origin: str, origin_mode: str, ship: str, commodity: str | None, destination_region: str | None,
-            exclude_ground_stations: bool = False, require_autoload: bool = False,
+            rank_by: str = "profit", exclude_ground_stations: bool = False, require_autoload: bool = False,
     ) -> str:
         cache = await self.uex_client.get_uex_cache()
 
@@ -232,7 +246,7 @@ class BestRouteTool(UplinkTool):
         result = await find_best_route(
             self.uex_client, self.scw_client, [t.id for t in origin_terminals], ship, vehicle.scu, cache,
             commodity_id=commodity_id, exclude_ground=exclude_ground_stations, require_autoload=require_autoload,
-            destination_terminal_ids=destination_terminal_ids,
+            destination_terminal_ids=destination_terminal_ids, rank_by=rank_by,
         )
         if result is None:
             qualifiers = []
@@ -245,8 +259,8 @@ class BestRouteTool(UplinkTool):
             suffix = f" ({', '.join(qualifiers)})" if qualifiers else ""
             return f"No usable in-system route turned up {origin_label}{suffix}."
 
-        best, score, scu = result.best, result.best_score, result.best_scu
-        runner_up, runner_up_score, runner_up_scu = result.runner_up, result.runner_up_score, result.runner_up_scu
+        best, scu = result.best, result.best_scu
+        runner_up, runner_up_scu = result.runner_up, result.runner_up_scu
         terminal_kind = "a ground station" if best.is_on_ground_destination else "an orbital/space station"
 
         # Lead with what the origin actually resolved to, so the pilot hears the
@@ -262,10 +276,19 @@ class BestRouteTool(UplinkTool):
         else:
             opening = f"Best {origin_label}, from {best.origin_terminal_name}"
 
+        # Per-run leads unless the pilot asked about rate. It's what actually lands in
+        # their account, and it's the trustworthy figure: (sell - buy) x SCU, no duration
+        # estimate involved. The hourly rate extrapolates that over an estimated run time
+        # whose inputs are both known-weak, which is how one 1.9-minute run came to be
+        # quoted at 5.4 million an hour against a real payout of 170,000.
+        per_run = f"{round(result.best_profit):,} aUEC for the run"
+        per_hour = f"{profit_per_hour(result.best_rate):,} aUEC/hour"
+        headline = f"{per_hour}, {per_run}" if rank_by == "per_hour" else f"{per_run}, {per_hour}"
+
         message = (
             f"{opening} in the {vehicle.name}: {scu:.0f} SCU of "
             f"{best.commodity_name} to {best.destination_terminal_name} — about "
-            f"{profit_per_hour(score):,} aUEC/hour. It's {terminal_kind}."
+            f"{headline}. It's {terminal_kind}."
         )
 
         # A region can hold far more terminals than one search may fetch live, so say so
@@ -289,7 +312,12 @@ class BestRouteTool(UplinkTool):
         if runner_up is not None:
             message += (
                 f" Next best was {runner_up.commodity_name} to {runner_up.destination_terminal_name} "
-                f"at about {profit_per_hour(runner_up_score):,} aUEC/hour."
+                # Compared on the same measure the search ranked by, or the two options
+                # aren't comparable — a runner-up quoted per hour against a winner quoted
+                # per run reads as though the runner-up won.
+                + (f"at about {profit_per_hour(result.runner_up_rate):,} aUEC/hour."
+                   if rank_by == "per_hour"
+                   else f"at about {round(result.runner_up_profit):,} aUEC for the run.")
             )
             # The runner-up gets its own token because naming it out loud without one
             # offers the pilot something they can't actually pick — start_trade_run can

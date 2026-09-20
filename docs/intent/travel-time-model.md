@@ -5,10 +5,15 @@ can't distinguish a surface terminal from the station in orbit above it.
 
 ## Problem
 
-Profit per hour is the ranking criterion for every route ALICE recommends, and the
-headline number she says out loud. It's `profit / (transfer_time + travel_time)`. So the
-travel estimate isn't a detail — it decides which route wins, and a systematic undercount
-on one *kind* of flight biases every recommendation toward that kind.
+Profit per hour is `profit / (transfer_time + travel_time)`, so the travel estimate
+decides the rate, and a systematic undercount on one *kind* of flight biases the rate
+toward that kind.
+
+As of 2026-09-20 `best_route` ranks by **profit per run** by default precisely because
+that measure never touches this model — see `rank_by` in `best_route_tool.py`. Per-hour
+is still offered when a pilot asks for it, and still feeds `trade_advisor`'s comparison
+against a committed run, so this remains load-bearing rather than optional. Fixing it is
+what would let per-hour become a trustworthy default again.
 
 The current model measures **horizontal distance only**. Measured 2026-09-18:
 
@@ -47,15 +52,26 @@ durations.
 
 An estimate that accounts for every phase of a real trip, not just the quantum cruise.
 
-Missing phases, as named by Jeff:
+Missing phases. Walking one real arrival at Orison, in order:
 
-- **Surface → orbit.** Atmospheric ascent from a landing zone.
-- **Orbit → surface.** Entry and descent, which is not symmetric with ascent.
-- **Jump gate transit.** Currently excluded outright — the docstring notes it isn't
-  distance-proportional the way in-system QT is, and the wiki's own route planner shows no
-  number for it either.
-- **Hydrogen burn, orbit → hangar.** The slow non-quantum approach and docking phase,
-  which is pure overhead no distance figure captures.
+1. **Quantum cruise** — the only phase modelled today.
+2. **QT drive cooldown, then spool-up** — fixed overhead paid per jump, not per km. A
+   route with several hops pays it several times.
+3. **Post-QT sublight approach** — you drop out 25–50 km short and fly the rest on
+   normal thrust. Distance-proportional but at a completely different speed to QT.
+4. **Atmospheric entry and descent** — arriving at Orison puts you above Crusader, and
+   the descent is its own phase. Not symmetric with the ascent leaving.
+5. **Surface travel to the dock** — another ~25 km once you're in atmosphere.
+6. **Cargo transfer** — and *auto-load has its own duration*, distinct from the manual
+   crate-handling model in `cargo_packing`. `CargoTransferType` already distinguishes
+   AUTOLOAD from MANUAL on the ledger; only the manual path has a time estimate.
+
+Each one is small. Together they're the difference between a modelled 1.9 minutes and
+what the trip actually takes.
+
+Also missing: **jump gate transit** for cross-system routes, currently excluded outright —
+the docstring notes it isn't distance-proportional the way in-system QT is, and the wiki's
+own route planner shows no number for that phase either.
 
 ## Constraints
 
@@ -66,10 +82,11 @@ Missing phases, as named by Jeff:
 
 - **Therefore: only model phases that differ between candidates.** A phase every route
   pays equally cancels out of the ranking and can be ignored entirely, however real it is
-  in the cockpit. That's the test for whether each of the four below is worth the effort —
-  surface→orbit matters because only surface origins pay it, and jump transit matters
-  because only cross-system routes do. A hangar approach every destination requires is
-  a constant, and constants don't change which route wins.
+  in the cockpit. That's the test for whether each phase above is worth the effort:
+  atmospheric entry matters because only surface destinations pay it, and jump transit
+  matters because only cross-system routes do. QT spool-up, paid once per hop by every
+  route alike, is closer to a constant — worth modelling only if hop *counts* differ
+  between candidates, which they do on multi-jump routes.
 - Phase durations are likely ship-dependent (mass, quantum drive, atmospheric handling),
   so a single constant per phase may not survive contact with a Hull C versus a Cutlass.
 - Whatever lands must keep the `float | str` contract — callers treat a string as "can't
