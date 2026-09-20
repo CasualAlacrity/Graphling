@@ -58,6 +58,47 @@ Dashboards for diagnosis, and an alerting path that survives the failures it rep
     extractions and moderator corrections; a public status channel carries "the pool is
     behind right now." Different readers, different content.
 
+## Tracing is not monitoring — and it's priced per event
+
+LangSmith bills usage-based at **$5 per 1,000 traces** beyond the 5,000-trace free tier.
+A trace is one user utterance: `graph.ainvoke` opens the root and classify / respond /
+tool / respond all nest inside it. So at roughly 20 utterances a session and 3 sessions a
+week:
+
+| | traces/user/month | cost/user/month |
+|---|---|---|
+| full tracing | ~240 | **$1.20** |
+| 10% sampling | ~24 | $0.12 |
+| 5% sampling | ~12 | $0.06 |
+
+**At full tracing that costs more per user than the LLM does.** Chat inference is
+electricity once it's on FrankenLab, and the hosted classifier runs about $0.34/user/month
+at the same volume — so observability would outweigh the product working. The free tier
+tells the same story: 5,000 traces covers ~20 pilots at full rate, or ~200 at 10%.
+
+**Decided: sample low by default, and flip a specific user to full tracing on demand.**
+
+Blanket sampling alone is the wrong answer, because it fails exactly when it matters. At
+10%, a pilot reporting "ALICE sent me to the wrong station last night" has a 90% chance
+that trace doesn't exist. Sampling is good at aggregate health and useless for the one
+conversation you actually need to read.
+
+So: `LANGSMITH_TRACING_SAMPLING_RATE` low for everyone, and per-request tracing control
+(`langsmith.tracing_context`, the same mechanism that switches the overlay off) to enable
+full traces for one client while a reported problem is being reproduced. Aggregate cost of
+a 5% sample, complete data for the case under investigation.
+
+**The division of labour this implies:**
+
+- **Grafana answers "is something degrading"** — continuously, across all users, at no
+  per-event cost. Extraction failure rates, fallback rate, queue depth, latency.
+- **LangSmith answers "what happened in this one conversation"** — selectively, when
+  something specific needs explaining. Which tool was chosen and why, what the model saw.
+
+Neither should be paying to watch the other's problem. A trace is a debugging artefact
+about a single turn; a metric is a health signal about the system. Using traces as
+monitoring is what makes the bill scale with users instead of with incidents.
+
 ## Signals worth carrying (system-specific)
 
 General monitoring practice isn't the gap here — Jeff's LiveOps background covers it.
@@ -81,5 +122,8 @@ These are the ones particular to where *this* system breaks:
 
 - Alert thresholds for everything above — tune against real usage, don't guess.
 - Which external service backs the dead-man's switch.
+- How a client gets flipped into full-trace mode — an env var and a restart is the cheap
+  version; doing it without interrupting a pilot mid-run needs the API tier, since that's
+  where a per-user setting would live.
 - Whether extraction metrics live in the same Grafana instance as infrastructure metrics,
   given the DB is on Hetzner and Auspex runs at home.
