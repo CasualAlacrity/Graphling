@@ -73,17 +73,21 @@ directly.
           committed even with a token. Both fixed — see `docs/start-route-tool.md`.
           Standing rule that came out of it: any route ALICE mentions aloud must be
           selectable.
-- [ ] **Decide Trade Advisor's fate.** `app/tools/trade_run/trade_advisor_tool.py` is
-      built but parked out of `graph.py`'s tool list (commit `9f246c4`). Re-add as-is
-      (cheap, it works) — recommended — vs. leave parked vs. build the fuller
-      ledger-benchmarked version (needs real run data, so not now).
-- [ ] **Overlay ↔ AI shared-state check.** Confirm a run the AI creates or advances by
-      voice shows up live in the overlay's trade-runs panel (Qt refresh / threading).
-      Claude can do this.
-- [ ] **Manual/AI parity pass.** Every milestone reachable by voice has a manual
-      equivalent and vice versa. `finalize` (leg and run) stays manual-only — locked
-      decision, memory `project-trade-run-finalize-checkpoints`. AI may *prompt* the
-      pilot to finalize, never do it.
+- [x] **Decide Trade Advisor's fate — re-added as-is, 2026-09-22** (`60f002e`). 19 tools
+      now bound.
+- [x] **Overlay ↔ AI shared-state check — verified 2026-09-22.** Two refresh triggers
+      exist (`overlay_canvas.py`): tab-switch and the F3 toggle-open, the latter's
+      docstring explicitly naming this exact scenario ("an AI trade-run tool ran while
+      the overlay was hidden"). No live push while the panel is already open and sitting
+      on that tab — not a gap, that's exactly what Presence Layer Tier 2's event bus is
+      for, and the overlay is a toggle-open/close UI by design, not a persistent HUD.
+- [x] **Manual/AI parity pass — done 2026-09-22.** Every milestone has two-way parity
+      (arrive, buy/sell with overrides, confirm loaded/unloaded, start a run) except one:
+      **Abandon Run has no voice equivalent** — overlay-only, hard-deletes via
+      `delete_run`. Plausibly intentional (same "consequential action, manual-only"
+      logic as `finalize`), but that's implicit, not a decision anyone's actually made.
+      Worth a one-line call: leave voice-inaccessible on purpose, or add later as a
+      confirmed-only action.
 
 ## Phase 2 — Multi-tenancy (shared backend, per-user client)
 
