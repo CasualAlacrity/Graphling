@@ -45,7 +45,19 @@ class ConfirmCargoLoadedTool(UplinkTool):
             if next_step is LegMilestone.TRANSFERRED_AT:
                 result = await self._safe_run(trade_run_store.advance_leg(leg.id))
                 if isinstance(result, TradeLeg):
+                    # TRANSFERRED_AT is always the acquisition sequence's second-to-last
+                    # field (see trade_run_store's _ACQUISITION_SEQUENCE), so this always
+                    # lands on FINALIZED_AT — the one milestone no AI tool is allowed to
+                    # set (see docs/ledger-trust-and-corrections.md). Saying the bare enum
+                    # value here left the persona with no way to know that meant "tell the
+                    # pilot to click Finalize" — it just narrated "loading confirmed" and
+                    # moved on, silently skipping the pilot's own manual step.
                     new_next_step = trade_run_store.next_unset_field(result)
+                    if new_next_step == LegMilestone.FINALIZED_AT:
+                        return (f"Cargo loading confirmed for {result.commodity_name} at "
+                                f"{result.terminal_name}. This leg is ready to finalize — that's a "
+                                f"manual step, so tell the pilot to hit Finalize on it in the "
+                                f"overlay whenever they're ready.")
                     return (f"Advanced leg: {result.commodity_name} at {result.terminal_name} "
                             f"from {LegMilestone.TRANSFERRED_AT} to {new_next_step}")
                 else:

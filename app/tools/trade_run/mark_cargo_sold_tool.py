@@ -93,7 +93,18 @@ class MarkCargoSoldTool(UplinkTool):
                     cargo_transfer_fee=cargo_transfer_fee,
                 ))
                 if isinstance(result, TradeLeg):
+                    # TRANSACTION_COMPLETED_AT is always the sale sequence's second-to-last
+                    # field for both cargo_transfer_types (see trade_run_store's
+                    # _SALE_MANUAL_SEQUENCE / _SALE_AUTOLOAD_SEQUENCE), so this always lands
+                    # on FINALIZED_AT — the one milestone no AI tool is allowed to set (see
+                    # docs/ledger-trust-and-corrections.md). Saying the bare enum value here
+                    # left the persona with no way to know that meant "tell the pilot to
+                    # click Finalize" — see confirm_cargo_loaded's identical fix.
                     new_next_step = trade_run_store.next_unset_field(result)
+                    if new_next_step == LegMilestone.FINALIZED_AT:
+                        return (f"Sale recorded for {result.commodity_name} at {result.terminal_name}. "
+                                f"This leg is ready to finalize — that's a manual step, so tell the "
+                                f"pilot to hit Finalize on it in the overlay whenever they're ready.")
                     return (f"Advanced leg: {result.commodity_name} at {result.terminal_name} "
                             f"from {LegMilestone.TRANSACTION_COMPLETED_AT} to {new_next_step}")
                 else:
