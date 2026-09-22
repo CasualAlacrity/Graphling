@@ -1,4 +1,5 @@
 import asyncio
+import math
 import os
 from typing import NamedTuple
 
@@ -96,6 +97,36 @@ def profit_per_hour(score: float) -> int:
     (misread as starting with "three thousand"); a rounder number is far more reliable
     for TTS to read correctly, independent of the precision concern."""
     return round(score * 3600 / 1000) * 1000
+
+
+def speakable_aUEC(amount: float, unit: str = "aUEC") -> str:
+    """Formats an aUEC figure the way it should be spoken, not the way it should be read
+    on screen — round to 2 significant figures and say it as "X thousand"/"X.Y million"
+    rather than a comma-grouped digit string. profit_per_hour's rounding to the nearest
+    1,000 already addresses false precision, but a 7-digit comma-grouped number is still
+    what a live trace caught ElevenLabs mis-pronouncing; a live run separately had a pilot
+    hear "961,280 aUEC" and "5,338,000 aUEC/hour" read back digit-for-digit, which is both
+    the same TTS risk and needless precision for a figure that's already an estimate.
+    a route's per-run profit (exact arithmetic, not an extrapolation) goes through this
+    too, on the theory that a pilot wants a memorable number in conversation and can check
+    the overlay for the exact one."""
+    if amount == 0:
+        return f"0 {unit}"
+    sign = "-" if amount < 0 else ""
+    magnitude = 10 ** (1 - math.floor(math.log10(abs(amount))))
+    rounded = round(abs(amount) * magnitude) / magnitude
+    if rounded >= 1_000_000:
+        return f"{sign}{_trim_decimal(rounded / 1_000_000)} million {unit}"
+    if rounded >= 1_000:
+        return f"{sign}{_trim_decimal(rounded / 1_000)} thousand {unit}"
+    return f"{sign}{rounded:.0f} {unit}"
+
+
+def _trim_decimal(value: float) -> str:
+    """1 decimal place, unless the 2-significant-figure rounding above landed on a whole
+    number — 960.0 should read "960 thousand", not "960.0 thousand", but 4.2 needs that
+    digit or it silently drops the second significant figure (4200 -> "4 thousand")."""
+    return f"{value:.0f}" if value == round(value) else f"{value:.1f}"
 
 
 def _terminal_is_auto_load(cache, terminal_id: int) -> bool:

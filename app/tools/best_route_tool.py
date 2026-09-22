@@ -3,7 +3,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
-from tools.route_ranking import find_best_route, profit_per_hour
+from tools.route_ranking import find_best_route, profit_per_hour, speakable_aUEC
 from tools.starcitizenwiki.client import StarCitizenWikiClient
 from tools.trade_run import resolver, route_cache
 from tools.trade_run.resolver import AmbiguousRunError
@@ -281,8 +281,8 @@ class BestRouteTool(UplinkTool):
         # estimate involved. The hourly rate extrapolates that over an estimated run time
         # whose inputs are both known-weak, which is how one 1.9-minute run came to be
         # quoted at 5.4 million an hour against a real payout of 170,000.
-        per_run = f"{round(result.best_profit):,} aUEC for the run"
-        per_hour = f"{profit_per_hour(result.best_rate):,} aUEC/hour"
+        per_run = f"{speakable_aUEC(result.best_profit)} for the run"
+        per_hour = f"{speakable_aUEC(profit_per_hour(result.best_rate), 'aUEC/hour')}"
         headline = f"{per_hour}, {per_run}" if rank_by == "per_hour" else f"{per_run}, {per_hour}"
 
         message = (
@@ -315,9 +315,9 @@ class BestRouteTool(UplinkTool):
                 # Compared on the same measure the search ranked by, or the two options
                 # aren't comparable — a runner-up quoted per hour against a winner quoted
                 # per run reads as though the runner-up won.
-                + (f"at about {profit_per_hour(result.runner_up_rate):,} aUEC/hour."
+                + (f"at about {speakable_aUEC(profit_per_hour(result.runner_up_rate), 'aUEC/hour')}."
                    if rank_by == "per_hour"
-                   else f"at about {round(result.runner_up_profit):,} aUEC for the run.")
+                   else f"at about {speakable_aUEC(result.runner_up_profit)} for the run.")
             )
             # The runner-up gets its own token because naming it out loud without one
             # offers the pilot something they can't actually pick — start_trade_run can
