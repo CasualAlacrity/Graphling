@@ -58,8 +58,15 @@ directly.
       Also fixed a real bug this surfaced: `find_best_route` wasn't patching
       `is_auto_load_origin/destination` on its returned routes (`route_ranking.py`).
     - [ ] Tests still needed — see `docs/start-route-tool.md` "Tests still to add".
-    - [ ] Docs said "done" but this hasn't been run live yet — first real voice test of
-          best_route → start_trade_run → mark_arrived → ... → finalize is still ahead.
+    - [x] **First live voice test run, completed 2026-09-22.** best_route → start_trade_run
+          → mark_arrived → mark_cargo_acquired → confirm_cargo_loaded → mark_arrived (sale
+          leg) → mark_cargo_sold → Finalize (both legs, manual, in the overlay) — full loop,
+          voice to ledger. Verified in the DB: run `474397f7` finalized 08:02:55 UTC, 640
+          SCU Copper, Admin - Seraphim → Admin - Rod's Fuel 'N Supplies, Railen. Found real
+          bugs along the way (number pronunciation, missing finalize nudge, canned decline
+          lines, markdown creeping into spoken replies, `classify_topic` misfires, and the
+          ~30s cold-start latency) — first three fixed same day, rest logged above and in
+          `classify-topic-rework.md`.
     - [x] **Unselectable runner-up fixed 2026-09-18.** `best_route` named a second route
           but stashed only the winner, so "do that one instead" had nothing to resolve to;
           `find_best_route` also never returned the runner-up's SCU, so it couldn't be
@@ -152,12 +159,41 @@ outputs stay consistent.
          third dimension, a turn ALICE initiates rather than reacts to. Not runnable until
          `find_detour_pickup` and the graph-injection plumbing exist (Phase 4/backlog), but
          worth keeping as the target shape.
+      3. Phonetic/garbled entity resolution must keep matching correctly. Real transcripts
+         from the first live voice test (2026-09-21/22): Whisper rendered the ship "Railen"
+         as "my railing" and, separately, as "Raylin'" in the same session, and the location
+         "Orison" as "Oreson" — `best_route` resolved both correctly via the
+         `token_sort_ratio` hedge match (see the comment at `best_route_tool.py`'s
+         `_resolve_origin`). A good positive snapshot case — a future model swap regressing
+         this fails silently otherwise, since a *confident wrong* match (see the "Orson" →
+         "HDMS-Ander(son)" near-miss already documented there) looks identical to a correct
+         one without a known-good answer to check against.
+      4. `classify_topic` misclassifying a benign or in-progress turn as off-topic. Two real
+         instances: "All. Good morning." (live trace, 2026-09-22) got declined with the
+         canned "I don't do small talk" line, and "Let's do it." after a failed search was
+         declined the same way (`classify-topic-rework.md`'s open questions) — the
+         classifier has no signal for pending-confirmation state. Not a tool-call case, so
+         it may need its own small eval track rather than living in this dataset — noting it
+         here so it isn't lost before that decision gets made.
 - [ ] **Evaluators:** (a) correct tool selected, (b) args resolved to the right
       entities, (c) no spurious extra tool calls, (d) output snapshot / consistency
-      check so drift between models is visible.
+      check so drift between models is visible, (e) no markdown or other formatting
+      artifacts in any spoken response, and a tool's own spoken-form phrasing (e.g. "960
+      thousand aUEC") is relayed as given, not recomputed or reformatted back to raw digits
+      — regression measured live 2026-09-22: `best_route`'s phrased profit figure came back
+      as `960,000 aUEC` inside a markdown bullet list in the final persona reply.
 - [ ] **Runner + report.** Executes the suite against a named model via `get_chat_llm`
       and produces a pass / consistency summary. Decide: LangSmith `evaluate()` over a
       Hub dataset, local pytest, or both.
+- [ ] **Track per-case latency alongside correctness**, not just pass/fail — this harness is
+      also where a model swap or FrankenLab coming online gets measured, not just whether
+      tool selection held up. Concrete baseline from 2026-09-22 (Gemma 4, local, no
+      FrankenLab yet): a session's first `respond` call cost 29.64s of prompt-eval alone for
+      a ~9,700-token prompt (persona + all 18 bound tool schemas, before any real
+      conversation) — later calls in the same session reused the cache and dropped to
+      ~0.23s, and steady-state generation held ~28 tokens/sec regardless. Both numbers are
+      levers this harness should keep visible: tool-schema bulk (bind fewer/smaller tools,
+      or delegate to `agent-roles.md`'s datarunner) and raw hardware throughput.
 
 - [ ] **Travel-time model covers only horizontal distance.** Measured 2026-09-18: Orison
       TDD to Admin - Seraphim, a climb out of atmosphere, estimates at 0.1 min because
@@ -247,10 +283,9 @@ structured display intents to a queue the Qt layer renders; nothing parses ALICE
       is the data layer, not a stray name. Full reasoning in `docs/intent/agent-roles.md`.
       **Note for existing installs:** the rename leaves a stale `uplink` distribution and
       its old console scripts behind; `pip uninstall uplink` after re-running setup.
-- [ ] **Land the uncommitted batch.** mac run scripts, new README, voice
-      singleton-listener fix, `.gitignore` prompt-cache rationale, Windows path fixes,
-      deletion of `ai-presentation-narrative.md` + `Vector Tracking Ideas.md`. Group into
-      clean commits. (Fold the Chainlit removal in here — see "Near-term" above.)
+- [x] **Land the uncommitted batch.** Landed since this was written — verified: mac/windows
+      run scripts exist, README has no Chainlit references, `.gitignore` carries the
+      prompt-cache rationale, singleton-listener fix is in git history (`8385023`).
 - [ ] **README accuracy.** Tool count verified at 17 (6 UEX + 7 trade-run + 4 general).
       Demo clip still a placeholder.
 - [ ] **`trade-route-tracker.md` cleanup.** Fold dated "Known gaps" / live-testing notes

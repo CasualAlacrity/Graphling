@@ -71,4 +71,6 @@ nothing to leak.
 - The deeper question deferred from live testing: the classifier misfired on "Let's do
   it." after a failed search, treating a conversational commitment as off-topic. It has no
   signal for pending confirmation state. Fixing the decline *wording* doesn't fix the
-  decline *decision* — that's a separate diagram/design pass Jeff planned to draw.
+  decline *decision* — that's a separate diagram/design pass Jeff planned to draw. Same
+  failure mode caught again live 2026-09-22 ("All. Good morning." declined with the canned
+  line) — logged as a Phase 3 harness case in `docs/todo.md`.
