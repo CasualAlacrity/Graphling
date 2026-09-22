@@ -20,6 +20,7 @@ from tools.trade_run.mark_arrived_tool import MarkArrivedTool
 from tools.trade_run.mark_cargo_acquired_tool import MarkCargoAcquiredTool
 from tools.trade_run.mark_cargo_sold_tool import MarkCargoSoldTool
 from tools.trade_run.start_trade_run_tool import StartTradeRunTool
+from tools.trade_run.trade_advisor_tool import TradeAdvisorTool
 from tools.trade_run.trade_run_status_tool import TradeRunStatusTool
 from tools.travel_time_tool import TravelTimeTool
 from tools.uexcorp.client import UEXCorpClient
@@ -81,9 +82,11 @@ confirm_cargo_unloaded_tool = ConfirmCargoUnloadedTool()
 trade_run_status_tool = TradeRunStatusTool()
 cargo_packing_tool = CargoPackingTool(client=uex_client)
 start_trade_run_tool = StartTradeRunTool()
+trade_advisor_tool = TradeAdvisorTool(uex_client=uex_client, scw_client=scw_client)
 
 trade_run_tools = [mark_arrived_tool, mark_cargo_acquired_tool, mark_cargo_sold_tool, confirm_cargo_loaded_tool,
-                   confirm_cargo_unloaded_tool, trade_run_status_tool, cargo_packing_tool, start_trade_run_tool]
+                   confirm_cargo_unloaded_tool, trade_run_status_tool, cargo_packing_tool, start_trade_run_tool,
+                   trade_advisor_tool]
 
 # General Tools
 timer_tool = StartTimerTool()
