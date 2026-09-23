@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="627" viewBox="0 0 1200 627">
+  <defs>
+    <radialGradient id="glow" cx="0.78" cy="0.35" r="0.7">
+      <stop offset="0" stop-color="#F2650C" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#F2650C" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FF9142"/>
+      <stop offset="1" stop-color="#F2650C"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="627" fill="#0D0F10"/>
+  <rect width="1200" height="627" fill="url(#glow)"/>
+  <g stroke="#1B1E20" stroke-width="1">
+    <path d="M0 105H1200M0 210H1200M0 315H1200M0 420H1200M0 525H1200"/>
+    <path d="M120 0V627M240 0V627M360 0V627M480 0V627M600 0V627M720 0V627M840 0V627M960 0V627M1080 0V627"/>
+  </g>
+
+  <!-- left: title block -->
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+    <text x="70" y="110" font-size="20" font-weight="600" letter-spacing="6" fill="#F2650C">STAR CITIZEN  ·  VOICE COPILOT</text>
+    <text x="64" y="240" font-size="150" font-weight="800" letter-spacing="8" fill="#EDEAE4">ALICE</text>
+    <rect x="70" y="266" width="120" height="6" fill="#F2650C"/>
+    <text x="70" y="330" font-size="34" font-weight="500" fill="#EDEAE4">Ask for the best route.</text>
+    <text x="70" y="376" font-size="34" font-weight="500" fill="#9AA0A6">Keep your eyes on the cockpit.</text>
+    <text x="70" y="540" font-size="20" fill="#9AA0A6">LangGraph · LangChain · Pydantic · LangSmith · PySide6</text>
+    <text x="70" y="574" font-size="20" fill="#5C6266">Python · PostgreSQL · voice push-to-talk · overlay UI</text>
+  </g>
+
+  <!-- waveform -->
+  <g fill="url(#bar)" transform="translate(0,48)">
+    <rect x="70"  y="415" width="8" height="30" rx="4" transform="translate(0,-15)"/>
+    <rect x="92"  y="415" width="8" height="50" rx="4" transform="translate(0,-25)"/>
+    <rect x="114" y="415" width="8" height="80" rx="4" transform="translate(0,-40)"/>
+    <rect x="136" y="415" width="8" height="46" rx="4" transform="translate(0,-23)"/>
+    <rect x="158" y="415" width="8" height="96" rx="4" transform="translate(0,-48)"/>
+    <rect x="180" y="415" width="8" height="64" rx="4" transform="translate(0,-32)"/>
+    <rect x="202" y="415" width="8" height="34" rx="4" transform="translate(0,-17)"/>
+    <rect x="224" y="415" width="8" height="58" rx="4" transform="translate(0,-29)"/>
+    <rect x="246" y="415" width="8" height="24" rx="4" transform="translate(0,-12)"/>
+  </g>
+  
+  <!-- right: overlay mock card -->
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+    <rect x="640" y="100" width="490" height="427" rx="14" fill="#17191B" stroke="#33373A" stroke-width="2"/>
+    <rect x="640" y="100" width="490" height="56" rx="14" fill="#1F2224"/>
+    <rect x="640" y="140" width="490" height="16" fill="#1F2224"/>
+    <circle cx="670" cy="128" r="6" fill="#4CAF6D"/>
+    <text x="688" y="135" font-size="18" font-weight="600" letter-spacing="2" fill="#EDEAE4">BEST ROUTES</text>
+    <text x="1106" y="135" font-size="15" fill="#9AA0A6" text-anchor="end">by profit / run</text>
+
+    <!-- row 1 (highlighted) -->
+    <rect x="660" y="176" width="450" height="98" rx="10" fill="#1F2224" stroke="#F2650C" stroke-width="2"/>
+    <text x="682" y="212" font-size="22" font-weight="600" fill="#EDEAE4">Buy station  →  Sell station</text>
+    <text x="682" y="244" font-size="17" fill="#9AA0A6">Commodity  ·  full container load</text>
+    <text x="1088" y="222" font-size="26" font-weight="700" letter-spacing="2" fill="#F2650C" text-anchor="end">TOP PICK</text>
+    <text x="1088" y="250" font-size="15" fill="#9AA0A6" text-anchor="end">highest profit per run</text>
+
+    <!-- row 2 -->
+    <rect x="660" y="290" width="450" height="98" rx="10" fill="#17191B" stroke="#33373A" stroke-width="1.5"/>
+    <text x="682" y="326" font-size="22" font-weight="600" fill="#EDEAE4">Buy station  →  Sell station</text>
+    <text x="682" y="358" font-size="17" fill="#9AA0A6">Commodity  ·  stable market</text>
+    <rect x="1010" y="318" width="78" height="10" rx="5" fill="#33373A"/>
+    <rect x="1010" y="318" width="52" height="10" rx="5" fill="#4CAF6D"/>
+
+    <!-- row 3 -->
+    <rect x="660" y="404" width="450" height="98" rx="10" fill="#17191B" stroke="#33373A" stroke-width="1.5"/>
+    <text x="682" y="440" font-size="22" font-weight="600" fill="#EDEAE4">Buy station  →  Sell station</text>
+    <text x="682" y="472" font-size="17" fill="#9AA0A6">Commodity  ·  volatile market</text>
+    <rect x="1010" y="432" width="78" height="10" rx="5" fill="#33373A"/>
+    <rect x="1010" y="432" width="30" height="10" rx="5" fill="#E8B23A"/>
+  </g>
+</svg>
