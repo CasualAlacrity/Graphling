@@ -1,8 +1,9 @@
+import asyncio
 import os
 from typing import Annotated
 
 from dotenv import load_dotenv
-from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import START, StateGraph
 from langgraph.graph.message import add_messages
@@ -100,6 +101,43 @@ tools = uex_backed_tools + trade_run_tools + general_tools
 
 llm = get_chat_llm().bind_tools(tools)
 classifier_llm = get_chat_llm().with_structured_output(TopicClassification)
+
+
+async def prewarm() -> None:
+    """Fires one throwaway call through each bound LLM at the exact prompt shape it'll
+    see for real, so Ollama's prompt-prefix cache is warm before the pilot's first turn
+    lands on it instead of during it. Only meaningful for LLM_PROVIDER=ollama — measured
+    2026-09-22: the persona's tool-bound prompt (persona + every tool schema, ~9,700
+    tokens) cost ~30s of pure prompt-eval on its first call, dropping to well under a
+    second on every call afterward that shares the same prefix. A generic "ping the
+    model" warmup wouldn't fix this — load_duration was already ~2ms even on that cold
+    call, so it was never a model-loading cost, and Ollama's cache is keyed on the
+    actual prompt content — which is why this replays the real persona/classifier
+    prompts rather than sending something arbitrary. Hosted providers don't have this
+    cold-start cost, so this is a no-op for them rather than spending real money on a
+    call that buys nothing.
+
+    Best-effort: a prewarm failure shouldn't block startup, only means the pilot's
+    first message pays the cold-start cost this was meant to hide."""
+    if os.getenv("LLM_PROVIDER", "ollama") != "ollama":
+        return
+    if os.getenv("PREWARM_OLLAMA", "true").strip().lower() == "false":
+        return
+
+    warmup_turn = [HumanMessage(content="(warmup)")]
+    try:
+        await asyncio.gather(
+            llm.ainvoke(
+                PERSONA_TEMPLATE.invoke({}).to_messages() + warmup_turn,
+                config={"run_name": "prewarm-persona", "tags": ["warmup"]},
+            ),
+            classifier_llm.ainvoke(
+                CLASSIFY_TEMPLATE.invoke({}).to_messages() + warmup_turn,
+                config={"run_name": "prewarm-classifier", "tags": ["warmup"]},
+            ),
+        )
+    except Exception as exc:
+        print(f"[ALICE] Prewarm failed ({exc}) — the first real message will be slow instead.")
 
 
 async def respond(state: State) -> dict:

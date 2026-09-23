@@ -26,7 +26,7 @@ async def run() -> None:
     # submodule of this package), which would otherwise trigger this file's own
     # execution mid-way through graph.py's initialization, circling back on a
     # not-yet-finished module.
-    from graph import State, graph, uex_client
+    from graph import State, graph, prewarm, uex_client
 
     print("=" * 40)
     print("  ALICE — Push to talk")
@@ -34,14 +34,21 @@ async def run() -> None:
 
     load_whisper("base")
 
-    # First launch opens a browser for a one-time Discord login; every launch after
-    # that reads the cached identity straight off disk. thread_id carries the pilot's
-    # id so a shared checkpointer (Phase 2) can tell whose thread is whose — MemorySaver
-    # doesn't need it today (one process per pilot already isolates them), but every
-    # thread_id being wrong-shaped until then is exactly the kind of thing that's cheap
-    # to get right now and a migration to fix later.
-    identity = await get_pilot_identity()
+    # Identity, the UEX vocabulary cache, and warming the LLMs (graph.prewarm — see its
+    # own docstring for why) are all independent of each other — run them concurrently
+    # rather than one after another. On a first-time install this also means the
+    # prewarm and the UEX fetch happen *while* the pilot is off in their browser doing
+    # the one-time Discord login, not queued up after it.
+    identity, cache, _ = await asyncio.gather(
+        get_pilot_identity(),
+        uex_client.get_uex_cache(),
+        prewarm(),
+    )
     print(f"[ALICE] Signed in as {identity.username}.")
+    # thread_id carries the pilot's id so a shared checkpointer (Phase 2) can tell whose
+    # thread is whose — MemorySaver doesn't need it today (one process per pilot already
+    # isolates them), but every thread_id being wrong-shaped until then is exactly the
+    # kind of thing that's cheap to get right now and a migration to fix later.
     thread_id = f"{identity.user_id}:{uuid.uuid4()}"
     config = {"configurable": {"thread_id": thread_id}}
 
@@ -49,8 +56,6 @@ async def run() -> None:
     # words — without a hint it renders an unusual proper noun as the nearest common
     # English word instead (e.g. "Railen" -> "railing"). Ship names are the highest-value
     # vocabulary to bias toward: they're short, numerous, and the exact case that broke.
-    # Built once from the already-cached UEX catalog, not per-utterance.
-    cache = await uex_client.get_uex_cache()
     ship_name_prompt = ", ".join(vehicle.name for vehicle in cache.vehicles)
 
     print("[ALICE] Ready. Hold PTT key to speak.")
