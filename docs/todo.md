@@ -221,6 +221,24 @@ SC-focused, but each addition weighed against "would this also serve assistant-A
 someday?" Timers already pass that test and stay. Candidates to be brainstormed
 separately — don't pre-commit a list here.
 
+- [ ] **Confirmed-voice finalize (2026-09-23 decision).** Reverses the locked
+      manual-only-finalize decision on purpose: if the pilot tries to act on a leg that's
+      blocked behind an unfinalized predecessor, ALICE says so and offers to finalize it
+      ("The first leg hasn't been finalized. Want me to do that?"); on "yes" she may. The
+      review-friction the manual-only rule existed for is intentionally traded for less
+      friction here — named explicitly, not walked into. Needs: a `resolve_leg` fix so
+      "blocked by predecessor" is distinguishable from "no such leg" (fixes every
+      milestone tool at once, they all funnel through it); a narrowly-scoped new
+      `finalize_leg` tool (the store-level `advance_leg` already supports this — the
+      restriction was only ever at the tool layer); a decision on whether ALICE
+      auto-retries the originally-blocked action after finalizing or makes the pilot
+      repeat themselves (leaning: auto-retry); two persona-prompt additions (the "why
+      isn't this automatic" explanation, and the auto-retry instruction).
+- [ ] **User setting to bypass the confirm-before-finalize guard entirely** — an
+      intentional pilot opt-in once there's a real client + user-settings surface
+      (multi-tenancy, Phase 2+). Not buildable until that infra exists; flagged here so
+      it isn't lost.
+
 Named so far (from `docs/ledger-trust-and-corrections.md`, HCI design session) — the
 *simple* versions; the provenance/confidence layer they were originally coupled to is
 Parked:
