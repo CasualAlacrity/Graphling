@@ -87,10 +87,9 @@ directly.
 - [x] **Manual/AI parity pass — done 2026-09-22.** Every milestone has two-way parity
       (arrive, buy/sell with overrides, confirm loaded/unloaded, start a run) except one:
       **Abandon Run has no voice equivalent** — overlay-only, hard-deletes via
-      `delete_run`. Plausibly intentional (same "consequential action, manual-only"
-      logic as `finalize`), but that's implicit, not a decision anyone's actually made.
-      Worth a one-line call: leave voice-inaccessible on purpose, or add later as a
-      confirmed-only action.
+      `delete_run`. **Decided 2026-09-24: staying that way, on purpose.** Abandoning a
+      run is purely a pilot-run action — no voice path, no confirmed-only exception. Not
+      implicit anymore.
 
 ## Phase 2 — Multi-tenancy (shared backend, per-user client)
 
@@ -240,9 +239,9 @@ SC-focused, but each addition weighed against "would this also serve assistant-A
 someday?" Timers already pass that test and stay. Candidates to be brainstormed
 separately — don't pre-commit a list here.
 
-- [ ] **Confirmed-voice LEG finalize — flagged pain point, not a decision (2026-09-23).**
-      Finalize stays manual-only for now; this is naming a possible future softening, not
-      committing to build it. Scope, if it ever happens: **leg** finalize only, never run
+- [ ] **Confirmed-voice LEG finalize — future todo, reconfirmed 2026-09-24.**
+      Finalize stays manual-only for now; explicitly revisiting later, not deciding for
+      or against it today. Scope, if it ever happens: **leg** finalize only, never run
       finalize — locking a run into the ledger always needs the pilot's own review and
       click, full stop, no exception. In practice this can only ever fire for the
       **acquisition** leg — it's the only leg with a next leg in-run that could be
