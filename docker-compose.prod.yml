@@ -30,6 +30,8 @@ services:
       DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET}
       DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      UEXCORP_API_KEY: ${UEXCORP_API_KEY}
+      UEXCORP_BEARER_TOKEN: ${UEXCORP_BEARER_TOKEN}
     # Bound to loopback only, not 0.0.0.0 — nginx (already on this box, see
     # docs/deploy.md) is the only path in, proxying api.heyalice.help to here, same
     # shape as Flockt's app.flockt.farm -> 127.0.0.1:8088.

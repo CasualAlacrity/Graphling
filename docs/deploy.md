@@ -65,8 +65,13 @@ existing `app.flockt.farm` → `127.0.0.1:8088` site.
    DISCORD_CLIENT_SECRET=<from step 3>
    DISCORD_REDIRECT_URI=https://api.heyalice.help/auth/discord/callback
    JWT_SECRET_KEY=<python -c "import secrets; print(secrets.token_hex(32))">
+   UEXCORP_API_KEY=<same value as your own local .env>
+   UEXCORP_BEARER_TOKEN=<same value as your own local .env>
    ```
-   `docker-compose.prod.yml` reads these via `${VAR}` substitution from this file.
+   `docker-compose.prod.yml` reads these via `${VAR}` substitution from this file. The
+   last two are new as of the UEX/wiki cache move — if `/opt/graphling/.env` predates
+   that, add them before redeploying or every UEX cache endpoint fails with an empty
+   key/token.
 
 ## Deploying
 
