@@ -93,41 +93,64 @@ directly.
 
 ## Phase 2 — Multi-tenancy (shared backend, per-user client)
 
-Shape: one shared Postgres both pilots reach; each runs their own voice-loop client
-tagged with a user id. Individual co-pilot only — not fleet logistics. CLAUDE.md already
-frames this as an additive migration, not a redesign.
-
-- [x] **`user_id` on `TradeRun` / `TradeLeg` — done 2026-09-25** (`c1a4f6e2b9d3`, then
-      `e2b7d4a19f6c`). First pass stamped the raw Discord snowflake directly as a plain
-      string. Compared against Project Lyra and Uplink (two earlier projects with the
-      same Discord-login shape) surfaced that both keep a `users` table decoupled from
-      the auth provider specifically so a second provider can be added later without
-      touching every FK'd table — real enough prior art to redo this properly rather than
-      carry the string forward. `e2b7d4a19f6c` added `users` (id uuid pk, `discord_id`
-      unique) and swapped `TradeRun`/`TradeLeg.user_id` to a real FK against it, backfilled
-      via a generated placeholder user for the existing `"legacy"` rows. `db/user_service.
-      get_or_create_user()` resolves/creates that row once at login (`voice/__init__.py`),
-      and `db/current_user.py` now holds `users.id`, not the Discord id, for the rest of
-      the process. Not the full Lyra/Uplink `User` + `UserIdentity` split — that's for
-      when a second provider actually shows up; `users.discord_id` is deliberately its own
-      column (not the PK) so that split is additive later, per `User`'s docstring in
-      `db/models.py`. `create_run_from_route` stamps the FK; `get_in_progress_runs`/
-      `get_finalized_runs` filter by it. **Scoping boundary, on purpose:** `advance_leg`/
-      `record_purchase`/`record_sale`/`finalize_run`/`delete_run` take an id directly and
-      don't re-check ownership — a leg/run id is only ever learned via the two filtered
-      list functions above (resolver.py included), so this is scoped transitively rather
-      than duplicating the check at every id-based call. Revisit if ids ever start getting
-      shared/logged cross-tenant. Both migrations verified live against the local
-      docker-compose Postgres: upgrade/downgrade round-tripped cleanly each time, existing
-      2 runs / 4 legs backfilled and re-pointed correctly.
-- [x] **Client carries identity — done differently than sketched, via Discord OAuth
-      (2026-09-23), not an `ALICE_USER` env var.** `auth/discord_identity.py`'s
-      `get_pilot_identity()` already resolves a real per-pilot id at startup;
-      `voice/__init__.py` resolves the local `users` row from it
-      (`get_or_create_user`) and calls `db.current_user.set_current_user_id()` right
-      after, before anything (voice loop or overlay) can touch the ledger. `thread_id`
-      still uses the raw Discord id directly — that's a LangGraph checkpointer concern,
-      unrelated to ledger ownership.
+**Shape changed 2026-09-25 — server-mediated, not direct-DB.** Originally "one shared
+Postgres both pilots reach directly, each running their own client" — but that raises a
+real question direct-DB access can't answer cleanly: how does a client on someone else's
+machine reach a database that isn't on theirs? The two candidates were a VPN (Tailscale)
+or a plain VPS with a published Postgres port; both were rejected — Tailscale requires
+manually inviting every future pilot onto a private network (doesn't scale past "people
+I personally know", and isn't the shape a real paid product would ever want a stranger
+using anyway), and a bare published port is real exposure for a password-protected
+database. The actual fix: a small FastAPI server (`app/server/`) mediates every ledger
+read/write over HTTPS, authenticated by login (Discord OAuth + JWT), not network
+location. Postgres then never needs to be reachable from outside its own box at all —
+same shape as Flockt's own `db` container. Modeled on Project Lyra and Uplink (two
+earlier projects, same author, same Discord-OAuth-relay pattern), specifically for the
+security property they already have: the *server* verifies identity with Discord using
+a real client secret, not "the client says who it is." Full design/build order in the
+plan this was built from; deployment mechanics in `docs/deploy.md`.
+- [x] **`app/server/` built and tested — 2026-09-25.** `ledger_service.py` (the
+      DB-touching functions that used to live in `db/trade_run_store.py`, now taking
+      `user_id` explicitly since a server serves concurrent requests from potentially
+      different pilots — a process-global only ever worked for "one process = one
+      pilot"), `routes/ledger.py` (one route per function, behind
+      `Depends(get_current_user)`), `routes/auth.py` (the Discord OAuth relay — the
+      client's desktop app can't sit at the server's origin like a browser tab would, so
+      the server bounces the browser back to the client's own local listener with a JWT
+      once its Discord exchange is done), `dependencies.py` (JWT → `User`, modeled on
+      Lyra's `api/dependencies.py`). `db/trade_run_store.py` now holds only the pure,
+      DB-free helpers (`ordered_legs`, `run_profit`, etc.) — shared unchanged by both the
+      server and the client. `db/current_user.py` (the process-global from the direct-DB
+      design) is deleted; ownership is resolved per-request from the JWT instead.
+- [x] **`ledger_client.py` built — 2026-09-25.** The client's HTTP replacement for the
+      old direct-DB calls — same public function names `trade_run_store.py`'s
+      DB-touching functions used to have, so every tool file/`resolver.py`/overlay file
+      only needed its import line split (pure calls stay on `trade_run_store`,
+      DB-touching calls move to `ledger_client`), not a rewrite. Returns
+      `ledger_schemas.TradeRunOut`/`TradeLegOut` (Pydantic, parsed from the server's
+      JSON) rather than the SQLAlchemy classes — the pure helpers only ever do attribute
+      access, so this is invisible to them.
+- [x] **Auth rewritten for the relay — 2026-09-25.** `auth/discord_identity.py`'s old
+      client-side PKCE-to-Discord flow (public client, no secret) is gone; it now opens
+      `{ALICE_API_URL}/auth/discord/login` (the server) instead of Discord directly, and
+      caches a JWT (`PilotSession`) instead of a raw Discord id. Re-validates the cached
+      token against `/auth/users/me` before trusting it (`get_pilot_session`), so an
+      expired token surfaces as one clean re-login instead of a confusing 401 from
+      whichever tool happens to run first. `voice/__init__.py` updated to match —
+      `thread_id` now keys off the pilot's username rather than a Discord id, since the
+      client no longer holds one at all.
+- [x] **Deployment artifacts built and locally verified — 2026-09-25**, not yet
+      live-deployed. Root `Dockerfile` (copies the whole `app/` tree but installs only
+      `server/requirements.txt` — no LangChain/Whisper/PySide6 in the image),
+      `docker-compose.prod.yml` (Postgres with no published port; server bound to
+      `127.0.0.1:8090`, nginx as the only path in), `scripts/deploy_server.sh` (modeled
+      on `chicken-tracker/deploy-prod.sh`, same box/SSH key). Verified locally: the image
+      builds, boots, serves `/health` and the Discord login redirect, and its bundled
+      Alembic setup reaches the real local Postgres and reports the correct head
+      revision. **Still needed before this is real** (manual, only the account owner can
+      do these — see `docs/deploy.md`): turn Discord's "Public Client" off and get a
+      secret, register the server's redirect URI, add the `api.heyalice.help` nginx+
+      certbot site, and run the actual first deploy.
 - [ ] Multi-tenancy is also where the trade-data pipeline pools into — keep the schema
       open to per-observation station price/stock rows keyed by pilot + timestamp, even
       if that pipeline lands later.
@@ -137,17 +160,17 @@ community features (leaderboards) need it, see Parked. If it's trivial to leave 
 fine, but don't design it now.
 - [x] **Cache + reference tables stay global — enforced 2026-09-25**
       (`tests/db/test_tenancy_boundaries.py`). `UexPriceCache`/`UexReferenceCacheRecord`
-      never got a `user_id` in either migration above; a schema-column test now fails
-      loudly if that ever changes, rather than relying on someone noticing during review.
-      Shared economy data is the point.
-- [ ] **Infra:** Postgres moves from each person's local `docker-compose` to one
-      always-on reachable host (small VPS, or Tailscale to one machine). `db/session.py`
-      NullPool setup is already multi-loop-safe; multi-process is fine. Note for whenever
-      shared/concurrent threads are wanted: `MemorySaver` is in-process, so separate
-      client processes are already isolated today — only move to `AsyncPostgresSaver` if
-      checkpoint persistence or cross-client shared threads end up needed.
-- [x] **Runs scoped to owner — done 2026-09-25**, as part of the `user_id` migration
-      above. No cross-visibility of active runs.
+      never got a `user_id`; a schema-column test now fails loudly if that ever changes,
+      rather than relying on someone noticing during review. Shared economy data is the
+      point — still true, and still enforced, under the server-mediated shape.
+- [x] **Runs scoped to owner — done 2026-09-25.** `get_in_progress_runs`/
+      `get_finalized_runs` filter by the JWT-resolved `user_id` server-side now, instead
+      of a client-side process-global. No cross-visibility of active runs.
+      **Scoping boundary, on purpose, unchanged by the server move:**
+      `advance_leg`/`record_purchase`/`record_sale`/`finalize_run`/`delete_run` take an
+      id directly and don't re-check ownership — a leg/run id is only ever learned via
+      the two filtered list functions above, so this is scoped transitively. Revisit if
+      ids ever start getting shared/logged cross-tenant.
 - [x] Update CLAUDE.md's multi-tenancy framing — already done (it currently reads
       "Multi-tenancy is on the roadmap", no "v1 scope … no multi-tenancy" language left).
 

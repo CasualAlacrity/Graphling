@@ -1,8 +1,10 @@
 """Covers mark_cargo_sold's entailment backfill: a completed sale is mechanically
 impossible without arrival, and for manually-transferred cargo, unloading — so a pilot
 reporting the sale directly ("I sold the copper for 4,567") should get those recorded
-too, not be refused. Exercises the real trade_run_store functions (via a fake session),
-not mocked-out internals.
+too, not be refused. Fakes only the true IO boundary — ledger_client.advance_leg/
+record_sale, the HTTP calls to the server — so ledger_client.catch_up_before_
+transaction's real orchestration logic (looping advance_leg) is what's actually under
+test here, not a re-implementation of it.
 
 The autoload/manual distinction matters for the message: autoload never has an
 independent unloading step (see _SALE_AUTOLOAD_SEQUENCE), so saying "recorded unloading"
@@ -11,39 +13,24 @@ for one would be wrong, not just verbose.
 import uuid
 from datetime import UTC, datetime
 
-from db.models import CargoTransferType, LegType, TradeLeg
+import ledger_client
+from db.models import CargoTransferType, LegType
+from db.trade_run_store import next_unset_field
+from ledger_schemas import TradeLegOut
 from tools.trade_run import resolver
 from tools.trade_run.mark_cargo_sold_tool import MarkCargoSoldTool
 
 
 def _leg(cargo_transfer_type=CargoTransferType.MANUAL, **overrides):
     fields = dict(
-        id=uuid.uuid4(), leg_type=LegType.SALE, terminal_id=2, terminal_name="Admin - Rod's Fuel 'N Supplies",
-        commodity_name="Copper", quantity_scu=640, price_per_unit=4700,
-        cargo_transfer_type=cargo_transfer_type, cargo_transfer_fee=0,
+        id=uuid.uuid4(), run_id=uuid.uuid4(), leg_type=LegType.SALE, terminal_id=2,
+        terminal_name="Admin - Rod's Fuel 'N Supplies", commodity_name="Copper", quantity_scu=640,
+        price_per_unit=4700, cargo_transfer_type=cargo_transfer_type, cargo_transfer_fee=0,
         created_at=datetime.now(UTC), started_at=datetime.now(UTC),
         reached_at=None, transaction_completed_at=None, transferred_at=None, finalized_at=None,
     )
     fields.update(overrides)
-    return TradeLeg(**fields)
-
-
-class _FakeSession:
-    def __init__(self, leg):
-        self._leg = leg
-        self.committed = False
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *exc):
-        return False
-
-    async def get(self, model, entity_id):
-        return self._leg
-
-    async def commit(self):
-        self.committed = True
+    return TradeLegOut.model_validate(fields)
 
 
 async def _returning(value):
@@ -51,9 +38,25 @@ async def _returning(value):
 
 
 def _wire(monkeypatch, leg):
+    """leg is shared by reference across fakes, so a mutation from one call (e.g. the
+    catch-up advance) is visible to the next (the sale itself) — matches how the real
+    server's single row persists between calls."""
     monkeypatch.setattr(resolver, "resolve_leg", lambda **kwargs: _returning(leg))
-    from db import trade_run_store
-    monkeypatch.setattr(trade_run_store, "SessionLocal", lambda: _FakeSession(leg))
+
+    async def _fake_advance_leg(leg_id):
+        setattr(leg, next_unset_field(leg), datetime.now(UTC))
+        return leg
+
+    async def _fake_record_sale(leg_id, quantity_scu, price_per_unit, cargo_transfer_type, cargo_transfer_fee):
+        leg.quantity_scu = quantity_scu
+        leg.price_per_unit = price_per_unit
+        leg.cargo_transfer_type = cargo_transfer_type
+        leg.cargo_transfer_fee = cargo_transfer_fee
+        leg.transaction_completed_at = datetime.now(UTC)
+        return leg
+
+    monkeypatch.setattr(ledger_client, "advance_leg", _fake_advance_leg)
+    monkeypatch.setattr(ledger_client, "record_sale", _fake_record_sale)
 
 
 async def _sell(price=4567):

@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: graphling
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: graphling
+    # No published port — same as Flockt's own `db` service. Once a server mediates
+    # every ledger read/write, Postgres never needs to be reachable from outside this
+    # box at all; only the `server` container below talks to it, over the compose
+    # network at postgres:5432.
+    volumes:
+      - graphling_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U graphling"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  server:
+    image: graphling-server:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TRADE_DB_URL: postgresql://graphling:${POSTGRES_PASSWORD}@postgres:5432/graphling
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET}
+      DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+    # Bound to loopback only, not 0.0.0.0 — nginx (already on this box, see
+    # docs/deploy.md) is the only path in, proxying api.heyalice.help to here, same
+    # shape as Flockt's app.flockt.farm -> 127.0.0.1:8088.
+    ports:
+      - "127.0.0.1:8090:8000"
+
+volumes:
+  graphling_pgdata:

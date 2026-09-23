@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import QTabWidget, QVBoxLayout, QWidget
 from qasync import asyncSlot
 
-from db import trade_run_store
+import ledger_client
 from overlay import theme
 from overlay.theme import HudWindow
 
@@ -59,7 +59,7 @@ class OverlayCanvas(HudWindow):
         self.tabs.blockSignals(False)
 
         try:
-            await trade_run_store.create_run_from_route(route, int(round(quantity)), ship)
+            await ledger_client.create_run_from_route(route, int(round(quantity)), ship)
         except Exception as exc:
             self.trade_runs_panel.show_message(f"Couldn't create run — {exc}")
         else:

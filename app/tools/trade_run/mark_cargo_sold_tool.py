@@ -2,8 +2,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+import ledger_client
 from db import trade_run_store
-from db.models import CargoTransferType, LegMilestone, LegType, TradeLeg
+from db.models import CargoTransferType, LegMilestone, LegType
+from ledger_schemas import TradeLegOut
 from tools.trade_run import resolver
 from tools.trade_run.resolver import AmbiguousLegError
 from tools.uplink_tool import UplinkTool
@@ -98,20 +100,20 @@ class MarkCargoSoldTool(UplinkTool):
                 caught_up_steps.append("unloading")
 
             if caught_up_steps:
-                leg = await self._safe_run(trade_run_store.catch_up_before_transaction(leg))
-                if not isinstance(leg, TradeLeg):
+                leg = await self._safe_run(ledger_client.catch_up_before_transaction(leg))
+                if not isinstance(leg, TradeLegOut):
                     return leg
                 next_step = trade_run_store.next_unset_field(leg)
 
             if next_step is LegMilestone.TRANSACTION_COMPLETED_AT:
-                result = await self._safe_run(trade_run_store.record_sale(
+                result = await self._safe_run(ledger_client.record_sale(
                     leg_id=leg.id,
                     quantity_scu=quantity_scu,
                     price_per_unit=price_per_unit,
                     cargo_transfer_type=cargo_transfer_type,
                     cargo_transfer_fee=cargo_transfer_fee,
                 ))
-                if isinstance(result, TradeLeg):
+                if isinstance(result, TradeLegOut):
                     # TRANSACTION_COMPLETED_AT is always the sale sequence's second-to-last
                     # field for both cargo_transfer_types (see trade_run_store's
                     # _SALE_MANUAL_SEQUENCE / _SALE_AUTOLOAD_SEQUENCE), so this always lands

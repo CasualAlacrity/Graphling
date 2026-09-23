@@ -2,8 +2,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+import ledger_client
 from db import trade_run_store
-from db.models import LegMilestone, LegType, TradeLeg
+from db.models import LegMilestone, LegType
+from ledger_schemas import TradeLegOut
 from tools.trade_run import resolver
 from tools.trade_run.resolver import AmbiguousLegError
 from tools.uplink_tool import UplinkTool
@@ -43,8 +45,8 @@ class ConfirmCargoLoadedTool(UplinkTool):
             leg = await resolver.resolve_leg(leg_type=LegType.ACQUISITION, commodity=commodity, terminal=terminal)
             next_step = trade_run_store.next_unset_field(leg)
             if next_step is LegMilestone.TRANSFERRED_AT:
-                result = await self._safe_run(trade_run_store.advance_leg(leg.id))
-                if isinstance(result, TradeLeg):
+                result = await self._safe_run(ledger_client.advance_leg(leg.id))
+                if isinstance(result, TradeLegOut):
                     # TRANSFERRED_AT is always the acquisition sequence's second-to-last
                     # field (see trade_run_store's _ACQUISITION_SEQUENCE), so this always
                     # lands on FINALIZED_AT — the one milestone no AI tool is allowed to

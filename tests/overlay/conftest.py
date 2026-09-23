@@ -9,6 +9,7 @@ import qasync
 from doubles import make_fake_cache, make_route, make_trade_run
 from PySide6.QtWidgets import QApplication
 
+import ledger_client
 from db import trade_run_store
 from overlay import theme
 
@@ -115,12 +116,12 @@ def wired_panels(qasync_loop, monkeypatch, fake_cache):
 @pytest.fixture
 def wired_canvas(wired_panels, monkeypatch):
     """An OverlayCanvas with FilterPanel/ResultsPanel from wired_panels plus fresh
-    TradeRunsPanel/TradeLedgerPanel, and trade_run_store's DB-touching functions
-    replaced by an in-memory store — the pure functions (current_step_title,
-    run_investment, etc.) are left real, so rendering reflects real logic operating on
-    fake data. A single patch on the shared `db.trade_run_store` module object covers
-    both overlay_canvas.py and trade_runs_panel.py, since both do `from db import
-    trade_run_store` (module access), not `from db.trade_run_store import name`."""
+    TradeRunsPanel/TradeLedgerPanel, and ledger_client's DB-touching functions replaced
+    by an in-memory store — the pure functions (current_step_title, run_investment,
+    etc.), still on db.trade_run_store, are left real, so rendering reflects real logic
+    operating on fake data. A single patch on the shared `ledger_client` module object
+    covers both overlay_canvas.py and trade_runs_panel.py, since both do `import
+    ledger_client` (module access), not `from ledger_client import name`."""
     from overlay import overlay_canvas as overlay_canvas_module
     from overlay import trade_runs_panel as trade_runs_panel_module
 
@@ -206,14 +207,14 @@ def wired_canvas(wired_panels, monkeypatch):
         call_log.append(("delete_run", run_id))
         store_state["in_progress"] = [run for run in store_state["in_progress"] if run.id != run_id]
 
-    monkeypatch.setattr(trade_run_store, "create_run_from_route", fake_create_run_from_route)
-    monkeypatch.setattr(trade_run_store, "get_in_progress_runs", fake_get_in_progress_runs)
-    monkeypatch.setattr(trade_run_store, "get_finalized_runs", fake_get_finalized_runs)
-    monkeypatch.setattr(trade_run_store, "advance_leg", fake_advance_leg)
-    monkeypatch.setattr(trade_run_store, "record_purchase", fake_record_purchase)
-    monkeypatch.setattr(trade_run_store, "record_sale", fake_record_sale)
-    monkeypatch.setattr(trade_run_store, "finalize_run", fake_finalize_run)
-    monkeypatch.setattr(trade_run_store, "delete_run", fake_delete_run)
+    monkeypatch.setattr(ledger_client, "create_run_from_route", fake_create_run_from_route)
+    monkeypatch.setattr(ledger_client, "get_in_progress_runs", fake_get_in_progress_runs)
+    monkeypatch.setattr(ledger_client, "get_finalized_runs", fake_get_finalized_runs)
+    monkeypatch.setattr(ledger_client, "advance_leg", fake_advance_leg)
+    monkeypatch.setattr(ledger_client, "record_purchase", fake_record_purchase)
+    monkeypatch.setattr(ledger_client, "record_sale", fake_record_sale)
+    monkeypatch.setattr(ledger_client, "finalize_run", fake_finalize_run)
+    monkeypatch.setattr(ledger_client, "delete_run", fake_delete_run)
 
     trade_runs_panel = trade_runs_panel_module.TradeRunsPanel()
     trade_ledger_panel = trade_runs_panel_module.TradeLedgerPanel()

@@ -2,8 +2,10 @@ import os
 
 from rapidfuzz import fuzz
 
+import ledger_client
 from db import trade_run_store
-from db.models import LegType, TradeLeg, TradeRun
+from db.models import LegType
+from ledger_schemas import TradeLegOut, TradeRunOut
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.matching import LOW_CONFIDENCE_MAX, match_by_name_or_code_with_score
 
@@ -13,7 +15,7 @@ uex_client = UEXCorpClient(
 )
 
 
-def _describe_run(run: TradeRun) -> str:
+def _describe_run(run: TradeRunOut) -> str:
     # Set, not list — an ordinary run's acquisition and sale legs share one commodity
     # name, and repeating it ("Copper, Copper") would read like a typo, not emphasis.
     commodities = sorted({leg.commodity_name for leg in run.legs})
@@ -22,7 +24,7 @@ def _describe_run(run: TradeRun) -> str:
     return f"{ship_part} ({commodity_part})"
 
 
-def _describe_leg(run: TradeRun, leg: TradeLeg) -> str:
+def _describe_leg(run: TradeRunOut, leg: TradeLegOut) -> str:
     ship_part = f"in the {run.ship}" if run.ship else "on an unassigned ship"
     return f"{leg.commodity_name} at {leg.terminal_name} {ship_part}"
 
@@ -33,7 +35,7 @@ class AmbiguousLegError(Exception):
     own (two concurrent copper runs from the same terminal, different ships), and the
     message this builds is what every catching tool relays to the pilot verbatim."""
 
-    def __init__(self, candidates: list[tuple[TradeRun, TradeLeg]]):
+    def __init__(self, candidates: list[tuple[TradeRunOut, TradeLegOut]]):
         self.candidates = candidates
         descriptions = "; ".join(_describe_leg(run, leg) for run, leg in candidates)
         super().__init__(
@@ -43,7 +45,7 @@ class AmbiguousLegError(Exception):
 
 
 class AmbiguousRunError(Exception):
-    def __init__(self, candidates: list[TradeRun]):
+    def __init__(self, candidates: list[TradeRunOut]):
         self.candidates = candidates
         descriptions = "; ".join(_describe_run(run) for run in candidates)
         super().__init__(
@@ -69,9 +71,9 @@ def _confident_match(query, items):
 
 async def resolve_leg(
         leg_type: LegType | None = None, commodity: str | None = None, terminal: str | None = None
-) -> TradeLeg:
+) -> TradeLegOut:
     cache = await uex_client.get_uex_cache()
-    current_runs = await trade_run_store.get_in_progress_runs()
+    current_runs = await ledger_client.get_in_progress_runs()
 
     matched_commodity = _confident_match(commodity, cache.commodities)
     matched_terminal = _confident_match(terminal, cache.terminals)
@@ -100,12 +102,12 @@ async def resolve_leg(
     return matches[0][1] if matches else None
 
 
-async def resolve_run(ship: str | None = None) -> TradeRun:
+async def resolve_run(ship: str | None = None) -> TradeRunOut:
     """Resolves to a single active TradeRun — no UEX lookup involved, since ship here is
     just matched against each run's own stored ship string, not a reference catalog. With
     no hint, or only one active run regardless of hint, that run is the answer; with more
     than one candidate this raises AmbiguousRunError instead of guessing."""
-    current_runs = await trade_run_store.get_in_progress_runs()
+    current_runs = await ledger_client.get_in_progress_runs()
 
     if ship:
         matches = [run for run in current_runs if run.ship and fuzz.partial_ratio(ship.lower(), run.ship.lower()) >= 60]

@@ -2,8 +2,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from db import trade_run_store
-from db.models import LegType
+import ledger_client
 from tools.trade_run import route_cache
 from tools.uplink_tool import UplinkTool
 
@@ -49,9 +48,8 @@ class StartTradeRunTool(UplinkTool):
         if qty <= 0:
             return "That route can't fill any cargo right now — origin or destination stock is at zero."
 
-        run = await trade_run_store.create_run_from_route(route, qty, vehicle_name)
+        await ledger_client.create_run_from_route(route, qty, vehicle_name)
 
-        acquisition = next(leg for leg in run.legs if leg.leg_type == LegType.ACQUISITION)
         return (
             f"Run started — {route.commodity_name}, from {route.origin_terminal_name} to "
             f"{route.destination_terminal_name}."

@@ -37,3 +37,15 @@ alembic>=1.13
 # Trade route tracker (overlay UI)
 PySide6>=6.7
 qasync>=0.27
+
+# Ledger server (app/server/) — mediates Postgres access behind Discord OAuth + JWT.
+# Not needed to run the desktop client itself, only the server (see server/README or
+# scripts/mac/run-server.sh), but kept in one requirements.txt rather than a second file
+# since both run from the same repo/venv in local dev.
+fastapi>=0.115
+uvicorn[standard]>=0.32
+pydantic-settings>=2.5
+python-jose[cryptography]>=3.3
+
+# Ledger client (ledger_client.py) — the desktop client's HTTP calls to the server above.
+httpx>=0.27

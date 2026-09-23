@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 )
 from qasync import asyncSlot
 
+import ledger_client
 from db import trade_run_store
 from db.models import LegMilestone, LegType
 from overlay import theme, uex_lookup
@@ -261,7 +262,7 @@ class TradeRunsPanel(HudWindow):
     @asyncSlot()
     async def refresh(self):
         try:
-            runs = await trade_run_store.get_in_progress_runs()
+            runs = await ledger_client.get_in_progress_runs()
         except Exception as exc:
             self.show_message(f"Couldn't load trade runs — {exc}")
             return
@@ -539,7 +540,7 @@ class TradeRunsPanel(HudWindow):
     @asyncSlot(object)
     async def _on_advance(self, leg_id):
         try:
-            await trade_run_store.advance_leg(leg_id)
+            await ledger_client.advance_leg(leg_id)
         except Exception as exc:
             self.show_message(f"Couldn't update leg — {exc}")
             return
@@ -548,7 +549,7 @@ class TradeRunsPanel(HudWindow):
     @asyncSlot(object, object, object, object, object)
     async def _on_record_purchase(self, leg_id, quantity_scu, price_per_unit, cargo_transfer_type, cargo_transfer_fee):
         try:
-            await trade_run_store.record_purchase(
+            await ledger_client.record_purchase(
                 leg_id, quantity_scu, price_per_unit, cargo_transfer_type, cargo_transfer_fee
             )
         except Exception as exc:
@@ -560,7 +561,7 @@ class TradeRunsPanel(HudWindow):
     @asyncSlot(object, object, object, object, object)
     async def _on_record_sale(self, leg_id, quantity_scu, price_per_unit, cargo_transfer_type, cargo_transfer_fee):
         try:
-            await trade_run_store.record_sale(
+            await ledger_client.record_sale(
                 leg_id, quantity_scu, price_per_unit, cargo_transfer_type, cargo_transfer_fee
             )
         except Exception as exc:
@@ -572,7 +573,7 @@ class TradeRunsPanel(HudWindow):
     @asyncSlot(object)
     async def _on_finalize(self, run_id):
         try:
-            await trade_run_store.finalize_run(run_id)
+            await ledger_client.finalize_run(run_id)
         except Exception as exc:
             self.show_message(f"Couldn't finalize run — {exc}")
             return
@@ -582,7 +583,7 @@ class TradeRunsPanel(HudWindow):
     @asyncSlot(object)
     async def _on_abandon(self, run_id):
         try:
-            await trade_run_store.delete_run(run_id)
+            await ledger_client.delete_run(run_id)
         except Exception as exc:
             self.show_message(f"Couldn't remove run — {exc}")
             return
@@ -639,7 +640,7 @@ class TradeLedgerPanel(HudWindow):
     @asyncSlot()
     async def refresh(self):
         try:
-            runs = await trade_run_store.get_finalized_runs()
+            runs = await ledger_client.get_finalized_runs()
         except Exception as exc:
             self.show_message(f"Couldn't load the ledger — {exc}")
             return

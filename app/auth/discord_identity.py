@@ -1,17 +1,26 @@
-"""One-time Discord login for a stable per-pilot identity.
+"""One-time Discord login for a stable per-pilot session, relayed through ALICE's own
+ledger server (app/server/) rather than talking to Discord directly.
 
-Authorization Code + PKCE, no client secret — ALICE is a distributed desktop app with
-nowhere safe to keep one (anyone could pull it out of an installed copy), and Discord's
-"Public Client" setting exists for exactly this case. See docs/todo.md's Phase 2 section
-for how the resulting identity feeds thread_id/user_id.
+ALICE used to do the whole OAuth PKCE dance itself (public client, no secret — a
+desktop app has nowhere safe to keep one). Now that a real server sits in front of the
+trade ledger, the server holds the Discord client secret and does the actual exchange
+independently — the "verified with Discord" property a client claiming its own identity
+can't provide. This module's job shrinks to: open a browser at the server's login
+endpoint, and catch the JWT it hands back.
 
-Only ever needs the `identify` scope. The goal is a durable Discord user id to key the
-trade ledger by, not ongoing API access — so the identity is cached locally after the
-first login and the access token itself is discarded immediately after the one /users/@me
-call. Nothing here refreshes a token or calls Discord again once the cache is warm.
+Flow (see server/routes/auth.py for the other half):
+1. Start a one-shot local listener (unchanged from the old PKCE flow) and open
+   {ALICE_API_URL}/auth/discord/login?redirect_uri=<listener>&client_state=<state> —
+   the server's URL, not Discord's.
+2. The server does its own exchange with Discord, then redirects the browser back to
+   the listener with ?token=<jwt>&username=<name>&state=<state>.
+3. Validate state, cache {token, username}, done.
+
+Only ever needs one round trip. The goal is a durable session to key the trade ledger
+by, not ongoing interactive use — so the session is cached locally after the first
+login and nothing here refreshes it until it expires (server-issued JWTs currently last
+7 days — see server/config.py's jwt_expire_minutes).
 """
-import base64
-import hashlib
 import json
 import os
 import secrets
@@ -22,47 +31,40 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse
 
-import requests
+import httpx
 
-AUTHORIZE_URL = "https://discord.com/oauth2/authorize"
-TOKEN_URL = "https://discord.com/api/oauth2/token"
-IDENTIFY_URL = "https://discord.com/api/users/@me"
 DEFAULT_REDIRECT_URI = "http://localhost:8765/callback"
 
-# Not a secret — just a Discord user id + username, cached so login only ever happens
-# once per install. Per-user home directory, not the repo, same reasoning as any other
-# local machine state.
+# Not a secret store — just a JWT + display name, cached so login only ever happens once
+# per install (until the token expires). Per-user home directory, not the repo, same
+# reasoning as any other local machine state.
 IDENTITY_CACHE_PATH = Path.home() / ".alice" / "identity.json"
 
 
 @dataclass
-class PilotIdentity:
-    user_id: str
+class PilotSession:
+    token: str
     username: str
 
 
-def _load_cached_identity() -> PilotIdentity | None:
+def _api_url() -> str:
+    return os.getenv("ALICE_API_URL", "http://localhost:8000").rstrip("/")
+
+
+def _load_cached_session() -> PilotSession | None:
     if not IDENTITY_CACHE_PATH.exists():
         return None
     try:
         data = json.loads(IDENTITY_CACHE_PATH.read_text())
-        return PilotIdentity(user_id=data["user_id"], username=data["username"])
+        return PilotSession(token=data["token"], username=data["username"])
     except (json.JSONDecodeError, KeyError):
         # A corrupted cache shouldn't block startup — just log in again and overwrite it.
         return None
 
 
-def _save_cached_identity(identity: PilotIdentity) -> None:
+def _save_cached_session(session: PilotSession) -> None:
     IDENTITY_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    IDENTITY_CACHE_PATH.write_text(json.dumps({"user_id": identity.user_id, "username": identity.username}))
-
-
-def _pkce_pair() -> tuple[str, str]:
-    # 86 chars from 64 random bytes — comfortably inside RFC 7636's 43-128 range, and
-    # token_urlsafe's alphabet (A-Za-z0-9-_) is already a subset of PKCE's allowed set.
-    verifier = secrets.token_urlsafe(64)
-    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
-    return verifier, challenge
+    IDENTITY_CACHE_PATH.write_text(json.dumps({"token": session.token, "username": session.username}))
 
 
 class _CallbackHandler(BaseHTTPRequestHandler):
@@ -73,7 +75,8 @@ class _CallbackHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         params = parse_qs(urlparse(self.path).query)
         self.server.result = {
-            "code": params.get("code", [None])[0],
+            "token": params.get("token", [None])[0],
+            "username": params.get("username", [None])[0],
             "state": params.get("state", [None])[0],
             "error": params.get("error", [None])[0],
         }
@@ -93,64 +96,52 @@ def _await_callback(port: int) -> dict:
     return server.result
 
 
-async def login() -> PilotIdentity:
-    """Runs the full Discord OAuth PKCE flow once and returns the pilot's identity."""
-    client_id = os.getenv("DISCORD_CLIENT_ID")
-    if not client_id:
-        raise ValueError("DISCORD_CLIENT_ID is not set — see .env-template's OAuth section.")
-    redirect_uri = os.getenv("DISCORD_REDIRECT_URI", DEFAULT_REDIRECT_URI)
+async def login() -> PilotSession:
+    """Opens ALICE's server-side login endpoint and returns the resulting session."""
+    redirect_uri = os.getenv("DISCORD_LOCAL_REDIRECT_URI", DEFAULT_REDIRECT_URI)
     port = urlparse(redirect_uri).port
 
-    verifier, challenge = _pkce_pair()
     state = secrets.token_urlsafe(16)
-    authorize_url = f"{AUTHORIZE_URL}?" + urlencode({
-        "response_type": "code",
-        "client_id": client_id,
-        "scope": "identify",
+    login_url = f"{_api_url()}/auth/discord/login?" + urlencode({
         "redirect_uri": redirect_uri,
-        "state": state,
-        "code_challenge": challenge,
-        "code_challenge_method": "S256",
+        "client_state": state,
     })
-    webbrowser.open(authorize_url)
+    webbrowser.open(login_url)
 
     # The wait for the pilot to actually complete the browser flow is unbounded, unlike
     # every other network call in this codebase (which use a fixed timeout) — this has
     # to run off the event loop or it'd stall everything else ALICE is doing.
     result = await get_running_loop().run_in_executor(None, _await_callback, port)
 
-    if result is None or result.get("error") or not result.get("code"):
-        raise RuntimeError(f"Discord login failed or was cancelled: {result}")
+    if result is None or result.get("error") or not result.get("token"):
+        raise RuntimeError(f"ALICE login failed or was cancelled: {result}")
     if result.get("state") != state:
-        raise RuntimeError("Discord login response didn't match the request that started it — aborting.")
+        raise RuntimeError("Login response didn't match the request that started it — aborting.")
 
-    token_response = requests.post(
-        TOKEN_URL,
-        data={
-            "client_id": client_id,
-            "grant_type": "authorization_code",
-            "code": result["code"],
-            "redirect_uri": redirect_uri,
-            "code_verifier": verifier,
-        },
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-    )
-    token_response.raise_for_status()
-    access_token = token_response.json()["access_token"]
-
-    identify_response = requests.get(IDENTIFY_URL, headers={"Authorization": f"Bearer {access_token}"})
-    identify_response.raise_for_status()
-    profile = identify_response.json()
-
-    identity = PilotIdentity(user_id=profile["id"], username=profile["username"])
-    _save_cached_identity(identity)
-    return identity
+    session = PilotSession(token=result["token"], username=result.get("username") or "pilot")
+    _save_cached_session(session)
+    return session
 
 
-async def get_pilot_identity() -> PilotIdentity:
-    """The entry point everything else calls — the cached identity if one exists,
-    otherwise runs the login flow once and caches the result for next time."""
-    cached = _load_cached_identity()
-    if cached is not None:
+async def _is_valid(session: PilotSession) -> bool:
+    try:
+        async with httpx.AsyncClient(base_url=_api_url(), timeout=10) as client:
+            response = await client.get("/auth/users/me", headers={"Authorization": f"Bearer {session.token}"})
+        return response.status_code == 200
+    except httpx.HTTPError:
+        # Server unreachable shouldn't force a re-login the pilot can't complete either —
+        # let the cached (possibly still-good) session through and fail later if it's
+        # actually expired, rather than compounding one outage into a second one.
+        return True
+
+
+async def get_pilot_session() -> PilotSession:
+    """The entry point everything else calls — the cached session if one exists and
+    still validates against the server, otherwise runs the login flow once and caches
+    the result for next time. Checked here rather than left to fail on the first real
+    ledger call, so an expired token surfaces as one clear re-login instead of a
+    confusing 401 from whatever tool the pilot happened to use first."""
+    cached = _load_cached_session()
+    if cached is not None and await _is_valid(cached):
         return cached
     return await login()

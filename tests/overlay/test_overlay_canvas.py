@@ -26,8 +26,8 @@ def test_add_route_requested_failure_surfaces_message(qasync_loop, wired_canvas,
     async def failing_create_run_from_route(route, quantity_scu, ship):
         raise ConnectionError("Postgres unreachable")
 
-    from db import trade_run_store
-    monkeypatch.setattr(trade_run_store, "create_run_from_route", failing_create_run_from_route)
+    import ledger_client
+    monkeypatch.setattr(ledger_client, "create_run_from_route", failing_create_run_from_route)
 
     async def scenario():
         await canvas._on_add_route_requested(route)

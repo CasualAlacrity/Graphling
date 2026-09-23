@@ -2,8 +2,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+import ledger_client
 from db import trade_run_store
-from db.models import LegMilestone, TradeLeg
+from db.models import LegMilestone
+from ledger_schemas import TradeLegOut
 from tools.trade_run import resolver
 from tools.trade_run.resolver import AmbiguousLegError
 from tools.uplink_tool import UplinkTool
@@ -44,8 +46,8 @@ class MarkArrivedTool(UplinkTool):
         try:
             leg = await resolver.resolve_leg(commodity=commodity, terminal=terminal)
             if trade_run_store.next_unset_field(leg) == LegMilestone.REACHED_AT:
-                result = await self._safe_run(trade_run_store.advance_leg(leg.id))
-                if isinstance(result, TradeLeg):
+                result = await self._safe_run(ledger_client.advance_leg(leg.id))
+                if isinstance(result, TradeLegOut):
                     next_step = trade_run_store.next_unset_field(result)
                     return (f"Advanced leg: {result.commodity_name} at {result.terminal_name} "
                             f"from {LegMilestone.REACHED_AT} to {next_step}")

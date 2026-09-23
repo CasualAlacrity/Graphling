@@ -23,7 +23,7 @@ alice-voice = "voice:main"
 # app/ is the package root rather than a package itself.
 [tool.setuptools]
 package-dir = { "" = "app" }
-py-modules = ["graph", "llm", "prompt_loader"]
+py-modules = ["graph", "llm", "prompt_loader", "ledger_schemas", "ledger_client"]
 
 [tool.setuptools.packages.find]
 where = ["app"]
@@ -38,6 +38,11 @@ src = ["app"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# B008 (no function calls in argument defaults) flags FastAPI's own Depends(...) idiom —
+# a real anti-pattern in general, but exactly how FastAPI's DI is meant to be used.
+"app/server/**" = ["B008"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

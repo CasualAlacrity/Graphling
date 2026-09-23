@@ -2,6 +2,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+import ledger_client
 from db import trade_run_store
 from tools.uplink_tool import UplinkTool
 
@@ -25,7 +26,7 @@ class TradeRunStatusTool(UplinkTool):
     progress_label: str = "Checking trade run, looking for current status."
 
     async def _arun(self, *args: Any, **kwargs: Any) -> Any:
-        result = await self._safe_run(trade_run_store.get_in_progress_runs())
+        result = await self._safe_run(ledger_client.get_in_progress_runs())
         if not isinstance(result, list):
             return result
         if not result:

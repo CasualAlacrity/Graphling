@@ -54,6 +54,12 @@ is meant to be the foundation richer memory could build on later, not a replacem
   needing semantic retrieval.
 - **Ollama** — local model support alongside hosted providers (OpenAI/Anthropic), swappable via a
   provider-agnostic `get_llm()`-style helper.
+- **FastAPI ledger server (`app/server/`), added 2026-09-25.** The one exception to "just
+  ALICE is the whole deployable surface": Postgres is no longer reachable from the desktop
+  client directly (see `docs/todo.md` Phase 2) — a small server mediates every trade-ledger
+  read/write over HTTPS, authenticated by Discord OAuth + JWT rather than network location.
+  It is *not* the agent — LangGraph/tools/voice all stay client-side; the server only knows
+  about the ledger and login. See `docs/deploy.md` for how it's deployed and run locally.
 
 ## Key decisions
 

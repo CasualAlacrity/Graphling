@@ -2,8 +2,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+import ledger_client
 from db import trade_run_store
-from db.models import CargoTransferType, LegMilestone, LegType, TradeLeg
+from db.models import CargoTransferType, LegMilestone, LegType
+from ledger_schemas import TradeLegOut
 from tools.trade_run import resolver
 from tools.trade_run.resolver import AmbiguousLegError
 from tools.uplink_tool import UplinkTool
@@ -87,20 +89,20 @@ class MarkCargoAcquiredTool(UplinkTool):
 
             caught_up = next_step is LegMilestone.REACHED_AT
             if caught_up:
-                leg = await self._safe_run(trade_run_store.catch_up_before_transaction(leg))
-                if not isinstance(leg, TradeLeg):
+                leg = await self._safe_run(ledger_client.catch_up_before_transaction(leg))
+                if not isinstance(leg, TradeLegOut):
                     return leg
                 next_step = trade_run_store.next_unset_field(leg)
 
             if next_step is LegMilestone.TRANSACTION_COMPLETED_AT:
-                result = await self._safe_run(trade_run_store.record_purchase(
+                result = await self._safe_run(ledger_client.record_purchase(
                     leg_id=leg.id,
                     quantity_scu=quantity_scu,
                     price_per_unit=price_per_unit,
                     cargo_transfer_type=cargo_transfer_type,
                     cargo_transfer_fee=cargo_transfer_fee,
                 ))
-                if isinstance(result, TradeLeg):
+                if isinstance(result, TradeLegOut):
                     if caught_up:
                         return (f"Recorded arrival and the purchase for {result.commodity_name} "
                                 f"at {result.terminal_name}.")

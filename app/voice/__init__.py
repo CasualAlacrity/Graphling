@@ -13,9 +13,7 @@ import uuid
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 
-from auth.discord_identity import get_pilot_identity
-from db.current_user import set_current_user_id
-from db.user_service import get_or_create_user
+from auth.discord_identity import get_pilot_session
 from voice.audio_output import play_audio
 from voice.tts import synthesize
 from voice.voice_input import listen_once, load_whisper
@@ -36,29 +34,24 @@ async def run() -> None:
 
     load_whisper("base")
 
-    # Identity, the UEX vocabulary cache, and warming the LLMs (graph.prewarm — see its
-    # own docstring for why) are all independent of each other — run them concurrently
-    # rather than one after another. On a first-time install this also means the
-    # prewarm and the UEX fetch happen *while* the pilot is off in their browser doing
-    # the one-time Discord login, not queued up after it.
-    identity, cache, _ = await asyncio.gather(
-        get_pilot_identity(),
+    # The session, the UEX vocabulary cache, and warming the LLMs (graph.prewarm — see
+    # its own docstring for why) are all independent of each other — run them
+    # concurrently rather than one after another. On a first-time install this also
+    # means the prewarm and the UEX fetch happen *while* the pilot is off in their
+    # browser doing the one-time login, not queued up after it.
+    session, cache, _ = await asyncio.gather(
+        get_pilot_session(),
         uex_client.get_uex_cache(),
         prewarm(),
     )
-    print(f"[ALICE] Signed in as {identity.username}.")
-    # Scopes every trade_run_store read/write to this pilot for the rest of the process
-    # (db/current_user.py) — must happen before anything in the overlay or voice loop can
-    # touch the ledger, which is why it's right here rather than deferred into the loop.
-    # get_or_create_user maps the Discord id to (and creates, on a first-ever login) the
-    # local users row TradeRun/TradeLeg.user_id actually FKs to.
-    user = await get_or_create_user(identity.user_id)
-    set_current_user_id(user.id)
-    # thread_id carries the pilot's id so a shared checkpointer (Phase 2) can tell whose
+    print(f"[ALICE] Signed in as {session.username}.")
+    # Ledger ownership is resolved server-side per-request from this session's token now
+    # (server/dependencies.get_current_user) — nothing to set up client-side for it.
+    # thread_id carries the pilot's name so a shared checkpointer (Phase 2) can tell whose
     # thread is whose — MemorySaver doesn't need it today (one process per pilot already
     # isolates them), but every thread_id being wrong-shaped until then is exactly the
     # kind of thing that's cheap to get right now and a migration to fix later.
-    thread_id = f"{identity.user_id}:{uuid.uuid4()}"
+    thread_id = f"{session.username}:{uuid.uuid4()}"
     config = {"configurable": {"thread_id": thread_id}}
 
     # Whisper has no built-in awareness that "Railen" or "Baijini Point" are expected
