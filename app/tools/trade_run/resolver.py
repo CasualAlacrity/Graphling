@@ -13,14 +13,43 @@ uex_client = UEXCorpClient(
 )
 
 
+def _describe_run(run: TradeRun) -> str:
+    # Set, not list — an ordinary run's acquisition and sale legs share one commodity
+    # name, and repeating it ("Copper, Copper") would read like a typo, not emphasis.
+    commodities = sorted({leg.commodity_name for leg in run.legs})
+    commodity_part = " and ".join(commodities) if commodities else "no commodity yet"
+    ship_part = f"the {run.ship}" if run.ship else "an unassigned ship"
+    return f"{ship_part} ({commodity_part})"
+
+
+def _describe_leg(run: TradeRun, leg: TradeLeg) -> str:
+    ship_part = f"in the {run.ship}" if run.ship else "on an unassigned ship"
+    return f"{leg.commodity_name} at {leg.terminal_name} {ship_part}"
+
+
 class AmbiguousLegError(Exception):
-    def __init__(self, candidates: list[TradeLeg]):
+    """candidates pairs each matching leg with its own run — not just the leg — because
+    a bare leg (commodity + terminal) isn't always enough to tell two runs apart on its
+    own (two concurrent copper runs from the same terminal, different ships), and the
+    message this builds is what every catching tool relays to the pilot verbatim."""
+
+    def __init__(self, candidates: list[tuple[TradeRun, TradeLeg]]):
         self.candidates = candidates
+        descriptions = "; ".join(_describe_leg(run, leg) for run, leg in candidates)
+        super().__init__(
+            f"You've got {len(candidates)} legs matching that, and I'm not sure which one "
+            f"you mean — {descriptions}. Which one?"
+        )
 
 
 class AmbiguousRunError(Exception):
     def __init__(self, candidates: list[TradeRun]):
         self.candidates = candidates
+        descriptions = "; ".join(_describe_run(run) for run in candidates)
+        super().__init__(
+            f"You've got {len(candidates)} active runs, and I'm not sure which one you "
+            f"mean — {descriptions}. Which one?"
+        )
 
 
 def _confident_match(query, items):
@@ -61,14 +90,14 @@ async def resolve_leg(
             if (no_hint_given
                     or (matched_commodity and matched_commodity.name == leg.commodity_name)
                     or (matched_terminal and matched_terminal.name == leg.terminal_name)):
-                matches.append(leg)
+                matches.append((run, leg))
 
     if len(matches) > 1:
         raise AmbiguousLegError(matches)
     elif len(matches) < 1:
         raise ValueError(f"No run with leg for {leg_type} with {commodity} or {terminal}")
 
-    return matches[0] if matches else None
+    return matches[0][1] if matches else None
 
 
 async def resolve_run(ship: str | None = None) -> TradeRun:

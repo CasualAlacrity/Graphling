@@ -47,9 +47,16 @@ class TradeAdvisorTool(UplinkTool):
     scw_client: StarCitizenWikiClient
 
     async def _arun(self, commodity: str | None = None, ship: str | None = None, *args: Any, **kwargs: Any) -> Any:
+        # ship was previously accepted but never passed to resolve_run — a no-op that
+        # meant naming a ship couldn't disambiguate between concurrent runs the way the
+        # arg's own description promises. Separately, ambiguous and absent are different
+        # problems: "start one first" is actively wrong to say when 2+ runs already
+        # exist and the pilot just needs to pick one.
         try:
-            run = await resolver.resolve_run()
-        except (ValueError, AmbiguousRunError):
+            run = await resolver.resolve_run(ship=ship)
+        except AmbiguousRunError as are:
+            return str(are)
+        except ValueError:
             run = None
 
         if run is None:
