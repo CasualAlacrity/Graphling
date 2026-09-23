@@ -221,19 +221,40 @@ SC-focused, but each addition weighed against "would this also serve assistant-A
 someday?" Timers already pass that test and stay. Candidates to be brainstormed
 separately — don't pre-commit a list here.
 
-- [ ] **Confirmed-voice finalize (2026-09-23 decision).** Reverses the locked
-      manual-only-finalize decision on purpose: if the pilot tries to act on a leg that's
-      blocked behind an unfinalized predecessor, ALICE says so and offers to finalize it
-      ("The first leg hasn't been finalized. Want me to do that?"); on "yes" she may. The
-      review-friction the manual-only rule existed for is intentionally traded for less
-      friction here — named explicitly, not walked into. Needs: a `resolve_leg` fix so
-      "blocked by predecessor" is distinguishable from "no such leg" (fixes every
-      milestone tool at once, they all funnel through it); a narrowly-scoped new
-      `finalize_leg` tool (the store-level `advance_leg` already supports this — the
-      restriction was only ever at the tool layer); a decision on whether ALICE
-      auto-retries the originally-blocked action after finalizing or makes the pilot
-      repeat themselves (leaning: auto-retry); two persona-prompt additions (the "why
-      isn't this automatic" explanation, and the auto-retry instruction).
+- [ ] **Confirmed-voice LEG finalize — flagged pain point, not a decision (2026-09-23).**
+      Finalize stays manual-only for now; this is naming a possible future softening, not
+      committing to build it. Scope, if it ever happens: **leg** finalize only, never run
+      finalize — locking a run into the ledger always needs the pilot's own review and
+      click, full stop, no exception. In practice this can only ever fire for the
+      **acquisition** leg — it's the only leg with a next leg in-run that could be
+      blocked behind it; nothing blocks after the sale leg except the run's own finalize,
+      which this never touches.
+
+      A worked scenario ("I sold the copper for 4,567/SCU" while the acquisition leg is
+      still unfinalized) surfaced two real gaps, independent of whether this ever gets
+      built:
+      1. **`resolver.AmbiguousLegError` is broken today.** It never calls
+         `super().__init__()`, so `str(error)` — what every milestone tool returns
+         verbatim to the persona — is Python's raw repr of the candidate list. Verified:
+         `"[<db.models.TradeLeg object at 0x100a41a60>, ...]"`. Any pilot with 2+ active
+         runs who says something ambiguous gets that, or ALICE has nothing usable to
+         relay. Worth fixing on its own regardless of this feature.
+      2. **The scenario needs ALICE to infer arrival + unloading from "I sold it"** —
+         neither was stated — which directly conflicts with the persona prompt's existing
+         section 11 rule: "Only call an action tool when the pilot's own words state that
+         a milestone happened... do not chain further tool calls trying to work around it
+         without new input from the pilot." That line exists so she never invents
+         progress that didn't happen. Reconciling "infer skipped steps from a later
+         statement" with "never invent unstated progress" is a real design question of
+         its own, and overlaps with the already-parked **Force-complete path** / "ask,
+         never accuse" idea (`docs/ledger-trust-and-corrections.md`, Phase 4 backlog).
+
+      If it's ever built: retrying the pilot's original blocked action after a confirmed
+      finalize must use the *specific values the pilot already stated* (e.g. that exact
+      4,567/unit), not just re-call the tool bare and fall back to the leg's originally-
+      planned price — the conversation history already has what's needed; nothing new to
+      build there, but the retry instruction has to say so explicitly or a model will get
+      it subtly wrong.
 - [ ] **User setting to bypass the confirm-before-finalize guard entirely** — an
       intentional pilot opt-in once there's a real client + user-settings surface
       (multi-tenancy, Phase 2+). Not buildable until that infra exists; flagged here so
