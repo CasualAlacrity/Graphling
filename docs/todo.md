@@ -57,7 +57,10 @@ directly.
       just looks it up and commits, no re-resolution. See `docs/start-route-tool.md`.
       Also fixed a real bug this surfaced: `find_best_route` wasn't patching
       `is_auto_load_origin/destination` on its returned routes (`route_ranking.py`).
-    - [ ] Tests still needed — see `docs/start-route-tool.md` "Tests still to add".
+    - [x] **Tests added 2026-09-22** (`5ae0736`) — all 6 cases from `docs/start-route-tool.md`
+          "Tests still to add": `tests/tools/test_start_trade_run_tool.py` and
+          `tests/tools/test_best_route_tool.py` (the runner-up-token case, which turned
+          out to be `best_route_tool`'s concern, not `start_trade_run`'s).
     - [x] **First live voice test run, completed 2026-09-22.** best_route → start_trade_run
           → mark_arrived → mark_cargo_acquired → confirm_cargo_loaded → mark_arrived (sale
           leg) → mark_cargo_sold → Finalize (both legs, manual, in the overlay) — full loop,
