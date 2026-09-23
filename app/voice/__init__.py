@@ -13,6 +13,7 @@ import uuid
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 
+from auth.discord_identity import get_pilot_identity
 from voice.audio_output import play_audio
 from voice.tts import synthesize
 from voice.voice_input import listen_once, load_whisper
@@ -32,7 +33,16 @@ async def run() -> None:
     print("=" * 40)
 
     load_whisper("base")
-    thread_id = str(uuid.uuid4())
+
+    # First launch opens a browser for a one-time Discord login; every launch after
+    # that reads the cached identity straight off disk. thread_id carries the pilot's
+    # id so a shared checkpointer (Phase 2) can tell whose thread is whose — MemorySaver
+    # doesn't need it today (one process per pilot already isolates them), but every
+    # thread_id being wrong-shaped until then is exactly the kind of thing that's cheap
+    # to get right now and a migration to fix later.
+    identity = await get_pilot_identity()
+    print(f"[ALICE] Signed in as {identity.username}.")
+    thread_id = f"{identity.user_id}:{uuid.uuid4()}"
     config = {"configurable": {"thread_id": thread_id}}
 
     # Whisper has no built-in awareness that "Railen" or "Baijini Point" are expected
