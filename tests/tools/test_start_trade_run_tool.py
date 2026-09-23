@@ -5,11 +5,15 @@ surface: best_route stashes a token, and a later turn's start_trade_run must res
 token instead of copying it, or the plumbing losing data along the way (autoload flag,
 quantity override, zero-stock guard). See docs/start-route-tool.md "Tests still to add".
 """
+import uuid
+
 from db import trade_run_store
 from db.models import CargoTransferType
 from tools.trade_run import route_cache
 from tools.trade_run.start_trade_run_tool import StartTradeRunTool
 from tools.uexcorp.trade_data import UEXTradeRoute
+
+_PILOT_ID = uuid.uuid4()
 
 
 def _route(is_auto_load_origin=1, is_auto_load_destination=0, **overrides):
@@ -77,6 +81,7 @@ async def test_happy_path_creates_run_with_correct_cargo_transfer_type(monkeypat
     route = _route(is_auto_load_origin=1, is_auto_load_destination=0)
     token = route_cache.stash(route, 40, "Railen")
     monkeypatch.setattr(trade_run_store, "get_in_progress_runs", _async_return([]))
+    monkeypatch.setattr(trade_run_store, "get_current_user_id", lambda: _PILOT_ID)
     session = _FakeSession()
     monkeypatch.setattr(trade_run_store, "SessionLocal", lambda: session)
 
@@ -85,6 +90,7 @@ async def test_happy_path_creates_run_with_correct_cargo_transfer_type(monkeypat
 
     assert session.committed
     run = session.added
+    assert run.user_id == _PILOT_ID
     assert len(run.legs) == 2
     acquisition = next(leg for leg in run.legs if leg.leg_type.value == "acquisition")
     sale = next(leg for leg in run.legs if leg.leg_type.value == "sale")
@@ -92,6 +98,8 @@ async def test_happy_path_creates_run_with_correct_cargo_transfer_type(monkeypat
     assert sale.cargo_transfer_type == CargoTransferType.MANUAL
     assert acquisition.quantity_scu == 40
     assert sale.quantity_scu == 40
+    assert acquisition.user_id == _PILOT_ID
+    assert sale.user_id == _PILOT_ID
     assert run.ship == "Railen"
     assert "Run started" in message
 
@@ -115,6 +123,7 @@ async def test_quantity_override_replaces_cached_scu_hint(monkeypatch):
     route = _route()
     token = route_cache.stash(route, 40, "Railen")
     monkeypatch.setattr(trade_run_store, "get_in_progress_runs", _async_return([]))
+    monkeypatch.setattr(trade_run_store, "get_current_user_id", lambda: _PILOT_ID)
     session = _FakeSession()
     monkeypatch.setattr(trade_run_store, "SessionLocal", lambda: session)
 
@@ -128,6 +137,7 @@ async def test_cached_scu_hint_used_when_quantity_not_overridden(monkeypatch):
     route = _route()
     token = route_cache.stash(route, 40, "Railen")
     monkeypatch.setattr(trade_run_store, "get_in_progress_runs", _async_return([]))
+    monkeypatch.setattr(trade_run_store, "get_current_user_id", lambda: _PILOT_ID)
     session = _FakeSession()
     monkeypatch.setattr(trade_run_store, "SessionLocal", lambda: session)
 

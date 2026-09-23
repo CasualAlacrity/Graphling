@@ -4,10 +4,21 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from db.current_user import get_current_user_id
 from db.models import CargoTransferType, LegMilestone, LegType, TradeLeg, TradeRun
 from db.session import SessionLocal
 from tools.cargo_packing import format_container_sizes, usable_container_sizes
 from tools.uexcorp.trade_data import UEXTradeRoute
+
+# Multi-tenancy scoping boundary (docs/todo.md Phase 2): create_run_from_route stamps
+# user_id, and get_in_progress_runs/get_finalized_runs filter by it — those are the only
+# two ways a pilot's client ever learns a run/leg id in the first place (resolver.py
+# resolves against get_in_progress_runs; the overlay lists via the same two functions).
+# advance_leg/record_purchase/record_sale/finalize_run/delete_run take an id directly and
+# don't re-check ownership themselves — a UUID from a run/leg you were never handed isn't
+# guessable, so this is scoped transitively rather than duplicating the check at every
+# id-based call. Revisit if that stops being true (e.g. ids start getting shared/logged
+# somewhere cross-tenant).
 
 # started_at is deliberately not in these sequences — a leg is considered "already
 # traveling" from the moment it exists (see create_run_from_route / advance_leg's
@@ -155,7 +166,9 @@ def run_duration(run: TradeRun) -> timedelta:
 
 
 async def create_run_from_route(route: UEXTradeRoute, quantity_scu: int, ship: str | None) -> TradeRun:
+    user_id = get_current_user_id()
     acquisition = TradeLeg(
+        user_id=user_id,
         leg_type=LegType.ACQUISITION,
         terminal_id=route.origin_terminal_id,
         terminal_name=route.origin_terminal_name,
@@ -168,6 +181,7 @@ async def create_run_from_route(route: UEXTradeRoute, quantity_scu: int, ship: s
         started_at=datetime.now(UTC),
     )
     sale = TradeLeg(
+        user_id=user_id,
         leg_type=LegType.SALE,
         terminal_id=route.destination_terminal_id,
         terminal_name=route.destination_terminal_name,
@@ -179,7 +193,10 @@ async def create_run_from_route(route: UEXTradeRoute, quantity_scu: int, ship: s
         ),
     )
     usable_sizes = usable_container_sizes(route.container_sizes_origin, route.container_sizes_destination)
-    run = TradeRun(ship=ship, usable_container_sizes=format_container_sizes(usable_sizes), legs=[acquisition, sale])
+    run = TradeRun(
+        user_id=user_id, ship=ship,
+        usable_container_sizes=format_container_sizes(usable_sizes), legs=[acquisition, sale],
+    )
 
     async with SessionLocal() as session:
         session.add(run)
@@ -194,7 +211,7 @@ async def get_in_progress_runs() -> list[TradeRun]:
     async with SessionLocal() as session:
         result = await session.execute(
             select(TradeRun)
-            .where(TradeRun.finalized_at.is_(None))
+            .where(TradeRun.finalized_at.is_(None), TradeRun.user_id == get_current_user_id())
             .options(selectinload(TradeRun.legs))
             .order_by(TradeRun.created_at)
         )
@@ -205,7 +222,7 @@ async def get_finalized_runs(limit: int = 50) -> list[TradeRun]:
     async with SessionLocal() as session:
         result = await session.execute(
             select(TradeRun)
-            .where(TradeRun.finalized_at.is_not(None))
+            .where(TradeRun.finalized_at.is_not(None), TradeRun.user_id == get_current_user_id())
             .options(selectinload(TradeRun.legs))
             .order_by(TradeRun.finalized_at.desc())
             .limit(limit)

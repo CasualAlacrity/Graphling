@@ -14,6 +14,8 @@ from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 
 from auth.discord_identity import get_pilot_identity
+from db.current_user import set_current_user_id
+from db.user_service import get_or_create_user
 from voice.audio_output import play_audio
 from voice.tts import synthesize
 from voice.voice_input import listen_once, load_whisper
@@ -45,6 +47,13 @@ async def run() -> None:
         prewarm(),
     )
     print(f"[ALICE] Signed in as {identity.username}.")
+    # Scopes every trade_run_store read/write to this pilot for the rest of the process
+    # (db/current_user.py) — must happen before anything in the overlay or voice loop can
+    # touch the ledger, which is why it's right here rather than deferred into the loop.
+    # get_or_create_user maps the Discord id to (and creates, on a first-ever login) the
+    # local users row TradeRun/TradeLeg.user_id actually FKs to.
+    user = await get_or_create_user(identity.user_id)
+    set_current_user_id(user.id)
     # thread_id carries the pilot's id so a shared checkpointer (Phase 2) can tell whose
     # thread is whose — MemorySaver doesn't need it today (one process per pilot already
     # isolates them), but every thread_id being wrong-shaped until then is exactly the

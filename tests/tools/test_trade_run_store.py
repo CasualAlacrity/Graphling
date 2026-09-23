@@ -511,3 +511,124 @@ async def test_catch_up_before_transaction_never_advances_a_leg_past_transaction
 
     assert result is leg
     assert session.committed is False
+
+
+# Multi-tenancy scoping (docs/todo.md Phase 2) — create_run_from_route stamps the current
+# pilot's id onto the run and both legs; get_in_progress_runs/get_finalized_runs filter
+# their query by it. These are the two places the store touches db.current_user directly
+# (see the module-level comment above create_run_from_route's original definition).
+
+class _CapturingSession:
+    """Doesn't execute anything for real — just records the compiled SELECT so a test can
+    assert the user_id filter actually made it into the WHERE clause, not just that some
+    query ran."""
+
+    def __init__(self):
+        self.executed_stmt = None
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def execute(self, stmt):
+        self.executed_stmt = stmt
+
+        class _EmptyResult:
+            def scalars(self):
+                return self
+
+            def all(self):
+                return []
+
+        return _EmptyResult()
+
+
+def _compiled_where(stmt) -> str:
+    return str(stmt.whereclause.compile(compile_kwargs={"literal_binds": True}))
+
+
+async def test_get_in_progress_runs_filters_by_the_current_user(monkeypatch):
+    pilot_id = uuid.uuid4()
+    monkeypatch.setattr(trade_run_store, "get_current_user_id", lambda: pilot_id)
+    session = _CapturingSession()
+    monkeypatch.setattr(trade_run_store, "SessionLocal", lambda: session)
+
+    await trade_run_store.get_in_progress_runs()
+
+    # SQLAlchemy's generic UUID literal renderer drops the hyphens.
+    assert f"trade_run.user_id = '{pilot_id.hex}'" in _compiled_where(session.executed_stmt)
+
+
+async def test_get_finalized_runs_filters_by_the_current_user(monkeypatch):
+    pilot_id = uuid.uuid4()
+    monkeypatch.setattr(trade_run_store, "get_current_user_id", lambda: pilot_id)
+    session = _CapturingSession()
+    monkeypatch.setattr(trade_run_store, "SessionLocal", lambda: session)
+
+    await trade_run_store.get_finalized_runs()
+
+    assert f"trade_run.user_id = '{pilot_id.hex}'" in _compiled_where(session.executed_stmt)
+
+
+async def test_get_in_progress_runs_raises_without_a_signed_in_pilot(monkeypatch):
+    # db.current_user.get_current_user_id's own guard — asserted here too so a future
+    # refactor that bypasses it (e.g. inlining a default) gets caught at this call site.
+    monkeypatch.setattr(trade_run_store, "SessionLocal", lambda: _CapturingSession())
+
+    with pytest.raises(RuntimeError, match="No pilot identity set"):
+        await trade_run_store.get_in_progress_runs()
+
+
+async def test_create_run_from_route_stamps_user_id_on_the_run_and_both_legs(monkeypatch):
+    from tools.uexcorp.trade_data import UEXTradeRoute
+
+    route = UEXTradeRoute(
+        id_commodity=10, commodity_name="Agricium",
+        id_terminal_origin=1, origin_terminal_name="Orison TDD",
+        origin_star_system_name="Stanton", origin_planet_name="Crusader",
+        id_terminal_destination=2, destination_terminal_name="Seraphim Station",
+        destination_star_system_name="Stanton", destination_planet_name="Crusader",
+        price_origin=10.0, price_destination=20.0, price_margin=10.0,
+        scu_origin=100, scu_destination=100, status_origin=2, status_destination=1,
+        distance=10.0, is_on_ground_origin=0, is_on_ground_destination=0,
+        is_auto_load_origin=0, is_auto_load_destination=0,
+        container_sizes_origin=[1, 2, 4], container_sizes_destination=[1, 2, 4],
+    )
+    pilot_id = uuid.uuid4()
+    monkeypatch.setattr(trade_run_store, "get_current_user_id", lambda: pilot_id)
+
+    class _AddSession:
+        def __init__(self):
+            self.added = None
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        def add(self, obj):
+            self.added = obj
+
+        async def commit(self):
+            pass
+
+        async def execute(self, stmt):
+            class _Result:
+                def __init__(self, value):
+                    self._value = value
+
+                def scalar_one(self):
+                    return self._value
+
+            return _Result(self.added)
+
+    session = _AddSession()
+    monkeypatch.setattr(trade_run_store, "SessionLocal", lambda: session)
+
+    run = await trade_run_store.create_run_from_route(route, 40, "Railen")
+
+    assert run.user_id == pilot_id
+    assert all(leg.user_id == pilot_id for leg in run.legs)

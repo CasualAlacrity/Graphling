@@ -97,10 +97,37 @@ Shape: one shared Postgres both pilots reach; each runs their own voice-loop cli
 tagged with a user id. Individual co-pilot only — not fleet logistics. CLAUDE.md already
 frames this as an additive migration, not a redesign.
 
-- [ ] **`user_id` on `TradeRun` / `TradeLeg`.** FK (or plain string id for now), backfill
-      a default tenant, Alembic migration. All trade-ledger reads/writes filter by it.
-      Get this right now so future per-pilot aggregation (org ops / leaderboards — most
-      hauled, greatest value, contribution) is a query, not a migration under pressure.
+- [x] **`user_id` on `TradeRun` / `TradeLeg` — done 2026-09-25** (`c1a4f6e2b9d3`, then
+      `e2b7d4a19f6c`). First pass stamped the raw Discord snowflake directly as a plain
+      string. Compared against Project Lyra and Uplink (two earlier projects with the
+      same Discord-login shape) surfaced that both keep a `users` table decoupled from
+      the auth provider specifically so a second provider can be added later without
+      touching every FK'd table — real enough prior art to redo this properly rather than
+      carry the string forward. `e2b7d4a19f6c` added `users` (id uuid pk, `discord_id`
+      unique) and swapped `TradeRun`/`TradeLeg.user_id` to a real FK against it, backfilled
+      via a generated placeholder user for the existing `"legacy"` rows. `db/user_service.
+      get_or_create_user()` resolves/creates that row once at login (`voice/__init__.py`),
+      and `db/current_user.py` now holds `users.id`, not the Discord id, for the rest of
+      the process. Not the full Lyra/Uplink `User` + `UserIdentity` split — that's for
+      when a second provider actually shows up; `users.discord_id` is deliberately its own
+      column (not the PK) so that split is additive later, per `User`'s docstring in
+      `db/models.py`. `create_run_from_route` stamps the FK; `get_in_progress_runs`/
+      `get_finalized_runs` filter by it. **Scoping boundary, on purpose:** `advance_leg`/
+      `record_purchase`/`record_sale`/`finalize_run`/`delete_run` take an id directly and
+      don't re-check ownership — a leg/run id is only ever learned via the two filtered
+      list functions above (resolver.py included), so this is scoped transitively rather
+      than duplicating the check at every id-based call. Revisit if ids ever start getting
+      shared/logged cross-tenant. Both migrations verified live against the local
+      docker-compose Postgres: upgrade/downgrade round-tripped cleanly each time, existing
+      2 runs / 4 legs backfilled and re-pointed correctly.
+- [x] **Client carries identity — done differently than sketched, via Discord OAuth
+      (2026-09-23), not an `ALICE_USER` env var.** `auth/discord_identity.py`'s
+      `get_pilot_identity()` already resolves a real per-pilot id at startup;
+      `voice/__init__.py` resolves the local `users` row from it
+      (`get_or_create_user`) and calls `db.current_user.set_current_user_id()` right
+      after, before anything (voice loop or overlay) can touch the ledger. `thread_id`
+      still uses the raw Discord id directly — that's a LangGraph checkpointer concern,
+      unrelated to ledger ownership.
 - [ ] Multi-tenancy is also where the trade-data pipeline pools into — keep the schema
       open to per-observation station price/stock rows keyed by pilot + timestamp, even
       if that pipeline lands later.
@@ -110,15 +137,16 @@ community features (leaderboards) need it, see Parked. If it's trivial to leave 
 fine, but don't design it now.
 - [ ] **Cache + reference tables stay global.** `UexPriceCache`,
       `UexReferenceCacheRecord` — no tenant column. Shared economy data is the point.
-- [ ] **Client carries identity.** `ALICE_USER` (or similar) in `.env` per install;
-      `thread_id` becomes `f"{user}:{uuid}"`. `MemorySaver` is in-process so separate
-      client processes are already isolated — only move to `AsyncPostgresSaver` if
-      checkpoint persistence or shared threads are wanted.
 - [ ] **Infra:** Postgres moves from each person's local `docker-compose` to one
       always-on reachable host (small VPS, or Tailscale to one machine). `db/session.py`
-      NullPool setup is already multi-loop-safe; multi-process is fine.
-- [ ] **Runs scoped to owner.** No cross-visibility of active runs for now.
-- [ ] Update CLAUDE.md's "v1 scope … no multi-tenancy" section to match.
+      NullPool setup is already multi-loop-safe; multi-process is fine. Note for whenever
+      shared/concurrent threads are wanted: `MemorySaver` is in-process, so separate
+      client processes are already isolated today — only move to `AsyncPostgresSaver` if
+      checkpoint persistence or cross-client shared threads end up needed.
+- [x] **Runs scoped to owner — done 2026-09-25**, as part of the `user_id` migration
+      above. No cross-visibility of active runs.
+- [x] Update CLAUDE.md's multi-tenancy framing — already done (it currently reads
+      "Multi-tenancy is on the roadmap", no "v1 scope … no multi-tenancy" language left).
 
 **Deferred (real, not now):** group / crewed runs; cross-pilot run visibility; the org
 ops/leaderboard feature itself (only the schema hook for it lands now).

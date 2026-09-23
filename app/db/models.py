@@ -41,9 +41,28 @@ class LegMilestone(enum.StrEnum):
     FINALIZED_AT = "finalized_at"
 
 
+class User(Base):
+    """One row per pilot who's ever signed into ALICE. discord_id is its own column
+    rather than doubling as the primary key, specifically so a second identity provider
+    can be added later without touching every table that already FKs to users.id —
+    Project Lyra/Uplink's fuller User + UserIdentity split (a provider + provider_user_id
+    table alongside this one) is the shape to grow into if/when that actually happens;
+    a single-provider table doesn't need that abstraction yet."""
+
+    __tablename__ = "users"
+
+    discord_id: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+
+
 class TradeRun(Base):
     __tablename__ = "trade_run"
 
+    # FK to users.id, not the raw Discord id directly — see User's docstring. Every row
+    # before this column existed got backfilled to a "legacy" placeholder user by the
+    # migration that added it (see its docstring) rather than left null.
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     ship: Mapped[str | None] = mapped_column(String, nullable=True)
     # CSV of SCU sizes (e.g. "1,2,4,8,16,24,32") loadable at the origin AND unloadable at
     # the destination — snapshotted from the route at creation time, same as
@@ -60,6 +79,15 @@ class TradeRun(Base):
 class TradeLeg(Base):
     __tablename__ = "trade_leg"
 
+    # Copied down from the owning TradeRun at creation time (see
+    # trade_run_store.create_run_from_route) rather than only living on the parent —
+    # legs are fetched directly by id in most of trade_run_store (advance_leg,
+    # record_purchase/sale), so this is what a future ownership check on those paths
+    # would filter by without an extra join to trade_run. Same FK-to-users.id shape as
+    # TradeRun.user_id — see User's docstring.
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     run_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("trade_run.id", ondelete="CASCADE"), nullable=False
     )
