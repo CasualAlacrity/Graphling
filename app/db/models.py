@@ -146,3 +146,27 @@ class UexReferenceCacheRecord(Base):
 
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class WikiCacheKind(enum.StrEnum):
+    SHIP_SPEED = "ship_speed"
+    LOCATIONS = "locations"
+
+
+class WikiCache(Base):
+    """Shared server-side cache for star-citizen.wiki data (ship speeds, the locations/
+    positions dataset) — same kind/key/payload shape as UexPriceCache above, reused
+    rather than inventing a new one. Previously an in-memory-only, per-process cache on
+    StarCitizenWikiClient itself (no Postgres involved at all); moved here so pilots
+    share fetches against a public API the same way the UEX cache already shares fetches
+    against UEX's. `key` is the ship name (lowercased) for SHIP_SPEED, or the literal
+    "_all" for LOCATIONS (a singleton, like uex_reference_cache above, but keyed rather
+    than a separate table since it's one more row in an already-generic shape)."""
+
+    __tablename__ = "wiki_cache"
+    __table_args__ = (UniqueConstraint("kind", "key", name="uq_wiki_cache_kind_key"),)
+
+    kind: Mapped[WikiCacheKind] = mapped_column(Enum(WikiCacheKind, name="wiki_cache_kind"), nullable=False)
+    key: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

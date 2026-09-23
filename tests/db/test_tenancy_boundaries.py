@@ -1,10 +1,10 @@
-"""Guards the Phase 2 decision that UexPriceCache/UexReferenceCacheRecord stay global,
-shared economy data — not a design that needs re-litigating every time someone's near
-the trade ledger's user_id (docs/todo.md's "Cache + reference tables stay global"). A
-column check rather than a comment: a future edit that adds user_id to either cache
-table breaks this test instead of drifting in silently.
+"""Guards the Phase 2 decision that UexPriceCache/UexReferenceCacheRecord/WikiCache stay
+global, shared economy/reference data — not a design that needs re-litigating every time
+someone's near the trade ledger's user_id (docs/todo.md's "Cache + reference tables stay
+global"). A column check rather than a comment: a future edit that adds user_id to any
+cache table breaks this test instead of drifting in silently.
 """
-from db.models import TradeLeg, TradeRun, UexPriceCache, UexReferenceCacheRecord
+from db.models import TradeLeg, TradeRun, UexPriceCache, UexReferenceCacheRecord, WikiCache
 
 
 def test_uex_price_cache_has_no_tenant_column():
@@ -13,6 +13,10 @@ def test_uex_price_cache_has_no_tenant_column():
 
 def test_uex_reference_cache_has_no_tenant_column():
     assert "user_id" not in UexReferenceCacheRecord.__table__.columns.keys()
+
+
+def test_wiki_cache_has_no_tenant_column():
+    assert "user_id" not in WikiCache.__table__.columns.keys()
 
 
 def test_trade_run_and_leg_do_have_a_tenant_column():

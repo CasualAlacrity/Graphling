@@ -3,6 +3,7 @@ import re
 
 from pydantic import BaseModel, PrivateAttr
 
+import wiki_cache_client
 from tools.http_utils import get_with_retries
 from tools.starcitizenwiki.models import LocationPosition, ShipSpeed
 
@@ -16,9 +17,11 @@ LOCATIONS_URL = "https://api.star-citizen.wiki/api/locations/positions"
 
 class StarCitizenWikiClient(BaseModel):
     """No API key needed — confirmed via response headers, this is a public, unauthenticated
-    endpoint. Cached in-memory only, no DB persistence: ship stats only change on game
-    patches, not within a session, so there's no freshness window to track, just a
-    fetch-once-per-ship-name cache for the process's lifetime."""
+    endpoint. get_ship_speed/get_locations go through the server's shared cache now
+    (server/wiki_cache_service.py, docs/todo.md Phase 2's cache follow-up) — this class
+    only keeps an in-memory L1 in front of that HTTP call, a fetch-once-per-process fast
+    path, not the source of truth. fetch_*_from_wiki below are the real API calls; only
+    the server (which owns its own instance of this class) ever calls those directly."""
 
     _cache: dict[str, ShipSpeed | None] = PrivateAttr(default_factory=dict)
     _cache_lock: asyncio.Lock = PrivateAttr(default_factory=asyncio.Lock)
@@ -34,26 +37,16 @@ class StarCitizenWikiClient(BaseModel):
             if cache_key in self._cache:
                 return self._cache[cache_key]
 
-            response = await asyncio.to_thread(
-                get_with_retries, API_BASE_URL + "vehicles", {}, {"filter[name]": ship_name},
-            )
-            response.raise_for_status()
-            results = response.json()["data"]
-
-            # The API's own name filter already does the fuzzy/partial matching (confirmed live
-            # — "railen" correctly matched "Gatac Railen") — no client-side fuzzy match needed
-            # on top of it. Just takes the first result if more than one comes back.
-            ship_speed = ShipSpeed.model_validate(results[0]) if results else None
+            ship_speed = await wiki_cache_client.get_ship_speed(ship_name)
             self._cache[cache_key] = ship_speed
             return ship_speed
 
     async def get_locations(self) -> list[LocationPosition]:
-        """Fetches and caches the full locations/positions dataset — ~1774 named
-        locations (planets, moons, stations, cities, outposts) with real coordinates,
-        letting travel time be estimated for pairs UEX's orbit-level distance data can't
-        reach (e.g. an orbital station to a surface city on the same planet). Fetched
-        once, cached for the process's lifetime — static game data, same reasoning as
-        get_ship_speed."""
+        """The full locations/positions dataset — ~1774 named locations (planets,
+        moons, stations, cities, outposts) with real coordinates, letting travel time
+        be estimated for pairs UEX's orbit-level distance data can't reach (e.g. an
+        orbital station to a surface city on the same planet). Fetched once per
+        process, same reasoning as get_ship_speed."""
         if self._locations_cache is not None:
             return self._locations_cache
 
@@ -61,11 +54,30 @@ class StarCitizenWikiClient(BaseModel):
             if self._locations_cache is not None:
                 return self._locations_cache
 
-            response = await asyncio.to_thread(get_with_retries, LOCATIONS_URL, {})
-            response.raise_for_status()
-            locations = [LocationPosition.model_validate(row) for row in response.json()["data"]]
+            locations = await wiki_cache_client.get_locations()
             self._locations_cache = locations
             return locations
+
+    async def fetch_ship_speed_from_wiki(self, ship_name: str) -> ShipSpeed | None:
+        """The real wiki API call, with no caching of its own — called only from
+        server/wiki_cache_service.py, on a cache miss there."""
+        response = await asyncio.to_thread(
+            get_with_retries, API_BASE_URL + "vehicles", {}, {"filter[name]": ship_name},
+        )
+        response.raise_for_status()
+        results = response.json()["data"]
+
+        # The API's own name filter already does the fuzzy/partial matching (confirmed live
+        # — "railen" correctly matched "Gatac Railen") — no client-side fuzzy match needed
+        # on top of it. Just takes the first result if more than one comes back.
+        return ShipSpeed.model_validate(results[0]) if results else None
+
+    async def fetch_locations_from_wiki(self) -> list[LocationPosition]:
+        """The real wiki API call, with no caching of its own — called only from
+        server/wiki_cache_service.py, on a cache miss there."""
+        response = await asyncio.to_thread(get_with_retries, LOCATIONS_URL, {})
+        response.raise_for_status()
+        return [LocationPosition.model_validate(row) for row in response.json()["data"]]
 
     async def find_location(self, name: str, system: str) -> LocationPosition | None:
         """Exact, case-insensitive match on name + system. This cross-references two

@@ -66,7 +66,7 @@ async def _rank(monkeypatch, rows, ship_scu=200):
     async def _fixed_travel(*args, **kwargs):
         return FIXED_TRAVEL_SECONDS
 
-    async def _rows_for(_client, origin_terminal_ids):
+    async def _rows_for(origin_terminal_ids):
         return rows, len(origin_terminal_ids)
 
     monkeypatch.setattr("tools.route_ranking.estimate_travel_time", _fixed_travel)
@@ -138,37 +138,28 @@ async def test_autoload_is_patched_onto_both_routes(monkeypatch):
 
 # --- live-fetch budgeting / lazy cache population ----------------------------
 
-class _FakeSession:
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *exc):
-        return False
-
-
 TEST_BUDGET = 8
 
 
 def _budget_env(monkeypatch, cached_ids):
-    """Patches the cache layer so no Postgres is involved, and pins the budget so these
-    don't depend on whatever MAX_LIVE_ROUTE_FETCHES is set to locally. Returns the list
-    recording which origins were fetched live."""
+    """Patches uex_cache_client so no network/Postgres is involved, and pins the budget
+    so these don't depend on whatever MAX_LIVE_ROUTE_FETCHES is set to locally. Returns
+    the list recording which origins were fetched live."""
     fetched = []
 
     monkeypatch.setattr("tools.route_ranking.MAX_LIVE_ROUTE_FETCHES", TEST_BUDGET)
 
-    async def _cached(_session, terminal_id):
+    async def _cached(terminal_id):
         if terminal_id in cached_ids:
             return [{"origin": terminal_id, "source": "cache"}]
         return None
 
-    async def _fetch(_client, _session, terminal_id):
+    async def _fetch(terminal_id):
         fetched.append(terminal_id)
         return [{"origin": terminal_id, "source": "live"}]
 
-    monkeypatch.setattr("tools.route_ranking.SessionLocal", _FakeSession)
-    monkeypatch.setattr("tools.route_ranking.cached_routes_from_terminal", _cached)
-    monkeypatch.setattr("tools.route_ranking.fetch_routes_from_terminal", _fetch)
+    monkeypatch.setattr("tools.route_ranking.uex_cache_client.cached_routes_from_terminal", _cached)
+    monkeypatch.setattr("tools.route_ranking.uex_cache_client.fetch_routes_from_terminal", _fetch)
     return fetched
 
 
@@ -180,7 +171,7 @@ async def test_live_fetches_are_capped_but_cached_origins_are_free(monkeypatch):
     cached_ids = set(range(10))
     fetched = _budget_env(monkeypatch, cached_ids)
 
-    rows, searched = await _route_rows_for(object(), origins)
+    rows, searched = await _route_rows_for(origins)
 
     assert len(fetched) == TEST_BUDGET
     assert searched == len(cached_ids) + TEST_BUDGET
@@ -193,7 +184,7 @@ async def test_only_uncached_origins_consume_the_budget(monkeypatch):
     origins = list(range(12))
     fetched = _budget_env(monkeypatch, cached_ids=set(range(12)))
 
-    rows, searched = await _route_rows_for(object(), origins)
+    rows, searched = await _route_rows_for(origins)
 
     assert fetched == []
     assert searched == 12
@@ -204,7 +195,7 @@ async def test_everything_is_searched_when_it_fits_in_the_budget(monkeypatch):
     origins = [1, 2, 3]
     fetched = _budget_env(monkeypatch, cached_ids=set())
 
-    _rows, searched = await _route_rows_for(object(), origins)
+    _rows, searched = await _route_rows_for(origins)
 
     assert sorted(fetched) == origins
     assert searched == 3

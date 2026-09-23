@@ -21,7 +21,15 @@ existing `app.flockt.farm` → `127.0.0.1:8088` site.
 
 ## One-time setup on the box
 
-1. **nginx + certbot site for `api.heyalice.help`** (that domain is already live on this
+1. **DNS first, before certbot.** Add an `A` record for `api.heyalice.help` pointing at
+   `168.119.234.226` (and an `AAAA` record too if the box has an IPv6 address) at
+   whatever DNS provider hosts `heyalice.help`. Let's Encrypt verifies domain ownership
+   by actually reaching the domain — certbot fails with a `DNS problem: NXDOMAIN` error
+   until this resolves. Propagation is usually minutes, sometimes longer depending on
+   the provider's TTL; `dig api.heyalice.help` should return the box's IP before moving
+   on to step 2.
+
+2. **nginx + certbot site for `api.heyalice.help`** (that domain is already live on this
    box for the static landing page — this adds an API subdomain alongside it):
    ```bash
    sudo tee /etc/nginx/sites-available/api.heyalice.help <<'EOF'
@@ -42,7 +50,7 @@ existing `app.flockt.farm` → `127.0.0.1:8088` site.
    sudo certbot --nginx -d api.heyalice.help
    ```
 
-2. **Discord Developer Portal** (discord.com/developers/applications), manual, only the
+3. **Discord Developer Portal** (discord.com/developers/applications), manual, only the
    account owner can do this:
    - Turn **"Public Client" OFF** — the server now holds a real client secret (the old
      client-side PKCE flow needed it on; this replaced that, see
@@ -50,11 +58,11 @@ existing `app.flockt.farm` → `127.0.0.1:8088` site.
    - Copy the resulting **Client Secret**.
    - Add a **Redirect URI**: `https://api.heyalice.help/auth/discord/callback`.
 
-3. **`/opt/graphling/.env`** on the box (not committed — create it directly there):
+4. **`/opt/graphling/.env`** on the box (not committed — create it directly there):
    ```
    POSTGRES_PASSWORD=<generate one>
    DISCORD_CLIENT_ID=<from the portal>
-   DISCORD_CLIENT_SECRET=<from step 2>
+   DISCORD_CLIENT_SECRET=<from step 3>
    DISCORD_REDIRECT_URI=https://api.heyalice.help/auth/discord/callback
    JWT_SECRET_KEY=<python -c "import secrets; print(secrets.token_hex(32))">
    ```

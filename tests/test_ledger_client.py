@@ -43,7 +43,7 @@ def _mock_client(monkeypatch, handler):
     async def _fake_client():
         return httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://test")
 
-    monkeypatch.setattr(ledger_client, "_client", _fake_client)
+    monkeypatch.setattr(ledger_client, "authenticated_client", _fake_client)
 
 
 async def test_get_in_progress_runs_hits_the_right_endpoint_and_parses_the_response(monkeypatch):

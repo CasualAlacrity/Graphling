@@ -48,17 +48,11 @@ def call_log():
 
 @pytest.fixture(autouse=True)
 def fake_route_source(monkeypatch, call_log):
-    """Doubles the two DB-touching pieces search_routes() relies on, so this exercises
-    the real fan-out/filtering logic without needing Postgres or live UEX."""
+    """Doubles the network-touching piece search_routes() relies on (now an HTTP call
+    to the server, uex_cache_client — see docs/todo.md Phase 2's cache follow-up), so
+    this exercises the real fan-out/filtering logic without needing Postgres or live UEX."""
 
-    class FakeSession:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *exc):
-            return False
-
-    async def fake_get_commodity_route_rows(client, session, commodity_id):
+    async def fake_get_commodity_route_rows(commodity_id):
         call_log.append(commodity_id)
         await asyncio.sleep(0.02)  # simulate network latency
         return FAKE_ROUTES_BY_COMMODITY.get(commodity_id, [])
@@ -70,8 +64,7 @@ def fake_route_source(monkeypatch, call_log):
             if any(row[field] == terminal_id for row in rows)
         }
 
-    monkeypatch.setattr(uex_lookup, "SessionLocal", lambda: FakeSession())
-    monkeypatch.setattr(uex_lookup, "get_commodity_route_rows", fake_get_commodity_route_rows)
+    monkeypatch.setattr(uex_lookup.uex_cache_client, "get_commodity_route_rows", fake_get_commodity_route_rows)
     monkeypatch.setattr(uex_lookup, "commodity_ids_at", fake_commodity_ids_at)
     monkeypatch.setattr(uex_lookup, "_terminal_is_auto_load", lambda terminal_id: TERMINAL_AUTOLOAD.get(terminal_id, 0))
 
@@ -164,7 +157,7 @@ async def test_fanout_concurrency_is_bounded(monkeypatch):
     in_flight = 0
     max_in_flight = 0
 
-    async def tracking_fetch(client, session, commodity_id):
+    async def tracking_fetch(commodity_id):
         nonlocal in_flight, max_in_flight
         in_flight += 1
         max_in_flight = max(max_in_flight, in_flight)
@@ -172,7 +165,7 @@ async def test_fanout_concurrency_is_bounded(monkeypatch):
         in_flight -= 1
         return many_commodities.get(commodity_id, [])
 
-    monkeypatch.setattr(uex_lookup, "get_commodity_route_rows", tracking_fetch)
+    monkeypatch.setattr(uex_lookup.uex_cache_client, "get_commodity_route_rows", tracking_fetch)
 
     await uex_lookup._fanout_route_rows(list(range(1, 13)))
 

@@ -5,7 +5,7 @@ import requests
 from langsmith import traceable
 from pydantic import BaseModel, PrivateAttr
 
-from db.session import SessionLocal
+import uex_cache_client
 from tools.http_utils import REQUEST_TIMEOUT_SECONDS, get_with_retries
 from tools.uexcorp.reference_cache import (
     CachedCommodity,
@@ -21,7 +21,6 @@ from tools.uexcorp.reference_cache import (
     CachedVehicle,
     UexReferenceCache,
 )
-from tools.uexcorp.reference_cache_store import load_reference_cache, store_reference_cache
 
 
 class UEXCorpClient(BaseModel):
@@ -44,8 +43,14 @@ class UEXCorpClient(BaseModel):
     # per candidate route — 261 times in a single warm region search, every one of them a
     # cache hit returning immediately. Tracing the accessor turned one route search into
     # 261 traced runs of a no-op and burned a month of LangSmith quota in two days. The
-    # actual fetch is traced instead, on _build_uex_cache below, where there's real work
+    # actual fetch is traced instead, on build_uex_cache below, where there's real work
     # and a real duration worth seeing.
+    #
+    # In-memory only on this side now — the Postgres-backed cache (docs/todo.md Phase 2's
+    # cache follow-up) moved server-side (server/uex_cache_service.py), since the client
+    # can't assume Postgres is reachable at all. This is just the process-lifetime L1
+    # fast path in front of the HTTP call, same shape it always had in front of the DB
+    # check.
     async def get_uex_cache(self) -> UexReferenceCache:
         uex_cache = self._uex_cache
         if uex_cache and self._is_fresh(uex_cache):
@@ -61,26 +66,18 @@ class UEXCorpClient(BaseModel):
             if uex_cache and self._is_fresh(uex_cache):
                 return uex_cache
 
-            async with SessionLocal() as session:
-                stored_cache = await load_reference_cache(session)
-            if stored_cache is not None:
-                print("Using cached UEX reference data from Postgres.", flush=True)
-                self._uex_cache = stored_cache
-                return stored_cache
-
-            print("No usable cache found — fetching fresh data from the UEX API "
-                  "(first run can take a minute)...", flush=True)
-            uex_cache = await self._build_uex_cache()
+            print("Fetching UEX reference data (server-cached)...", flush=True)
+            uex_cache = await uex_cache_client.get_reference_cache()
             self._uex_cache = uex_cache
-            print("UEX API fetch complete.", flush=True)
-
-            async with SessionLocal() as session:
-                await store_reference_cache(session, uex_cache)
-
+            print("UEX reference data ready.", flush=True)
             return uex_cache
 
     @traceable(name="uex_build_reference_cache")
-    async def _build_uex_cache(self) -> UexReferenceCache:
+    async def build_uex_cache(self) -> UexReferenceCache:
+        """Hits every UEX reference endpoint and assembles a fresh UexReferenceCache —
+        no caching of its own (that's the caller's job; server/uex_cache_service.py is
+        the only caller now, on a Postgres cache miss). Public because it's called from
+        outside this class now, unlike when get_uex_cache was the only caller."""
         headers = self.get_header()
 
         (

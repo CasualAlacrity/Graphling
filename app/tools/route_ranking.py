@@ -5,7 +5,7 @@ from typing import NamedTuple
 
 from dotenv import load_dotenv
 
-from db.session import SessionLocal
+import uex_cache_client
 from tools.cargo_packing import (
     best_container_mix,
     estimate_transfer_time,
@@ -14,7 +14,6 @@ from tools.cargo_packing import (
     usable_container_sizes,
 )
 from tools.travel_time import estimate_travel_time
-from tools.uexcorp.price_cache import cached_routes_from_terminal, fetch_routes_from_terminal
 from tools.uexcorp.trade_data import UEXTradeRoute
 
 # How many origin terminals a single search may fetch *live* from UEX. Everything already
@@ -57,31 +56,30 @@ class RouteSearch(NamedTuple):
     origins_available: int
 
 
-async def _route_rows_for(uex_client, origin_terminal_ids: list[int]) -> tuple[list[dict], int]:
+async def _route_rows_for(origin_terminal_ids: list[int]) -> tuple[list[dict], int]:
     """Route rows for as many origins as the budget allows, preferring cached ones.
 
     Cached origins cost nothing, so they're all used. Whatever's left gets up to
     MAX_LIVE_ROUTE_FETCHES live calls; the remainder is skipped this time and will be
     picked up by a later search, since the ones fetched now are cached for next time.
+
+    No uex_client parameter — the server owns the one that matters for this (its own
+    UEXCorpClient instance, uex_cache_service.py), now that this goes over HTTP instead
+    of a direct Postgres session (docs/todo.md Phase 2's cache follow-up).
     """
     cached_rows: list[dict] = []
     uncached: list[int] = []
 
-    async with SessionLocal() as session:
-        for origin_id in origin_terminal_ids:
-            rows = await cached_routes_from_terminal(session, origin_id)
-            if rows is None:
-                uncached.append(origin_id)
-            else:
-                cached_rows.extend(rows)
+    for origin_id in origin_terminal_ids:
+        rows = await uex_cache_client.cached_routes_from_terminal(origin_id)
+        if rows is None:
+            uncached.append(origin_id)
+        else:
+            cached_rows.extend(rows)
 
     to_fetch = uncached[:MAX_LIVE_ROUTE_FETCHES]
 
-    async def fetch(origin_id: int) -> list[dict]:
-        async with SessionLocal() as session:
-            return await fetch_routes_from_terminal(uex_client, session, origin_id)
-
-    fetched = await asyncio.gather(*[fetch(origin_id) for origin_id in to_fetch])
+    fetched = await asyncio.gather(*[uex_cache_client.fetch_routes_from_terminal(oid) for oid in to_fetch])
     for rows in fetched:
         cached_rows.extend(rows)
 
@@ -185,7 +183,7 @@ async def find_best_route(
     exclude_destination_terminal_name to skip the committed choice itself) and any tool
     that just wants "the best option from here" with no active run involved.
     """
-    raw_rows, origins_searched = await _route_rows_for(uex_client, origin_terminal_ids)
+    raw_rows, origins_searched = await _route_rows_for(origin_terminal_ids)
 
     # Cached rows are unfiltered by commodity on purpose (one cache entry serves every
     # commodity out of that terminal), so narrowing happens here rather than server-side.

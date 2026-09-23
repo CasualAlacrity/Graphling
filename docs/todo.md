@@ -139,18 +139,65 @@ plan this was built from; deployment mechanics in `docs/deploy.md`.
       whichever tool happens to run first. `voice/__init__.py` updated to match —
       `thread_id` now keys off the pilot's username rather than a Discord id, since the
       client no longer holds one at all.
-- [x] **Deployment artifacts built and locally verified — 2026-09-25**, not yet
-      live-deployed. Root `Dockerfile` (copies the whole `app/` tree but installs only
-      `server/requirements.txt` — no LangChain/Whisper/PySide6 in the image),
-      `docker-compose.prod.yml` (Postgres with no published port; server bound to
-      `127.0.0.1:8090`, nginx as the only path in), `scripts/deploy_server.sh` (modeled
-      on `chicken-tracker/deploy-prod.sh`, same box/SSH key). Verified locally: the image
-      builds, boots, serves `/health` and the Discord login redirect, and its bundled
-      Alembic setup reaches the real local Postgres and reports the correct head
-      revision. **Still needed before this is real** (manual, only the account owner can
-      do these — see `docs/deploy.md`): turn Discord's "Public Client" off and get a
-      secret, register the server's redirect URI, add the `api.heyalice.help` nginx+
-      certbot site, and run the actual first deploy.
+- [x] **Deployed live — 2026-09-25.** Root `Dockerfile` (copies the whole `app/` tree
+      but installs only `server/requirements.txt` — no LangChain/Whisper/PySide6 in the
+      image), `docker-compose.prod.yml` (Postgres with no published port; server bound
+      to `127.0.0.1:8090`, nginx as the only path in), `scripts/deploy_server.sh`
+      (modeled on `chicken-tracker/deploy-prod.sh`, same box/SSH key) — `/opt/graphling`
+      on the shared Hetzner box, `api.heyalice.help` (DNS + certbot, discovered live that
+      DNS has to resolve before certbot can issue a cert — `docs/deploy.md` now says so),
+      Discord's Public Client off with a real secret registered against the server's own
+      redirect URI. One deploy bug caught and fixed on the first real attempt:
+      `docker-compose.prod.yml` had `image: graphling-server:latest`, missing the
+      `feenstra32/` Docker Hub namespace, so `deploy_server.sh`'s tag-rewriting `sed`
+      silently never matched and the server tried (and failed) to pull a bare image name
+      that doesn't exist anywhere. Fully verified live end to end: `/health` over real
+      HTTPS, and a real Discord login round trip through `casual_alacrity`'s account —
+      the server's own exchange, `get_or_create_user`, JWT issuance (decoded and checked:
+      `sub` is the local `users.id` UUID, not the Discord id), and the redirect back to
+      the client's local listener all confirmed working against production.
+- [x] **UEX/wiki cache migration gap found and closed — 2026-09-25.** The real end-to-end
+      test above surfaced that the server move was incomplete: `tools/uexcorp/client.py`
+      (`get_uex_cache`), `tools/route_ranking.py`, and `overlay/uex_lookup.py` (5 call
+      sites) still hit Postgres directly for the UEX price/reference cache — it only
+      "worked" in testing because the client's own `.env` still pointed `TRADE_DB_URL` at
+      a local Postgres. Would have crashed Dennis's install outright on startup, since
+      production Postgres has no published port at all. Fixed the same way the ledger
+      was: `server/uex_cache_service.py` (thin `SessionLocal`-wrapping layer around the
+      *same*, unchanged `tools/uexcorp/reference_cache_store.py`/`price_cache.py`
+      functions — only who calls them moved) + `server/routes/uex_cache.py`, with a new
+      client-side `uex_cache_client.py`. `UEXCorpClient.get_uex_cache()` keeps an
+      in-memory L1 fast path but falls through to HTTP now, not Postgres;
+      `UEXCorpClient.build_uex_cache()` (renamed from a private `_build_uex_cache`, since
+      it's called from outside the class now) is the real UEX-API fetch the server uses
+      on a cache miss.
+
+      Also gave `tools/starcitizenwiki/client.py` (`StarCitizenWikiClient`) the same
+      shared-cache shape, at the user's explicit request — it had no correctness bug (no
+      Postgres dependency at all, pure in-memory per-process caching against a public
+      API), but no cross-pilot sharing either. New `wiki_cache` table (kind/key/payload,
+      mirroring `uex_price_cache`'s shape) + `server/wiki_cache_service.py` +
+      `server/routes/wiki_cache.py` + `wiki_cache_client.py`; `fetch_ship_speed_from_wiki`/
+      `fetch_locations_from_wiki` are the real-API-call methods the server uses on a miss,
+      `get_ship_speed`/`get_locations` are the client-side HTTP-backed orchestration
+      every existing caller keeps using unchanged.
+
+      One real bug caught by writing the tests, not by inspection: `ShipSpeed`'s fields
+      use `validation_alias=AliasPath(...)` to parse the wiki's nested API response, but
+      `model_dump()`/FastAPI's response serialization always writes the flat field names
+      — `model_validate()` on that flat JSON looks for the nested shape and always fails.
+      Fixed on both ends (`wiki_cache_service.py`'s cache-hit path, `wiki_cache_client.py`'s
+      response parsing) with `model_construct()` instead, which skips validation and just
+      assigns — safe here since the data always came from a real `ShipSpeed`'s own
+      `model_dump()`, never outside input.
+
+      Extracted `api_client.py` (the authenticated-httpx-client boilerplate `ledger_
+      client.py` already had) so `uex_cache_client.py`/`wiki_cache_client.py` share it
+      instead of a third copy. Verified end to end locally with `TRADE_DB_URL` completely
+      unset for the client process — `wiki_cache_client`, `uex_cache_client`, and
+      critically `UEXCorpClient.get_uex_cache()` itself all still worked (1791 wiki
+      locations, 205 UEX commodities, 826 terminals, real data through the local server).
+      249 tests passing.
 - [ ] Multi-tenancy is also where the trade-data pipeline pools into — keep the schema
       open to per-observation station price/stock rows keyed by pilot + timestamp, even
       if that pipeline lands later.

@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 10080  # 7 days
 
+    # UEX Corp — needed here now that the UEX cache's read-through-or-fetch logic lives
+    # server-side (uex_cache_service.py). Every other UEXCorpClient method (live,
+    # uncached lookups) stays client-side and never reads this.
+    uexcorp_api_key: str = ""
+    uexcorp_bearer_token: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

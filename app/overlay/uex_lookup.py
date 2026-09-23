@@ -3,12 +3,11 @@ import os
 
 from langsmith import tracing_context
 
-from db.session import SessionLocal, engine
+import uex_cache_client
 from tools.starcitizenwiki.client import StarCitizenWikiClient
 from tools.travel_time import estimate_travel_time
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.matching import find_commodity_by_id as _find_commodity_by_id
-from tools.uexcorp.price_cache import get_commodity_price_rows, get_commodity_route_rows, get_terminal_price_rows
 from tools.uexcorp.reference_cache import TerminalType
 from tools.uexcorp.trade_data import UEXTradeRoute
 
@@ -32,11 +31,10 @@ _star_system_codes = {}
 
 
 async def _load_uex_cache():
-    cache = await uex_client.get_uex_cache()
-    # get_uex_cache() now reads/writes the reference cache table. This call runs in its
-    # own throwaway asyncio.run() loop, same reasoning as search_routes' dispose.
-    await engine.dispose()
-    return cache
+    # get_uex_cache() goes over HTTP now (docs/todo.md Phase 2's cache follow-up) — no
+    # asyncpg engine involved on this side anymore, so nothing to dispose of once this
+    # throwaway asyncio.run() loop (init(), below) closes.
+    return await uex_client.get_uex_cache()
 
 
 def init():
@@ -176,8 +174,7 @@ async def commodity_volatility(commodity_id):
     # both, for every route sharing this commodity) — cached for 30min in the same
     # UexPriceCache table commodity_ids_at/terminal_ids_for already use, so this doesn't
     # add new fetch cost beyond what filtering already pays.
-    async with SessionLocal() as session:
-        rows = await get_commodity_price_rows(uex_client, session, commodity_id)
+    rows = await uex_cache_client.get_commodity_price_rows(commodity_id)
 
     volatility_by_terminal = {}
     for row in rows:
@@ -197,15 +194,13 @@ async def commodity_volatility(commodity_id):
 
 
 async def commodity_ids_at(terminal_id, side):
-    async with SessionLocal() as session:
-        rows = await get_terminal_price_rows(uex_client, session, terminal_id)
+    rows = await uex_cache_client.get_terminal_price_rows(terminal_id)
     field_name = "price_buy" if side == "buy" else "price_sell"
     return {row["id_commodity"] for row in rows if row.get(field_name)}
 
 
 async def terminal_ids_for(commodity_id, side):
-    async with SessionLocal() as session:
-        rows = await get_commodity_price_rows(uex_client, session, commodity_id)
+    rows = await uex_cache_client.get_commodity_price_rows(commodity_id)
     field_name = "price_buy" if side == "buy" else "price_sell"
     return {row["id_terminal"] for row in rows if row.get(field_name)}
 
@@ -224,8 +219,7 @@ async def _fanout_route_rows(commodity_ids) -> list[dict]:
 
     async def fetch(commodity_id):
         async with semaphore:
-            async with SessionLocal() as session:
-                return await get_commodity_route_rows(uex_client, session, commodity_id)
+            return await uex_cache_client.get_commodity_route_rows(commodity_id)
 
     results = await asyncio.gather(*(fetch(commodity_id) for commodity_id in commodity_ids))
     return [row for rows in results for row in rows]
@@ -275,8 +269,7 @@ async def _search_routes(
         # destination — reused here instead of asking UEX to filter server-side, so a
         # repeat search that only changes source/destination (very common while narrowing
         # filters) is a cache hit instead of a fresh live call.
-        async with SessionLocal() as session:
-            raw_routes = await get_commodity_route_rows(uex_client, session, commodity_id)
+        raw_routes = await uex_cache_client.get_commodity_route_rows(commodity_id)
         if source_terminal_id is not None:
             raw_routes = _filter_by_origin(raw_routes, source_terminal_id)
         if destination_terminal_id is not None:

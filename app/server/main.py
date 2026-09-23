@@ -2,11 +2,15 @@ from fastapi import FastAPI
 
 from server.routes.auth import router as auth_router
 from server.routes.ledger import router as ledger_router
+from server.routes.uex_cache import router as uex_cache_router
+from server.routes.wiki_cache import router as wiki_cache_router
 
 app = FastAPI(title="ALICE Ledger API")
 
 app.include_router(auth_router)
 app.include_router(ledger_router)
+app.include_router(uex_cache_router)
+app.include_router(wiki_cache_router)
 
 
 @app.get("/health")
