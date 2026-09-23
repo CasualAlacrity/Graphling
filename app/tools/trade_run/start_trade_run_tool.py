@@ -49,13 +49,10 @@ class StartTradeRunTool(UplinkTool):
         if qty <= 0:
             return "That route can't fill any cargo right now — origin or destination stock is at zero."
 
-        current_runs = await trade_run_store.get_in_progress_runs()
         run = await trade_run_store.create_run_from_route(route, qty, vehicle_name)
 
         acquisition = next(leg for leg in run.legs if leg.leg_type == LegType.ACQUISITION)
-        note = f" You now have {len(current_runs) + 1} active runs." if current_runs else ""
         return (
-            f"Run started — {qty} SCU {route.commodity_name}, {route.origin_terminal_name} to "
-            f"{route.destination_terminal_name} in the {vehicle_name}. You're traveling to "
-            f"{acquisition.terminal_name} to buy.{note}"
+            f"Run started — {route.commodity_name}, from {route.origin_terminal_name} to "
+            f"{route.destination_terminal_name}."
         )

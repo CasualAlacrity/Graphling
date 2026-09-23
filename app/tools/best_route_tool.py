@@ -170,8 +170,8 @@ class BestRouteTool(UplinkTool):
             # with three trade terminals, so exact matching can only ever hedge there.
             # Falling through to the region search answers the question the pilot asked
             # instead of holding out for a mode the model didn't pick.
-            region = terminals_within(origin, pool, cache)
-            if region and region.terminals:
+            region, _ = self._resolve_region(origin, cache)
+            if region is not None:
                 return region.terminals, f"in {region.name}", None
             return [], "", error
 
@@ -183,12 +183,23 @@ class BestRouteTool(UplinkTool):
                 return [], "", f"No terminals found within {DEFAULT_NEAR_DISTANCE} Gm of {origin}."
             return candidates, f"near {origin}", None
 
-        region = terminals_within(origin, pool, cache)
-        if region is None:
-            return [], "", f"Couldn't find a location matching '{origin}'."
-        if not region.terminals:
-            return [], "", f"No terminals found in {region.name}."
+        region, error = self._resolve_region(origin, cache)
+        if error:
+            return [], "", error
         return region.terminals, f"in {region.name}", None
+
+    @staticmethod
+    def _resolve_region(name: str, cache) -> tuple[Any, str | None]:
+        """Resolve `name` to a region with at least one trade terminal. Returns
+        (region, None) on success or (None, error_message) — used both for an origin
+        named as a region and for a destination_region constraint, which resolve the
+        same way."""
+        region = terminals_within(name, trade_terminals(cache), cache)
+        if region is None:
+            return None, f"Couldn't find a location matching '{name}'."
+        if not region.terminals:
+            return None, f"No terminals found in {region.name}."
+        return region, None
 
     async def _find_and_report(
             self, origin: str, origin_mode: str, ship: str, commodity: str | None, destination_region: str | None,
@@ -234,11 +245,9 @@ class BestRouteTool(UplinkTool):
 
         destination_terminal_ids = None
         if destination_region is not None:
-            destination = terminals_within(destination_region, trade_terminals(cache), cache)
-            if destination is None:
-                return f"Couldn't find a location matching '{destination_region}'."
-            if not destination.terminals:
-                return f"No terminals found in {destination.name}."
+            destination, error = self._resolve_region(destination_region, cache)
+            if error:
+                return error
             # Resolved spelling, so the reply confirms what was understood.
             destination_region = destination.name
             destination_terminal_ids = {t.id for t in destination.terminals}
@@ -259,6 +268,10 @@ class BestRouteTool(UplinkTool):
             suffix = f" ({', '.join(qualifiers)})" if qualifiers else ""
             return f"No usable in-system route turned up {origin_label}{suffix}."
 
+        return self._format_reply(result, vehicle, origin_label, rank_by)
+
+    @staticmethod
+    def _format_reply(result, vehicle, origin_label: str, rank_by: str) -> str:
         best, scu = result.best, result.best_scu
         runner_up, runner_up_scu = result.runner_up, result.runner_up_scu
         terminal_kind = "a ground station" if best.is_on_ground_destination else "an orbital/space station"

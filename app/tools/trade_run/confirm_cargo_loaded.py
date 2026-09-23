@@ -55,9 +55,7 @@ class ConfirmCargoLoadedTool(UplinkTool):
                     new_next_step = trade_run_store.next_unset_field(result)
                     if new_next_step == LegMilestone.FINALIZED_AT:
                         return (f"Cargo loading confirmed for {result.commodity_name} at "
-                                f"{result.terminal_name}. This leg is ready to finalize — that's a "
-                                f"manual step, so tell the pilot to hit Finalize on it in the "
-                                f"overlay whenever they're ready.")
+                                f"{result.terminal_name}.")
                     return (f"Advanced leg: {result.commodity_name} at {result.terminal_name} "
                             f"from {LegMilestone.TRANSFERRED_AT} to {new_next_step}")
                 else:
