@@ -135,8 +135,11 @@ frames this as an additive migration, not a redesign.
 Per-value **ledger provenance/confidence** is NOT part of this pass — shelved until
 community features (leaderboards) need it, see Parked. If it's trivial to leave a hook,
 fine, but don't design it now.
-- [ ] **Cache + reference tables stay global.** `UexPriceCache`,
-      `UexReferenceCacheRecord` — no tenant column. Shared economy data is the point.
+- [x] **Cache + reference tables stay global — enforced 2026-09-25**
+      (`tests/db/test_tenancy_boundaries.py`). `UexPriceCache`/`UexReferenceCacheRecord`
+      never got a `user_id` in either migration above; a schema-column test now fails
+      loudly if that ever changes, rather than relying on someone noticing during review.
+      Shared economy data is the point.
 - [ ] **Infra:** Postgres moves from each person's local `docker-compose` to one
       always-on reachable host (small VPS, or Tailscale to one machine). `db/session.py`
       NullPool setup is already multi-loop-safe; multi-process is fine. Note for whenever
