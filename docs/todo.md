@@ -179,6 +179,22 @@ outputs stay consistent.
          classifier has no signal for pending-confirmation state. Not a tool-call case, so
          it may need its own small eval track rather than living in this dataset — noting it
          here so it isn't lost before that decision gets made.
+      5. **Inference/ambiguity-gating class of case (2026-09-23).** "I sold the copper for
+         4,567 per SCU" said directly, with arrival/unloading never separately confirmed —
+         does the model pick `mark_cargo_sold` with the *exact* stated price, not a
+         paraphrase or a fallback to the leg's planned price? The backfill itself
+         (`catch_up_before_transaction`) is ordinary deterministic code now, covered by
+         unit tests, not something the harness needs to check — but "did it call the right
+         tool with the right args from an inference-shaped utterance" is exactly evaluators
+         (a)/(b) above, and this is the general *shape* worth growing more cases in: any
+         utterance where the correct tool call requires recognizing what a stated fact
+         necessarily implies, not just extracting an entity from it. Decided 2026-09-23:
+         push whatever can be made deterministic into code rather than leaning on the
+         model to plan multi-step chains — the harness is for judgment calls (tool/arg
+         selection), not a substitute for removing judgment from things that don't need
+         it. A hand-picked sample of phrasings is fine to start from and grow over time —
+         the point is catching inference issues with structure, before they're anecdotal
+         reports from actual pilots.
 - [ ] **Evaluators:** (a) correct tool selected, (b) args resolved to the right
       entities, (c) no spurious extra tool calls, (d) output snapshot / consistency
       check so drift between models is visible, (e) no markdown or other formatting
@@ -231,30 +247,38 @@ separately — don't pre-commit a list here.
       which this never touches.
 
       A worked scenario ("I sold the copper for 4,567/SCU" while the acquisition leg is
-      still unfinalized) surfaced two real gaps, independent of whether this ever gets
-      built:
-      1. **`resolver.AmbiguousLegError` is broken today.** It never calls
-         `super().__init__()`, so `str(error)` — what every milestone tool returns
-         verbatim to the persona — is Python's raw repr of the candidate list. Verified:
-         `"[<db.models.TradeLeg object at 0x100a41a60>, ...]"`. Any pilot with 2+ active
-         runs who says something ambiguous gets that, or ALICE has nothing usable to
-         relay. Worth fixing on its own regardless of this feature.
-      2. **The scenario needs ALICE to infer arrival + unloading from "I sold it"** —
-         neither was stated — which directly conflicts with the persona prompt's existing
-         section 11 rule: "Only call an action tool when the pilot's own words state that
-         a milestone happened... do not chain further tool calls trying to work around it
-         without new input from the pilot." That line exists so she never invents
-         progress that didn't happen. Reconciling "infer skipped steps from a later
-         statement" with "never invent unstated progress" is a real design question of
-         its own, and overlaps with the already-parked **Force-complete path** / "ask,
-         never accuse" idea (`docs/ledger-trust-and-corrections.md`, Phase 4 backlog).
+      still unfinalized) surfaced two real gaps. Both are now resolved, independent of
+      whether voice-finalize itself ever gets built:
+      1. **[x] `resolver.AmbiguousLegError` was broken — fixed 2026-09-23 (`085c2ad`).**
+         It never called `super().__init__()`, so `str(error)` — what every milestone
+         tool returned verbatim to the persona — was Python's raw repr of the candidate
+         list. Verified live: `"[<db.models.TradeLeg object at 0x100a41a60>, ...]"`.
+         Both `AmbiguousLegError` and `AmbiguousRunError` now build a real message
+         naming ship/commodity/terminal per candidate; audited all 6 catch sites, not
+         just the one that got noticed, and caught two more bugs in `trade_advisor_tool`
+         along the way (unused `ship` arg, a misleading fallback message).
+      2. **[x] The "infer arrival + unloading from 'I sold it'" conflict with the
+         persona's "don't chain tool calls" rule — resolved 2026-09-23, decided B, not A.**
+         Rather than have the LLM call `mark_arrived` → `confirm_cargo_unloaded` →
+         `mark_cargo_sold` itself (which would need the rule loosened, and is exactly the
+         kind of multi-step plan a small local model is least reliable at), the entailed
+         backfill now happens *inside* `mark_cargo_sold`/`mark_cargo_acquired` themselves
+         (`trade_run_store.catch_up_before_transaction`) — one tool call in, one out. The
+         persona's "don't chain" rule never needed to change: there's no LLM-orchestrated
+         chaining happening, so it still correctly blocks what it was written to block.
+         Covered by unit tests (`test_trade_run_store.py`, `test_mark_cargo_acquired_
+         tool.py`, `test_mark_cargo_sold_tool.py`) — deterministic, not dependent on model
+         behavior. Logged as a Phase 3 harness seed case above (item 5) for the part that
+         *does* still need a model: picking the right tool with the right stated value.
+         Still overlaps conceptually with the parked **Force-complete path** idea
+         (`docs/ledger-trust-and-corrections.md`) if that ever gets built for real.
 
-      If it's ever built: retrying the pilot's original blocked action after a confirmed
-      finalize must use the *specific values the pilot already stated* (e.g. that exact
-      4,567/unit), not just re-call the tool bare and fall back to the leg's originally-
-      planned price — the conversation history already has what's needed; nothing new to
-      build there, but the retry instruction has to say so explicitly or a model will get
-      it subtly wrong.
+      **Still open, and still separate from the above:** this entry's own subject — ALICE
+      finalizing the acquisition leg on voice confirmation to unblock the sale leg *at
+      all* — is unaffected by either fix. The backfill above only ever helps once a leg
+      is already reachable; a sale leg blocked behind a genuinely unfinalized acquisition
+      leg still can't be resolved by voice at all today, same as before. That's still
+      just a flagged pain point, not a decision.
 - [ ] **User setting to bypass the confirm-before-finalize guard entirely** — an
       intentional pilot opt-in once there's a real client + user-settings surface
       (multi-tenancy, Phase 2+). Not buildable until that infra exists; flagged here so

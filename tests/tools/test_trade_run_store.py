@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 import pytest
 
 from db import trade_run_store
-from db.models import CargoTransferType, LegType, TradeLeg, TradeRun
+from db.models import CargoTransferType, LegMilestone, LegType, TradeLeg, TradeRun
 
 
 def _make_leg(leg_type, cargo_transfer_type=CargoTransferType.MANUAL, **overrides):
@@ -430,3 +430,84 @@ async def test_finalize_run_succeeds_when_every_leg_is_done(monkeypatch):
 
     assert result.finalized_at is not None
     assert session.committed
+
+
+# catch_up_before_transaction — the entailment backfill: a completed purchase/sale is
+# mechanically impossible without its purely-timestamp prerequisites (arrival, and for
+# manual transfer, unloading) already being true, so a reported transaction is itself
+# sufficient evidence to record those too, not a guess. See docs/todo.md's Phase 3
+# harness entry and mark_cargo_acquired_tool/mark_cargo_sold_tool for where this is used.
+
+async def test_catch_up_before_transaction_is_a_noop_when_already_at_the_transaction_step(monkeypatch):
+    leg = _make_leg(LegType.ACQUISITION, started_at=datetime.now(UTC), reached_at=datetime.now(UTC))
+    session = _FakeSession(get_value=leg)
+    monkeypatch.setattr(trade_run_store, "SessionLocal", lambda: session)
+
+    result = await trade_run_store.catch_up_before_transaction(leg)
+
+    assert result is leg
+    assert session.committed is False  # advance_leg was never called
+
+
+async def test_catch_up_before_transaction_advances_reached_at_for_acquisition(monkeypatch):
+    leg = _make_leg(LegType.ACQUISITION, started_at=datetime.now(UTC))
+    session = _FakeSession(get_value=leg)
+    monkeypatch.setattr(trade_run_store, "SessionLocal", lambda: session)
+
+    result = await trade_run_store.catch_up_before_transaction(leg)
+
+    assert result.reached_at is not None
+    assert trade_run_store.next_unset_field(result) == LegMilestone.TRANSACTION_COMPLETED_AT
+
+
+async def test_catch_up_before_transaction_advances_both_steps_for_a_fresh_manual_sale(monkeypatch):
+    leg = _make_leg(LegType.SALE, CargoTransferType.MANUAL, started_at=datetime.now(UTC))
+    session = _FakeSession(get_value=leg)
+    monkeypatch.setattr(trade_run_store, "SessionLocal", lambda: session)
+
+    result = await trade_run_store.catch_up_before_transaction(leg)
+
+    assert result.reached_at is not None
+    assert result.transferred_at is not None
+    assert trade_run_store.next_unset_field(result) == LegMilestone.TRANSACTION_COMPLETED_AT
+
+
+async def test_catch_up_before_transaction_advances_only_transferred_when_already_arrived(monkeypatch):
+    leg = _make_leg(
+        LegType.SALE, CargoTransferType.MANUAL, started_at=datetime.now(UTC), reached_at=datetime.now(UTC),
+    )
+    session = _FakeSession(get_value=leg)
+    monkeypatch.setattr(trade_run_store, "SessionLocal", lambda: session)
+
+    result = await trade_run_store.catch_up_before_transaction(leg)
+
+    assert result.transferred_at is not None
+    assert trade_run_store.next_unset_field(result) == LegMilestone.TRANSACTION_COMPLETED_AT
+
+
+async def test_catch_up_before_transaction_skips_the_independent_unload_step_for_autoload(monkeypatch):
+    # _SALE_AUTOLOAD_SEQUENCE has no independent transferred_at position at all — only
+    # one advance_leg call should ever happen here, not two.
+    leg = _make_leg(LegType.SALE, CargoTransferType.AUTOLOAD, started_at=datetime.now(UTC))
+    session = _FakeSession(get_value=leg)
+    monkeypatch.setattr(trade_run_store, "SessionLocal", lambda: session)
+
+    result = await trade_run_store.catch_up_before_transaction(leg)
+
+    assert result.reached_at is not None
+    assert trade_run_store.next_unset_field(result) == LegMilestone.TRANSACTION_COMPLETED_AT
+
+
+async def test_catch_up_before_transaction_never_advances_a_leg_past_transaction_completed(monkeypatch):
+    now = datetime.now(UTC)
+    leg = _make_leg(
+        LegType.ACQUISITION, started_at=now, reached_at=now, transaction_completed_at=now,
+        transferred_at=now, finalized_at=now,
+    )
+    session = _FakeSession(get_value=leg)
+    monkeypatch.setattr(trade_run_store, "SessionLocal", lambda: session)
+
+    result = await trade_run_store.catch_up_before_transaction(leg)
+
+    assert result is leg
+    assert session.committed is False

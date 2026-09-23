@@ -57,12 +57,11 @@ class MarkCargoSoldTool(UplinkTool):
     description: str = (
         "Record that the pilot has sold cargo for their current, active sale leg — call this "
         "when they report a sale, e.g. 'I sold the copper', 'sold 640 SCU of iron', 'got 14 a "
-        "unit for the laranite'. Only works once the pilot has already confirmed arrival (see "
-        "mark_arrived), and for manually-unloaded cargo, once it's been confirmed unloaded — if "
-        "an earlier step hasn't happened yet, this will fail and tell you so instead of recording "
-        "the sale. Quantity, price, transfer type, and fee are all optional — only pass what the "
-        "pilot actually stated; anything unstated falls back to what was already planned for this "
-        "leg."
+        "unit for the laranite'. Arrival and unloading don't need to be separately confirmed "
+        "first — a completed sale already proves both happened, so this records them too if they "
+        "weren't already marked. Quantity, price, transfer type, and fee are all optional — only "
+        "pass what the pilot actually stated; anything unstated falls back to what was already "
+        "planned for this leg."
     )
     args_schema: type[BaseModel] = MarkCargoSoldArgs
     progress_label: str = "Updating trade run, marking that cargo has been sold."
@@ -84,6 +83,26 @@ class MarkCargoSoldTool(UplinkTool):
             cargo_transfer_type = leg.cargo_transfer_type if cargo_transfer_type is None else cargo_transfer_type
             cargo_transfer_fee = leg.cargo_transfer_fee if cargo_transfer_fee is None else cargo_transfer_fee
 
+            # REACHED_AT (always) or TRANSFERRED_AT (manual transfer only — autoload
+            # never has it as an independent step, see _SALE_AUTOLOAD_SEQUENCE) are the
+            # only fields that can precede a sale; a completed sale is impossible
+            # without both already being true, so it's evidence for them, not a guess.
+            # Named separately, not just a bool, because "unloading" isn't a real,
+            # separately-caught-up event for an autoload leg — saying so would be wrong.
+            caught_up_steps = []
+            if next_step is LegMilestone.REACHED_AT:
+                caught_up_steps.append("arrival")
+                if cargo_transfer_type == CargoTransferType.MANUAL:
+                    caught_up_steps.append("unloading")
+            elif next_step is LegMilestone.TRANSFERRED_AT:
+                caught_up_steps.append("unloading")
+
+            if caught_up_steps:
+                leg = await self._safe_run(trade_run_store.catch_up_before_transaction(leg))
+                if not isinstance(leg, TradeLeg):
+                    return leg
+                next_step = trade_run_store.next_unset_field(leg)
+
             if next_step is LegMilestone.TRANSACTION_COMPLETED_AT:
                 result = await self._safe_run(trade_run_store.record_sale(
                     leg_id=leg.id,
@@ -102,9 +121,16 @@ class MarkCargoSoldTool(UplinkTool):
                     # click Finalize" — see confirm_cargo_loaded's identical fix.
                     new_next_step = trade_run_store.next_unset_field(result)
                     if new_next_step == LegMilestone.FINALIZED_AT:
-                        return (f"Sale recorded for {result.commodity_name} at {result.terminal_name}. "
-                                f"This leg is ready to finalize — that's a manual step, so tell the "
-                                f"pilot to hit Finalize on it in the overlay whenever they're ready.")
+                        # Only three combinations are ever possible (see caught_up_steps
+                        # above), so spelling each out reads more naturally than a
+                        # generic join would for the single-item case.
+                        if caught_up_steps == ["arrival", "unloading"]:
+                            prefix = "Recorded arrival, unloading, and the sale"
+                        elif caught_up_steps:
+                            prefix = f"Recorded {caught_up_steps[0]} and the sale"
+                        else:
+                            prefix = "Sale recorded"
+                        return f"{prefix} for {result.commodity_name} at {result.terminal_name}."
                     return (f"Advanced leg: {result.commodity_name} at {result.terminal_name} "
                             f"from {LegMilestone.TRANSACTION_COMPLETED_AT} to {new_next_step}")
                 else:

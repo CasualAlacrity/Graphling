@@ -245,6 +245,26 @@ async def advance_leg(leg_id: UUID) -> TradeLeg:
         return leg
 
 
+async def catch_up_before_transaction(leg: TradeLeg) -> TradeLeg:
+    """Advances a leg through any purely-timestamp milestones still pending before a
+    purchase/sale can be recorded — arrival, and for a manually-transferred sale leg,
+    unloading. Exists so a pilot who reports a completed transaction directly ("I sold
+    it for 4,567") doesn't have to separately narrate steps a completed transaction
+    already proves happened: the terminal won't process a sale for cargo still on the
+    ship, or a purchase from someone who was never there, so the transaction being real
+    is itself sufficient evidence for what it depends on — not a guess. See the Phase 3
+    harness entry in docs/todo.md this is meant to be checked against.
+
+    Never advances into TRANSACTION_COMPLETED_AT itself — advance_leg already refuses
+    that field on its own (record_purchase/record_sale are the only way to set it), so
+    this relies on that guard rather than duplicating it. A leg already at or past
+    TRANSACTION_COMPLETED_AT is returned unchanged; it's not this function's place to
+    say whether that's an error, only its caller's."""
+    while next_unset_field(leg) not in (LegMilestone.TRANSACTION_COMPLETED_AT, None):
+        leg = await advance_leg(leg.id)
+    return leg
+
+
 def _apply_transaction(
         leg: TradeLeg,
         quantity_scu: int,

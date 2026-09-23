@@ -58,9 +58,9 @@ class MarkCargoAcquiredTool(UplinkTool):
     description: str = (
         "Record that the pilot has bought cargo for their current, active acquisition leg — "
         "call this when they report a purchase, e.g. 'I bought the copper', 'picked up 640 SCU "
-        "of iron', 'got the laranite for 14 a unit'. Only works once the pilot has already "
-        "confirmed arrival (see mark_arrived) — if arrival hasn't been marked yet, this will "
-        "fail and tell you so instead of recording the purchase. Quantity, price, transfer type, "
+        "of iron', 'got the laranite for 14 a unit'. Arrival doesn't need to be separately "
+        "confirmed first — a completed purchase already proves the pilot got there, so this "
+        "records arrival too if it wasn't already marked. Quantity, price, transfer type, "
         "and fee are all optional — only pass what the pilot actually stated; anything unstated "
         "falls back to what was already planned for this leg. This only records the transaction; "
         "it does not confirm the cargo has physically finished loading."
@@ -85,6 +85,13 @@ class MarkCargoAcquiredTool(UplinkTool):
             cargo_transfer_type = leg.cargo_transfer_type if cargo_transfer_type is None else cargo_transfer_type
             cargo_transfer_fee = leg.cargo_transfer_fee if cargo_transfer_fee is None else cargo_transfer_fee
 
+            caught_up = next_step is LegMilestone.REACHED_AT
+            if caught_up:
+                leg = await self._safe_run(trade_run_store.catch_up_before_transaction(leg))
+                if not isinstance(leg, TradeLeg):
+                    return leg
+                next_step = trade_run_store.next_unset_field(leg)
+
             if next_step is LegMilestone.TRANSACTION_COMPLETED_AT:
                 result = await self._safe_run(trade_run_store.record_purchase(
                     leg_id=leg.id,
@@ -94,6 +101,9 @@ class MarkCargoAcquiredTool(UplinkTool):
                     cargo_transfer_fee=cargo_transfer_fee,
                 ))
                 if isinstance(result, TradeLeg):
+                    if caught_up:
+                        return (f"Recorded arrival and the purchase for {result.commodity_name} "
+                                f"at {result.terminal_name}.")
                     new_next_step = trade_run_store.next_unset_field(result)
                     return (f"Advanced leg: {result.commodity_name} at {result.terminal_name} "
                             f"from {LegMilestone.TRANSACTION_COMPLETED_AT} to {new_next_step}")
