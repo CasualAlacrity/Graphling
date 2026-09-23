@@ -81,7 +81,15 @@ capacity-constrained GPU, not just a billing one.
   the configuration to avoid here — it's the one case where the x4 link is the bottleneck.
 - Ollama's fine-grained MoE offload control is weaker than llama.cpp's. If the winning
   configuration needs tensor-level placement, that may mean dropping below Ollama — which
-  matters because `get_chat_llm()` is `ChatOllama`-shaped.
+  matters because `get_chat_llm()` is `ChatOllama`-shaped. It also matters for
+  `graph.prewarm()` (2026-09-24, `PREWARM_OLLAMA` in `.env-template`): that only fires
+  for `LLM_PROVIDER=ollama`, on the assumption that prewarming is a local-dev-hardware
+  concern that stops mattering once FrankenLab or a closed-weight provider takes over.
+  That's only true if FrankenLab *also* ends up Ollama-shaped — the ~30s cold prompt-eval
+  measured on this Mac's base M4 doesn't disappear on better GPU, it just shrinks (same
+  math, faster hardware); it fully goes away only the day nothing in the stack is Ollama
+  anymore. If this question resolves toward llama.cpp instead, prewarm either needs a
+  llama.cpp-shaped equivalent or becomes genuinely dev-only for real.
 - Timeout values, and the spend-cap figures.
 - **Wait-vs-spend under load is a product decision, not a retry detail.** Today the design
   would silently choose "spend money" over "make users wait." At 2 users that's invisible;
