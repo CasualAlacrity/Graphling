@@ -93,6 +93,34 @@ async def test_get_reference_cache_builds_and_stores_on_a_miss(monkeypatch):
     assert session.committed
 
 
+async def test_refresh_reference_cache_rebuilds_unconditionally_even_with_a_fresh_row(monkeypatch):
+    # The whole point of refresh_ (server/refresh_static_caches.py, run after a patch)
+    # is to skip the cache check entirely — unlike get_reference_cache, a fresh existing
+    # row must not short-circuit this.
+    from tools.uexcorp.reference_cache import UexReferenceCache
+
+    fresh = UexReferenceCache(
+        fetched_at=datetime.now(UTC), commodities=[], star_systems=[], orbits=[], terminals=[], moons=[],
+        item_categories=[], items=[], vehicles=[], refinery_yields=[], poi=[], commodity_statuses=[],
+    )
+    session = _FakeSession(execute_value="a cache row would go here, but this must be ignored")
+    monkeypatch.setattr(uex_cache_service, "SessionLocal", lambda: session)
+
+    build_calls = []
+
+    async def fake_build():
+        build_calls.append(1)
+        return fresh
+
+    monkeypatch.setattr(UEXCorpClient, "build_uex_cache", lambda self: fake_build())
+
+    result = await uex_cache_service.refresh_reference_cache()
+
+    assert result is fresh
+    assert build_calls == [1]
+    assert session.committed
+
+
 async def test_get_commodity_price_rows_delegates_with_the_service_uex_client(monkeypatch):
     calls = []
 

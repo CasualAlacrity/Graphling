@@ -104,6 +104,27 @@ account) before pointing any real client's `ALICE_API_URL` at the new deploy —
 Dockerfile and alembic setup were verified locally against a real Postgres before this
 was ever written up, but the live Discord round trip only exists in production.
 
+## After a Star Citizen patch
+
+The UEX reference cache and wiki cache (ship speeds, locations) have a 24h TTL — after a
+patch, pilots could see pre-patch terminal/vehicle/ship data for up to a day waiting for
+that to expire naturally. Force a refresh instead:
+
+```bash
+ssh -i ~/.ssh/flockt root@168.119.234.226 "cd /opt/graphling && docker compose exec server python -m server.refresh_static_caches"
+```
+
+Rebuilds the UEX reference cache wholesale, and re-fetches every ship name already
+sitting in the wiki cache (not every ship that could ever exist — just what's actually
+been asked about) plus the locations dataset. Deliberately does **not** touch the UEX
+price/route cache (`uex_price_cache`) — that one has a 30-minute TTL already matched to
+UEX's own price-data freshness window, so it self-heals long before a manual refresh
+would matter, and a patch's real risk (a terminal's autoload flag, a vehicle's stats)
+is already covered by the reference cache rebuild — `find_best_route` re-patches
+autoload status against the *current* reference cache at query time regardless of what's
+sitting in a stale route row. See `server/refresh_static_caches.py`'s own docstring and
+`docs/todo.md`'s Phase 2 cache section for the full reasoning.
+
 ## Rollback
 
 The previous image is still on Docker Hub under its own SHA tag:

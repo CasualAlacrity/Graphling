@@ -64,10 +64,16 @@ async def get_ship_speed(ship_name: str) -> ShipSpeed | None:
         # the payload came from a real ShipSpeed's own model_dump(), not outside input.
         return ShipSpeed.model_construct(**value) if value is not None else None
 
+    return await refresh_ship_speed(ship_name)
+
+
+async def refresh_ship_speed(ship_name: str) -> ShipSpeed | None:
+    """Unconditional fetch-and-store, bypassing the cache check — for
+    server/refresh_static_caches.py. Cached even when None (ship not found) — a miss is
+    itself worth remembering for the TTL window rather than re-querying the wiki on
+    every subsequent lookup, same reasoning UexPriceCache already applies."""
+    key = ship_name.lower()
     ship_speed = await wiki_client.fetch_ship_speed_from_wiki(ship_name)
-    # Cached even when None (ship not found) — a miss is itself worth remembering for
-    # the TTL window rather than re-querying the wiki on every subsequent lookup, same
-    # reasoning UexPriceCache already applies to an empty result.
     await _store_payload(
         WikiCacheKind.SHIP_SPEED, key, {"ship_speed": ship_speed.model_dump(mode="json") if ship_speed else None},
     )
@@ -79,8 +85,23 @@ async def get_locations() -> list[LocationPosition]:
     if cached is not None:
         return [LocationPosition.model_validate(row) for row in cached["locations"]]
 
+    return await refresh_locations()
+
+
+async def refresh_locations() -> list[LocationPosition]:
+    """Unconditional fetch-and-store, bypassing the cache check — for
+    server/refresh_static_caches.py."""
     locations = await wiki_client.fetch_locations_from_wiki()
     await _store_payload(
         WikiCacheKind.LOCATIONS, LOCATIONS_KEY, {"locations": [loc.model_dump(mode="json") for loc in locations]},
     )
     return locations
+
+
+async def cached_ship_speed_keys() -> list[str]:
+    """Every ship name (lowercased cache key) already sitting in the cache — the set
+    server/refresh_static_caches.py re-fetches after a patch, not an exhaustive sweep of
+    every ship that could ever exist."""
+    async with SessionLocal() as session:
+        result = await session.execute(select(WikiCache.key).where(WikiCache.kind == WikiCacheKind.SHIP_SPEED))
+        return list(result.scalars().all())

@@ -154,3 +154,75 @@ async def test_stale_cache_row_is_treated_as_a_miss(monkeypatch):
     result = await wiki_cache_service.get_ship_speed("Railen")
 
     assert result is fresh
+
+
+# refresh_* — the unconditional fetch-and-store path server/refresh_static_caches.py
+# uses after a patch, which must bypass the cache check entirely (unlike get_ship_speed/
+# get_locations, a fresh existing row must not short-circuit these).
+
+async def test_refresh_ship_speed_refetches_even_with_a_fresh_cached_row(monkeypatch):
+    fresh_row = _make_row(WikiCacheKind.SHIP_SPEED, "railen", {"ship_speed": None})  # would be a hit if checked
+    session = _FakeSession(execute_value=fresh_row)
+    monkeypatch.setattr(wiki_cache_service, "SessionLocal", lambda: session)
+    fresh = _ship_speed()
+
+    fetch_calls = []
+
+    async def fake_fetch(self, ship_name):
+        fetch_calls.append(ship_name)
+        return fresh
+
+    monkeypatch.setattr(StarCitizenWikiClient, "fetch_ship_speed_from_wiki", fake_fetch)
+
+    result = await wiki_cache_service.refresh_ship_speed("Railen")
+
+    assert result is fresh
+    assert fetch_calls == ["Railen"]
+    assert session.committed
+
+
+async def test_refresh_locations_refetches_even_with_a_fresh_cached_row(monkeypatch):
+    fresh_row = _make_row(
+        WikiCacheKind.LOCATIONS, wiki_cache_service.LOCATIONS_KEY, {"locations": []},
+    )  # would be a hit if checked
+    session = _FakeSession(execute_value=fresh_row)
+    monkeypatch.setattr(wiki_cache_service, "SessionLocal", lambda: session)
+    fresh = [LocationPosition(name="Orison", type="City", system="Stanton", x=1.0, y=2.0, z=3.0)]
+
+    fetch_calls = []
+
+    async def fake_fetch(self):
+        fetch_calls.append(1)
+        return fresh
+
+    monkeypatch.setattr(StarCitizenWikiClient, "fetch_locations_from_wiki", fake_fetch)
+
+    result = await wiki_cache_service.refresh_locations()
+
+    assert result == fresh
+    assert fetch_calls == [1]
+    assert session.committed
+
+
+async def test_cached_ship_speed_keys_returns_only_ship_speed_kind_keys(monkeypatch):
+    class _FakeScalarsResult:
+        def __init__(self, values):
+            self._values = values
+
+        def scalars(self):
+            return self
+
+        def all(self):
+            return self._values
+
+    class _KeysSession(_FakeSession):
+        async def execute(self, stmt):
+            self.executed_stmt = stmt
+            return _FakeScalarsResult(["railen", "caterpillar"])
+
+    session = _KeysSession()
+    monkeypatch.setattr(wiki_cache_service, "SessionLocal", lambda: session)
+
+    result = await wiki_cache_service.cached_ship_speed_keys()
+
+    assert result == ["railen", "caterpillar"]

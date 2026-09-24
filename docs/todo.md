@@ -198,6 +198,35 @@ plan this was built from; deployment mechanics in `docs/deploy.md`.
       critically `UEXCorpClient.get_uex_cache()` itself all still worked (1791 wiki
       locations, 205 UEX commodities, 826 terminals, real data through the local server).
       249 tests passing.
+
+      **Deployed live — 2026-09-24.** One more bug found only by the real deploy, not
+      local testing: `server/requirements.txt` was scoped too narrowly — assumed the
+      server only needed the Postgres-touching parts of `tools/uexcorp/client.py`, but
+      `uex_cache_service.py`'s cache-miss path calls straight through to that same
+      class's other (`requests`-based) live-fetch methods as their fallback, and the
+      file also imports `langsmith` unconditionally for `@traceable`. Container
+      crash-looped (`ModuleNotFoundError`) until both were added — nginx's 502 correctly
+      reported nothing was listening upstream. Fixed, verified booting locally before
+      the second deploy, then confirmed live: both containers healthy, `wiki_cache`
+      migrated correctly, `/health` green, `/wiki-cache/locations` reachable through
+      nginx and correctly 401ing without a token.
+- [x] **Post-patch cache refresh script — 2026-09-24.** The 24h TTL on the reference/wiki
+      caches means a patch's changes (terminal/vehicle/ship data) could sit stale for up
+      to a day waiting for it to expire naturally. `server/refresh_static_caches.py`
+      (`docker compose exec server python -m server.refresh_static_caches`, see
+      `docs/deploy.md`) force-rebuilds the UEX reference cache and re-fetches every ship
+      name already in the wiki cache plus locations, bypassing the TTL check
+      (`uex_cache_service.refresh_reference_cache`/`wiki_cache_service.refresh_ship_
+      speed`/`refresh_locations`, new alongside the existing TTL-gated `get_*`
+      functions they share fetch/store logic with). Deliberately excludes the UEX
+      price/route cache — its 30-minute TTL already matches UEX's own price-data
+      freshness window, so it self-heals long before a manual refresh would help, and
+      the real patch risk (autoload flags, vehicle stats) is already covered by the
+      reference cache rebuild alone, since `find_best_route` re-patches those against
+      the *current* reference cache at query time regardless of what's cached in a
+      stale route row. Verified live against real Postgres/UEX/wiki: 205 commodities,
+      826 terminals, 282 vehicles, 1791 locations, all fetched_at timestamps confirmed
+      fresh in the DB afterward. 256 tests passing.
 - [ ] Multi-tenancy is also where the trade-data pipeline pools into — keep the schema
       open to per-observation station price/stock rows keyed by pilot + timestamp, even
       if that pipeline lands later.

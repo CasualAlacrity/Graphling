@@ -35,7 +35,14 @@ async def get_reference_cache() -> UexReferenceCache:
         cached = await load_reference_cache(session)
     if cached is not None:
         return cached
+    return await refresh_reference_cache()
 
+
+async def refresh_reference_cache() -> UexReferenceCache:
+    """Unconditional rebuild, bypassing the cache check entirely — for
+    server/refresh_static_caches.py, run by hand after a game patch, where a TTL-gated
+    read-through isn't what you want (the whole point is not waiting up to 24h for the
+    normal miss to happen on its own)."""
     cache = await uex_client.build_uex_cache()
 
     async with SessionLocal() as session:
