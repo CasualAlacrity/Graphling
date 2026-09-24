@@ -444,6 +444,26 @@ Parked:
       Trade Advisor. `get_finalized_runs` already exists; needs the aggregation + wiring.
 - [ ] **Hangar-size / Hull-C landing constraints** — backlogged, see
       `trade-route-tracker.md`'s "still open / not yet scoped" list.
+- [ ] **Tool output design — flagged 2026-09-24, not broken, revisit later.** Two related
+      but distinct concerns from a design discussion, neither urgent enough to act on now:
+      1. **Trade-run action tools' hand-composed phrase combinations.** `mark_cargo_sold_
+         tool.py` hardcodes three "recorded X, Y, and the sale" phrasings in Python because
+         a generic join read badly — arguably doing a little of the persona's job. Possible
+         fix, *not* a wholesale switch to UEX-tool-style structured data: keep success/
+         failure as an unambiguous field (never something inferred from a composed
+         sentence's tone — Section 6 of the persona prompt explicitly leans on tools
+         self-reporting outcomes plainly, and that's a real safety property worth keeping
+         for ledger-mutating tools), but let the *caught-up narrative* specifically
+         (`caught_up=["arrival", "unloading"]`) be structured data the persona phrases,
+         rather than a hardcoded lookup table of every combination.
+      2. **`best_route_tool.py`'s `_format_reply` smuggles route tokens inside the spoken
+         text itself** — `f" (Internal note, don't say this part aloud: {tokens_note}.)"`
+         — relying on the model reliably recognizing and obeying that parenthetical every
+         single reply, forever. The idiomatic LangChain fix is a tool `response_format=
+         "content_and_artifact"` return: `content` is the spoken message, `artifact` is
+         the route token(s), never entering the model's context as text to (mis)read
+         aloud at all. Worth checking whether `trade_advisor_tool.py` has the same
+         pattern when this gets picked up — not currently, per a live grep.
 
 ## Phase 5 — Tool-selection improvements (informed by Phase 3)
 
