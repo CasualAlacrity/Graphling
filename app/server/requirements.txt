@@ -17,3 +17,11 @@ sqlalchemy>=2.0
 greenlet>=3.0
 asyncpg>=0.29
 alembic>=1.13
+
+# uex_cache_service.py's cache-miss path calls straight through to UEXCorpClient's
+# other (uncached, requests-based) methods — get_commodity_prices etc. — not just the
+# Postgres-touching ones, so this genuinely is a server dependency, not client-only.
+# langsmith is tools/uexcorp/client.py's @traceable decorator — a no-op without
+# LANGSMITH_TRACING/LANGSMITH_API_KEY set, but the import itself is unconditional.
+requests
+langsmith
