@@ -49,10 +49,9 @@ LOCAL_MODEL_POWER_WATTS: dict[str, float] = {
     "gemma4": 420.0,
 }
 
-# $/kWh -- override with your real utility rate via this env var; 0.15 is a rough
-# US-average ballpark I'm guessing at, not your actual bill. Almost certainly wrong
-# for you specifically until this gets set for real.
-ELECTRICITY_RATE_USD_PER_KWH = float(os.getenv("ELECTRICITY_RATE_USD_PER_KWH", "0.15"))
+# $/kWh -- Jeff's real rate, not a guess. Override via this env var if it changes
+# or this ever runs on someone else's meter.
+ELECTRICITY_RATE_USD_PER_KWH = float(os.getenv("ELECTRICITY_RATE_USD_PER_KWH", "0.34"))
 
 
 def _local_cost_usd(model_name: str, latency_ms: float) -> float | None:
