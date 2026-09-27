@@ -278,9 +278,45 @@ Goal: when Jeff swaps in a new model or a provider ships an update, run one suit
 see whether every tool still gets selected and called with the right args, and whether
 outputs stay consistent.
 
-- [ ] **Deterministic external layer.** UEX Corp + Star Citizen Wiki HTTP calls recorded/
-      replayed (VCR-style cassettes) or behind a fake client, so the suite is stable and
-      offline. The UEX cache layer may already give a seam.
+- [ ] **Deterministic external layer.** Decided 2026-09-27: fake clients, not VCR-style
+      cassettes — no new dependency, consistent with the rest of the suite's existing
+      `httpx.MockTransport`/class-level-monkeypatch idiom, and easier to hand-craft the
+      garbled/ambiguous entity-name edge cases (below) than to capture them live. Backed
+      by one small shared "world" fixture (a fixed handful of terminals/commodities/
+      ships/routes), a deliberate exception to the rest of the suite's one-fixture-per-file
+      convention — the harness specifically needs the *same* world across many cases.
+      The server-mediation migration narrowed what actually needs faking: tools reach
+      UEX/wiki reference and route data through `uex_cache_client`/`wiki_cache_client`
+      (HTTP to *our own* ledger server, not the live APIs) and trade-run state through
+      `ledger_client` — only `UEXCorpClient`'s live per-request price/vehicle methods
+      (`get_commodity_prices`, `get_vehicle_purchase_prices`, etc., called directly by 6
+      of the 19 tools, uncached by design) ever touch a real external API from the
+      harness's vantage point at all.
+    - [x] **Live schema-drift check — framework built 2026-09-27, not yet scheduled.**
+          The fake-client harness above only proves our parsing code agrees with itself;
+          it can't catch UEX or the wiki actually renaming/dropping a field. Added
+          `app/check_live_schema.py` — a standalone script (same shape as
+          `server/refresh_static_caches.py`: run by hand or by an agent, not pytest-
+          collected) that hits every real endpoint our client code ever calls
+          (`build_uex_cache`'s 8 reference endpoints, `get_commodity_prices`,
+          `get_terminal_prices`, `get_item_prices`, `get_commodity_routes`,
+          `get_vehicle_purchase_prices`, `get_vehicle_rental_prices`,
+          `fetch_ship_speed_from_wiki`, `fetch_locations_from_wiki`) against a handful of
+          old, game-launch-era entities (Laranite, Cutlass Black, Freelancer) picked to
+          not disappear on their own, and fails loudly — per-endpoint, with the actual
+          exception — if a response no longer parses or comes back suspiciously empty.
+          Verified both ways: a clean run passes every check against production UEX/wiki;
+          a deliberately-broken bearer token correctly reports `SCHEMA DRIFT DETECTED`
+          with the real `403` and exits 1.
+
+          **Deliberately not scheduled yet** — decided 2026-09-27: we're still in active
+          development, where daily use already surfaces a drift by hand faster than a
+          weekly job would; this earns its keep once things are stable enough to go
+          quiet (production, past a code-lock). Built now anyway so the eventual
+          scheduling is just wiring, not design. When it does get scheduled (weekly,
+          via this environment's own scheduled-cloud-agent feature): on drift, the agent
+          **drafts a fix and opens a PR**, never auto-merges — same review bar as any
+          other change to parsing code that feeds a live, paid-API-backed product.
 - [ ] **Dataset of representative pilot utterances → expected tool call(s) + args.**
       Seed from real LangSmith traces plus tricky cases from git history (RMC matching,
       "is travel time included", cross-system routes, ambiguous ship names, compound
