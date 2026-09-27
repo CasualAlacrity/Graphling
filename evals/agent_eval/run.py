@@ -23,6 +23,7 @@ import os
 os.environ.setdefault("LANGSMITH_TRACING", "false")
 
 import asyncio
+import csv
 import json
 import sys
 import time
@@ -50,6 +51,32 @@ from harness.fakes import install_fakes  # noqa: E402
 from turn_metrics import compute_turn_metrics  # noqa: E402
 
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
+
+# The JSON report is the full, structured source of truth compare.py reads. This is
+# a flattened companion view of the same records -- one row per case x phrasing,
+# scalar fields only (dict fields get JSON-stringified into their cell) -- for
+# dragging into Excel/Sheets to eyeball trends across many runs over time, which a
+# pairwise JSON diff isn't really the tool for.
+CSV_FIELDS = [
+    "model_provider", "model_name", "case_id", "phrasing",
+    "expected_on_topic", "actual_on_topic", "on_topic_correct",
+    "expected_tool", "actual_tool", "tool_correct",
+    "expected_args", "actual_args", "args_correct",
+    "response_correct", "overall_pass",
+    "latency_ms", "tokens_in", "tokens_out", "tokens_total", "cost_usd",
+    "final_response", "judge_reasoning",
+]
+
+
+def _write_csv(records: list[dict], path: Path) -> None:
+    with path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=CSV_FIELDS, extrasaction="ignore")
+        writer.writeheader()
+        for record in records:
+            row = dict(record)
+            row["expected_args"] = json.dumps(row["expected_args"])
+            row["actual_args"] = json.dumps(row["actual_args"])
+            writer.writerow(row)
 
 MODEL_NAME_ENV_VAR = {
     "ollama": "OLLAMA_CHAT_MODEL",
@@ -203,9 +230,13 @@ async def main() -> int:
     print(f"  avg latency: {summary['avg_latency_ms']} ms")
 
     RESULTS_DIR.mkdir(exist_ok=True)
-    out_path = RESULTS_DIR / f"{model_provider}-{model_name}__{datetime.now(UTC):%Y%m%d-%H%M%S}.json"
-    out_path.write_text(json.dumps({"summary": summary, "records": records}, indent=2))
-    print(f"\nWrote {out_path}")
+    stem = f"{model_provider}-{model_name}__{datetime.now(UTC):%Y%m%d-%H%M%S}"
+    json_path = RESULTS_DIR / f"{stem}.json"
+    csv_path = RESULTS_DIR / f"{stem}.csv"
+    json_path.write_text(json.dumps({"summary": summary, "records": records}, indent=2))
+    _write_csv(records, csv_path)
+    print(f"\nWrote {json_path}")
+    print(f"Wrote {csv_path}")
 
     return 0 if passed == total else 1
 
