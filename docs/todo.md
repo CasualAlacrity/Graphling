@@ -278,7 +278,7 @@ Goal: when Jeff swaps in a new model or a provider ships an update, run one suit
 see whether every tool still gets selected and called with the right args, and whether
 outputs stay consistent.
 
-- [ ] **Deterministic external layer.** Decided 2026-09-27: fake clients, not VCR-style
+- [x] **Deterministic external layer — built 2026-09-27.** Decided 2026-09-27: fake clients, not VCR-style
       cassettes — no new dependency, consistent with the rest of the suite's existing
       `httpx.MockTransport`/class-level-monkeypatch idiom, and easier to hand-craft the
       garbled/ambiguous entity-name edge cases (below) than to capture them live. Backed
@@ -317,6 +317,54 @@ outputs stay consistent.
           via this environment's own scheduled-cloud-agent feature): on drift, the agent
           **drafts a fix and opens a PR**, never auto-merges — same review bar as any
           other change to parsing code that feeds a live, paid-API-backed product.
+    - [x] **`app/harness/` fake-client layer completed — 2026-09-27.** `world.py`
+          (a small fixed set of commodities/terminals/a vehicle/a route row/wiki ship
+          speed+locations, built from the real Pydantic models, not hand-rolled dicts)
+          and `fakes.py`'s `install_fakes()` (class-level patches on `UEXCorpClient`'s
+          live methods, module-level patches on `uex_cache_client`/`wiki_cache_client`)
+          — proven end to end against `commodity_price_lookup` and
+          `vehicle_purchase_lookup`, zero network calls. `ledger_client` (trade-run
+          state) intentionally not faked yet — no dataset case needs it so far.
+    - [x] **`evals/agent_eval/` — the LLM-in-the-loop harness itself, built and run for
+          real 2026-09-27.** One eval run = one model, same convention `evals/
+          start_trade_run_flow.py` already established (env-var driven, not an
+          in-process multi-model API) — comparing models means running this twice and
+          diffing the two report files. `cases.py`'s `HarnessCase` generalizes past
+          pure tool-selection on purpose: `expected_tool: str | None` (`None` = no tool
+          call is correct — covers a toolless reasoning/advice response, relevant once
+          memory lands) plus `expected_on_topic: bool`, which directly answers this
+          section's own open question above (item 4) about whether `classify_topic`
+          misfires need a separate eval track — they don't, they're just another case
+          shape in the same dataset. `judge.py` is a separate, fixed model (own env
+          vars `HARNESS_JUDGE_PROVIDER`/`_MODEL`) grading only response *substance*
+          against `expected_outcome` — tool name/args correctness stays a deterministic
+          check in `run.py`, no LLM call needed for something code can verify exactly.
+          `compare.py` diffs two report files (pass-rate/cost/token/latency deltas,
+          per-case FIXED/REGRESSED/still-failing). Starter dataset: 4 cases x 3
+          phrasings (commodity price, vehicle purchase, an off-topic decline, a
+          toolless SC-knowledge question) — small on purpose, matching this section's
+          own "hand-picked sample to start" framing.
+
+          **First real benchmark run, against `ollama:gemma4` (warm), 2026-09-27:**
+          10/12 passed (83%), $0 cost, 142,786 total tokens, ~29.7s avg latency
+          (cold — `prewarm()` didn't fully absorb the first call's cost here). Caught
+          two real issues, not synthetic ones: "What's the cheapest place to buy
+          Laranite?" got **no tool call at all**, and "Can you explain what quantum
+          drives do?" got a judged-incorrect explanation (missed the quantum-drive
+          spool-up time, claimed near-instant repositioning). Report committed at
+          `evals/agent_eval/results/ollama-gemma4__20260927-155736.json` — the
+          checked-in baseline future runs get compared against. One practical note:
+          the intended judge default (Anthropic Haiku) has only a placeholder key in
+          this `.env` and OpenAI's configured key is out of credits, so this run
+          used `HARNESS_JUDGE_PROVIDER=ollama HARNESS_JUDGE_MODEL=mistral-small` as a
+          one-off override — the code's real default stays `openai`/`gpt-4o-mini`
+          (documented in `judge.py`) once that account has credits again.
+
+          Still open from this section's older bullets, not yet built: evaluator (c)
+          no-spurious-extra-tool-calls and (e) markdown/formatting-artifact checks;
+          growing the dataset with the phonetic/garbled-entity and cross-turn-token
+          cases (items 1/3 above) — `ledger_client` needs faking first for the
+          cross-turn one.
 - [ ] **Dataset of representative pilot utterances → expected tool call(s) + args.**
       Seed from real LangSmith traces plus tricky cases from git history (RMC matching,
       "is travel time included", cross-system routes, ambiguous ship names, compound
@@ -344,9 +392,12 @@ outputs stay consistent.
          instances: "All. Good morning." (live trace, 2026-09-22) got declined with the
          canned "I don't do small talk" line, and "Let's do it." after a failed search was
          declined the same way (`classify-topic-rework.md`'s open questions) — the
-         classifier has no signal for pending-confirmation state. Not a tool-call case, so
-         it may need its own small eval track rather than living in this dataset — noting it
-         here so it isn't lost before that decision gets made.
+         classifier has no signal for pending-confirmation state. **Resolved 2026-09-27:**
+         doesn't need a separate eval track — `evals/agent_eval/cases.py`'s
+         `expected_on_topic` field covers it as one more case shape in the same dataset
+         (an `off_topic_greeting` case reproducing the "Good morning" pattern is already
+         in there). The "Let's do it." pending-confirmation variant isn't a dataset case
+         yet — same shape, just needs adding.
       5. **Inference/ambiguity-gating class of case (2026-09-23).** "I sold the copper for
          4,567 per SCU" said directly, with arrival/unloading never separately confirmed —
          does the model pick `mark_cargo_sold` with the *exact* stated price, not a
@@ -363,20 +414,25 @@ outputs stay consistent.
          it. A hand-picked sample of phrasings is fine to start from and grow over time —
          the point is catching inference issues with structure, before they're anecdotal
          reports from actual pilots.
-- [ ] **Evaluators:** (a) correct tool selected, (b) args resolved to the right
-      entities, (c) no spurious extra tool calls, (d) output snapshot / consistency
-      check so drift between models is visible, (e) no markdown or other formatting
-      artifacts in any spoken response, and a tool's own spoken-form phrasing (e.g. "960
-      thousand aUEC") is relayed as given, not recomputed or reformatted back to raw digits
-      — regression measured live 2026-09-22: `best_route`'s phrased profit figure came back
-      as `960,000 aUEC` inside a markdown bullet list in the final persona reply.
-- [ ] **Runner + report.** Executes the suite against a named model via `get_chat_llm`
-      and produces a pass / consistency summary. Decide: LangSmith `evaluate()` over a
-      Hub dataset, local pytest, or both.
-- [ ] **Track per-case latency alongside correctness**, not just pass/fail — this harness is
-      also where a model swap or FrankenLab coming online gets measured, not just whether
-      tool selection held up. Concrete baseline from 2026-09-22 (Gemma 4, local, no
-      FrankenLab yet): a session's first `respond` call cost 29.64s of prompt-eval alone for
+- [ ] **Evaluators:** (a) correct tool selected — **done**, deterministic check in
+      `run.py`. (b) args resolved to the right entities — **done** for exact/case-
+      insensitive match; not yet fuzzy. (c) no spurious extra tool calls — **not
+      built**, `run.py` only checks the first tool call today. (d) output snapshot /
+      consistency check so drift between models is visible — **done**, `compare.py`.
+      (e) no markdown or other formatting artifacts in any spoken response, and a
+      tool's own spoken-form phrasing (e.g. "960 thousand aUEC") is relayed as given,
+      not recomputed or reformatted back to raw digits — **not built**; the judge
+      grades substance, not formatting, today. Regression measured live 2026-09-22:
+      `best_route`'s phrased profit figure came back as `960,000 aUEC` inside a
+      markdown bullet list in the final persona reply.
+- [x] **Runner + report — built 2026-09-27.** `evals/agent_eval/run.py` +
+      `compare.py`, JSON report files checked into `evals/agent_eval/results/`, not
+      LangSmith `evaluate()` — see the harness build entry above for the full design.
+- [x] **Track per-case latency alongside correctness — built 2026-09-27.**
+      `app/turn_metrics.py`'s `TurnMetrics.latency_ms`, wall-clock around the whole
+      `graph.ainvoke()` call, recorded per case in the report file plus averaged in
+      its summary. Concrete baseline from 2026-09-22 (Gemma 4, local, no FrankenLab
+      yet): a session's first `respond` call cost 29.64s of prompt-eval alone for
       a ~9,700-token prompt (persona + all 18 bound tool schemas, before any real
       conversation) — later calls in the same session reused the cache and dropped to
       ~0.23s, and steady-state generation held ~28 tokens/sec regardless. Both numbers are
