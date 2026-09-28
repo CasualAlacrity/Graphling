@@ -49,6 +49,8 @@ LOCAL_MODEL_POWER_WATTS: dict[str, float] = {
     "gemma4": 420.0,
     "qwen2.5:14b": 420.0,  # same box/GPU as gemma4 -- a bigger model mostly shows up as
                            # more latency, not more watts, so the same draw estimate holds
+    "qwen3.5:9b": 420.0,
+    "gemma4:12b": 420.0,
 }
 
 # $/kWh -- Jeff's real rate, not a guess. Override via this env var if it changes
