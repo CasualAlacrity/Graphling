@@ -47,6 +47,8 @@ MODEL_PRICING: dict[tuple[str, str], tuple[float, float]] = {
 # reading under load if more precision matters later.
 LOCAL_MODEL_POWER_WATTS: dict[str, float] = {
     "gemma4": 420.0,
+    "qwen2.5:14b": 420.0,  # same box/GPU as gemma4 -- a bigger model mostly shows up as
+                           # more latency, not more watts, so the same draw estimate holds
 }
 
 # $/kWh -- Jeff's real rate, not a guess. Override via this env var if it changes

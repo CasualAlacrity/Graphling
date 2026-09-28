@@ -230,7 +230,10 @@ async def main() -> int:
     print(f"  avg latency: {summary['avg_latency_ms']} ms")
 
     RESULTS_DIR.mkdir(exist_ok=True)
-    stem = f"{model_provider}-{model_name}__{datetime.now(UTC):%Y%m%d-%H%M%S}"
+    # Ollama tags carry a colon (e.g. "qwen2.5:14b") -- fine in the JSON/CSV content
+    # itself, but sanitized for the filename to avoid any tooling friction.
+    safe_model_name = model_name.replace(":", "-").replace("/", "-")
+    stem = f"{model_provider}-{safe_model_name}__{datetime.now(UTC):%Y%m%d-%H%M%S}"
     json_path = RESULTS_DIR / f"{stem}.json"
     csv_path = RESULTS_DIR / f"{stem}.csv"
     json_path.write_text(json.dumps({"summary": summary, "records": records}, indent=2))
