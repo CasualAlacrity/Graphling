@@ -360,6 +360,29 @@ outputs stay consistent.
           one-off override — the code's real default stays `openai`/`gpt-4o-mini`
           (documented in `judge.py`) once that account has credits again.
 
+          **Local-model cost fixed 2026-09-28.** A model with no per-token API bill
+          isn't free — `app/turn_metrics.py` now prices Ollama models by estimated
+          system power draw (`LOCAL_MODEL_POWER_WATTS`, a spec-sheet guess — RTX
+          4080 TDP + ~100W for the rest of the system — until FrankenLab is up and a
+          real reading replaces it) x latency x Jeff's actual electricity rate
+          (`ELECTRICITY_RATE_USD_PER_KWH=0.34`, not a guess), rather than the
+          flat-$0 placeholder the first run above still carries.
+
+          **Second data point, `qwen2.5:14b`, 2026-09-28:** 7/12 passed (58%),
+          $0.043, ~91.2s avg latency — worse and slower than gemma4 on every axis,
+          same judge both times. When it skipped the tool call (same Laranite miss
+          gemma4 has), it didn't just fail silently — it hallucinated a wrong
+          location/price from its own training data rather than the fake world's
+          actual answer. Re-ran gemma4 too, under the corrected cost model, for a
+          fair comparison: `evals/agent_eval/results/ollama-gemma4__20260928-074516.
+          json` is the current baseline (supersedes the 2026-09-27 file, kept as
+          history, not deleted — its cost numbers predate the electricity fix and
+          aren't comparable to anything run since). That rerun scored 9/12 (75%),
+          not the original 10/12, on a *different* case — real LLM sampling
+          variance, not a bug. Worth remembering when reading any single comparison:
+          a 1-2 case swing between two runs of the *same* model may just be noise;
+          repeated runs / majority-vote scoring would settle this but isn't built.
+
           Still open from this section's older bullets, not yet built: evaluator (c)
           no-spurious-extra-tool-calls and (e) markdown/formatting-artifact checks;
           growing the dataset with the phonetic/garbled-entity and cross-turn-token
