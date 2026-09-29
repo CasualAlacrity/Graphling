@@ -20,7 +20,8 @@ class TurnMetrics(BaseModel):
     tokens_out: int
     tokens_total: int
     latency_ms: float
-    cost_usd: float | None  # None only if there's no pricing/power entry for this model
+    cost_usd: float | None  # None only for an unlisted *hosted* model -- every local
+                            # (Ollama) model gets a cost via DEFAULT_LOCAL_POWER_WATTS
 
 
 # (provider, model) -> ($ per 1M input tokens, $ per 1M output tokens). Hosted APIs
@@ -45,28 +46,24 @@ MODEL_PRICING: dict[tuple[str, str], tuple[float, float]] = {
 # guessed for the rest of the system (CPU/RAM/motherboard/PSU losses) while
 # actively inferencing. Refine with a real wall-meter (Kill-A-Watt or similar)
 # reading under load if more precision matters later.
-LOCAL_MODEL_POWER_WATTS: dict[str, float] = {
-    "gemma4": 420.0,
-    "qwen2.5:14b": 420.0,  # same box/GPU as gemma4 -- a bigger model mostly shows up as
-                           # more latency, not more watts, so the same draw estimate holds
-    "qwen3.5:9b": 420.0,
-    "gemma4:12b": 420.0,
-}
+#
+# Every local model measured so far gets the same estimate -- it's the same box/GPU
+# regardless of which model is loaded, and a bigger model mostly shows up as more
+# latency, not more watts. DEFAULT_LOCAL_POWER_WATTS is that shared estimate; entries
+# below only exist for a model that's genuinely known to differ (none do yet). Any
+# model name not in the dict -- including a composite label like "respond=gemma4:12b+
+# classify=gemma4" for a per-role split config (graph.py's OLLAMA_RESPOND_MODEL/
+# OLLAMA_CLASSIFY_MODEL) -- falls back to the default rather than reporting no cost.
+DEFAULT_LOCAL_POWER_WATTS = 420.0
+LOCAL_MODEL_POWER_WATTS: dict[str, float] = {}
 
 # $/kWh -- Jeff's real rate, not a guess. Override via this env var if it changes
 # or this ever runs on someone else's meter.
 ELECTRICITY_RATE_USD_PER_KWH = float(os.getenv("ELECTRICITY_RATE_USD_PER_KWH", "0.34"))
 
 
-def _local_cost_usd(model_name: str, latency_ms: float) -> float | None:
-    watts = LOCAL_MODEL_POWER_WATTS.get(model_name)
-    if watts is None:
-        print(
-            f"turn_metrics: no power estimate for local model {model_name!r} -- cost_usd "
-            f"will be None. Add a wattage to LOCAL_MODEL_POWER_WATTS if this model is "
-            f"going to be benchmarked for real."
-        )
-        return None
+def _local_cost_usd(model_name: str, latency_ms: float) -> float:
+    watts = LOCAL_MODEL_POWER_WATTS.get(model_name, DEFAULT_LOCAL_POWER_WATTS)
 
     kwh = (watts / 1000) * (latency_ms / 3_600_000)
     return kwh * ELECTRICITY_RATE_USD_PER_KWH

@@ -10,7 +10,7 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 from pydantic import BaseModel
 
-from llm import get_chat_llm
+from llm import get_chat_llm, get_classification_llm
 from prompt_loader import load_prompt
 from tools.best_route_tool import BestRouteTool
 from tools.starcitizenwiki.client import StarCitizenWikiClient
@@ -97,16 +97,15 @@ general_tools = [timer_tool, check_timer_tool, travel_time_tool, best_route_tool
 
 tools = uex_backed_tools + trade_run_tools + general_tools
 
-# reasoning=True only here, not on classifier_llm/reject_llm -- respond is where the
-# model actually decides whether/which tool to call, the one place the missed-tool-call
-# failures showed up. classify_topic and the reject line stay reasoning-off on purpose:
-# a fast binary decision and a short in-character line don't need it, and reasoning
-# costs real latency (see docs/todo.md's agent_eval entries for what's being tested
-# against). Experimental -- the harness is what decides whether this actually helps
-# versus just costing tokens/latency.
-llm = get_chat_llm(reasoning=True).bind_tools(tools)
-classifier_llm = get_chat_llm().with_structured_output(TopicClassification)
-reject_llm = get_chat_llm().with_structured_output(RejectLine)
+# get_chat_llm() (respond) and get_classification_llm() (classify_topic + reject) are
+# separately configured in .env (OLLAMA_CHAT_MODEL/OLLAMA_REASONING vs
+# OLLAMA_CLASSIFICATION_MODEL) -- see llm.py. respond is where the missed-tool-call
+# failures showed up and where reasoning has measurably helped (evals/agent_eval/
+# results/); classify_topic and the reject line are a fast binary decision and a
+# short in-character line, neither needing reasoning or necessarily respond's model.
+llm = get_chat_llm().bind_tools(tools)
+classifier_llm = get_classification_llm().with_structured_output(TopicClassification)
+reject_llm = get_classification_llm().with_structured_output(RejectLine)
 
 # name -> (llm instance, its static system-prompt template). Only a content-invariant
 # system prompt is worth prewarming at all: Ollama's cache is keyed on exact prompt

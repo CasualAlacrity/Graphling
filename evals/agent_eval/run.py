@@ -85,6 +85,23 @@ MODEL_NAME_ENV_VAR = {
 }
 
 
+def _resolve_model_name(model_provider: str) -> str:
+    """Single model name for the whole run, except Ollama's optional per-role split
+    (llm.py's get_chat_llm/get_classification_llm, OLLAMA_CHAT_MODEL vs
+    OLLAMA_CLASSIFICATION_MODEL) -- when those two differ, report a composite label
+    rather than silently naming the run after only one of the two models that
+    actually ran. turn_metrics.DEFAULT_LOCAL_POWER_WATTS covers the cost lookup for
+    a label like this with no matching table entry."""
+    if model_provider != "ollama":
+        return os.getenv(MODEL_NAME_ENV_VAR.get(model_provider, ""), "unknown")
+
+    respond_model = os.getenv("OLLAMA_CHAT_MODEL", "unknown")
+    classify_model = os.getenv("OLLAMA_CLASSIFICATION_MODEL") or respond_model
+    if respond_model == classify_model:
+        return respond_model
+    return f"respond={respond_model}+classify={classify_model}"
+
+
 def _tool_calls(messages: list) -> list[dict]:
     calls = []
     for message in messages:
@@ -187,7 +204,7 @@ async def _run_one(case: HarnessCase, phrasing: str, model_provider: str, model_
 
 async def main() -> int:
     model_provider = os.getenv("LLM_PROVIDER", "ollama")
-    model_name = os.getenv(MODEL_NAME_ENV_VAR.get(model_provider, ""), "unknown")
+    model_name = _resolve_model_name(model_provider)
 
     print(f"Running agent_eval against {model_provider}:{model_name}\n")
     await prewarm()
