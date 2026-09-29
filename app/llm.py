@@ -31,13 +31,15 @@ def get_classification_llm():
     and a short canned-shape line, neither needing get_chat_llm's reasoning or
     necessarily its model size. Falls back to *_CHAT_MODEL when a dedicated
     *_CLASSIFICATION_MODEL isn't set, so an unset .env behaves like one model
-    everywhere, same as before this split existed. Always reasoning-off, on
-    purpose -- no override needed here, unlike get_chat_llm."""
+    everywhere, same as before this split existed. Reasoning defaults off (the
+    fast/simple case here); set OLLAMA_CLASSIFICATION_REASONING=true in .env if a
+    future classification model actually needs it turned on."""
     provider = os.getenv("LLM_PROVIDER", "ollama")
 
     if provider == "ollama":
         model = os.getenv("OLLAMA_CLASSIFICATION_MODEL") or os.getenv("OLLAMA_CHAT_MODEL")
-        return ChatOllama(model=model, reasoning=False)
+        reasoning = os.getenv("OLLAMA_CLASSIFICATION_REASONING", "false").strip().lower() == "true"
+        return ChatOllama(model=model, reasoning=reasoning)
     elif provider == "openai":
         model = os.getenv("OPENAI_CLASSIFICATION_MODEL") or os.getenv("OPENAI_CHAT_MODEL")
         return ChatOpenAI(model=model)
