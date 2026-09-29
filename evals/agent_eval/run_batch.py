@@ -33,6 +33,16 @@ RUN_SCRIPT = REPO_ROOT / "evals" / "agent_eval" / "run.py"
 # judge usable again (see judge.py's own default).
 JUDGE_ENV = {"HARNESS_JUDGE_PROVIDER": "ollama", "HARNESS_JUDGE_MODEL": "mistral-small:latest"}
 
+# Every CONFIGS entry below only overrides the OLLAMA_* vars -- if a machine's own
+# .env has LLM_PROVIDER=openai (.env-template's default; only this repo's local .env
+# was ever changed to ollama), run.py ignores those overrides entirely and silently
+# runs gpt-4o-mini instead (confirmed 2026-09-29: a batch run on a freshly-set-up
+# machine produced an "openai-gpt-4o-mini" report despite CONFIGS naming only gemma4
+# models). Forcing it here removes the dependency on every machine's .env being
+# edited correctly; a CONFIGS entry can still override this explicitly if a future
+# batch deliberately wants to include a hosted-model comparison run.
+BASE_ENV = {"LLM_PROVIDER": "ollama"}
+
 # (label for the commit message, env var overrides for that run). Add/remove entries
 # to choose what a given batch covers -- nothing else in this file needs editing.
 CONFIGS: list[tuple[str, dict[str, str]]] = [
@@ -61,7 +71,7 @@ def _models_needed() -> set[str]:
 
 def _run_one_config(label: str, overrides: dict[str, str]) -> bool:
     print(f"\n{'=' * 60}\nRunning: {label}\n{'=' * 60}")
-    env = {**os.environ, **JUDGE_ENV, **overrides, "PYTHONPATH": "."}
+    env = {**os.environ, **BASE_ENV, **JUDGE_ENV, **overrides, "PYTHONPATH": "."}
     result = subprocess.run([sys.executable, str(RUN_SCRIPT)], cwd=str(APP_DIR), env=env)
     # run.py's own exit code is 0 (all cases passed) or 1 (some failed) -- neither
     # means the run itself crashed. Anything else means it genuinely errored out.
