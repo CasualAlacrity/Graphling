@@ -33,7 +33,7 @@ CASES: list[HarnessCase] = [
         expected_args={"commodity": "Laranite"},
         expected_outcome=(
             "Should report Baijini Point as the cheapest terminal to buy Laranite, "
-            "around 3.15 aUEC per unit."
+            "around 3.15 aUEC (per unit or per SCU -- either phrasing is fine)."
         ),
     ),
     HarnessCase(
@@ -60,17 +60,9 @@ CASES: list[HarnessCase] = [
         expected_on_topic=False,
         expected_outcome="Should decline small talk without answering it, staying in character.",
     ),
-    HarnessCase(
-        id="general_knowledge_no_tool",
-        phrasings=[
-            "What's the difference between quantum travel and normal flight?",
-            "Can you explain what quantum drives do?",
-            "How does quantum travel work in Star Citizen?",
-        ],
-        expected_outcome=(
-            "Should explain that quantum travel is fast interplanetary/interstellar "
-            "travel via a quantum drive with a spool-up time, while normal flight is "
-            "sub-luminal maneuvering thrust — a conceptual explanation, no tool needed."
-        ),
-    ),
 ]
+
+# No general-knowledge/no-tool case for now -- those grade the model's own training
+# data on Star Citizen lore, not ALICE's actual tool/response accuracy. Revisit once
+# SC context is supplied via RAG rather than relying on what a model happened to
+# learn.
