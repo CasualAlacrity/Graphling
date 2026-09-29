@@ -32,6 +32,21 @@ Model evidence so far (second machine, 5090, 2026-09-29, reasoning on — the
   and ~195s. The split 8B-classify/12B-respond config inherited the 12B's failures.
 - Every case sends ~20k input tokens (persona + 19 tool schemas).
 
+**Reasoning-off rerun** (same machine, same day, two independent runs each config —
+answers the "Reasoning off" open question below):
+
+- **gemma4 8B:** drops to 67–78% without reasoning (down from the runs above) — concrete
+  conveyance failures, e.g. a response that never mentions the correct terminal at all. 8B
+  is the one model in this lineup reasoning measurably helps.
+- **gemma4 12B:** **100% both runs, ~8s average** — no fabrication, no runaway generation.
+  Reverses the reasoning-on picture above entirely.
+- **gemma4:26b MoE:** 100% both runs, ~7.5s average — tied with 12B on accuracy/latency.
+  Loses to 12B specifically for FrankenLab's 4080 (16GB): 26B's smallest quant (16GB QAT)
+  leaves no VRAM headroom for concurrent KV cache the way 12B's 7.6GB does.
+- **Split 8B-classify/12B-respond:** 100% both runs too, once 12B stopped fabricating — the
+  split's earlier failures were 12B's reasoning-on behavior bleeding through, not a problem
+  with splitting roles per se.
+
 ## Desired outcome
 
 - Every utterance meets its tier's budget, measured **PTT release → first ElevenLabs audio
@@ -113,11 +128,17 @@ Model evidence so far (second machine, 5090, 2026-09-29, reasoning on — the
 - **Stage updates are toggleable at two levels:** by us per tool, switched on only where
   measured averages show a pilot would otherwise wait in silence; and by the pilot, who may
   not want to hear them. Acks and final answers are not optional.
-- **12B rejected, including as a conversation-only model** (2026-09-29). It fabricated
-  answers instead of calling tools, was the slowest config tested, and its toolless
-  answers were judged wrong more often than the 8B's. A "8B picks the tool, 12B phrases the
-  answer" split also *adds* a model call to every turn — the opposite of this doc's goal.
-  If ALICE's voice feels thin on the 8B, fix the prompt before reaching for a bigger model.
+- **12B rejected, including as a conversation-only model** (2026-09-29) — **superseded the
+  same day.** That verdict was reasoning-ON 12B: fabricated a different wrong Cutlass
+  Black terminal each run, was the slowest config tested, occasionally ran away to ~22k
+  output tokens. The reasoning-off rerun above reverses it: two clean 100% runs, ~8s
+  average, no fabrication, no runaway generation — not the slowest config, one of the
+  fastest. **Current read: `gemma4:12b` with `OLLAMA_REASONING=false` is the strongest
+  single-model option tested so far**, not a rejected one. The split-role critique still
+  holds independent of reasoning, though — a second model call every turn is the opposite
+  of this doc's goal — so prefer a straight `gemma4:12b` respond model over the split if
+  12B gets used. "Fix the prompt before reaching for a bigger model" is no longer the only
+  lever on offer: reasoning-off 12B is a real, cheap-enough alternative worth trying first.
 
 - **Audio vocabulary: earcons for the routine, speech for meaning** (2026-09-29). Modelled
   on Star Trek's ship computer (chirp for simple commands, "Working…" for longer ones,
@@ -169,9 +190,9 @@ Model evidence so far (second machine, 5090, 2026-09-29, reasoning on — the
 
 ## Open questions
 
-- **Reasoning off.** The 26B's output was mostly thinking tokens around one-sentence
-  replies. Rerun 8B and 26B with `OLLAMA_REASONING=false` before concluding anything
-  about whether 26B can fit tier budgets — and check whether accuracy holds.
+- **Resolved 2026-09-29 — reasoning off.** Reran 8B/12B/26B with `OLLAMA_REASONING=false`,
+  two runs each. See Model evidence and Decided above: 12B and 26B both hit 100% and get
+  fast enough to fit tier budgets; 8B needs reasoning on to hold its own accuracy.
 - **The 26B's 26–29s outliers** had *fewer* output tokens than its 10s cases. Prompt eval?
   Cache eviction? Unexplained until stage timing exists.
 - **Ack timing depends on respond #1.** An ack fired on tool-call emission still waits for
