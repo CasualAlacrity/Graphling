@@ -26,12 +26,23 @@ import asyncio
 import csv
 import json
 import sys
+import textwrap
 import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+# Plain ANSI -- no new dependency, and Terminal.app/Windows Terminal/PowerShell all
+# handle raw escape codes fine. Skipped when stdout isn't a real terminal (piped to
+# a file, or run_batch.py's subprocess output in a non-interactive context) so logs
+# don't fill up with escape-code noise.
+_COLOR = sys.stdout.isatty()
+
+
+def _c(text: str, code: str) -> str:
+    return f"\033[{code}m{text}\033[0m" if _COLOR else text
 
 # judge.py builds its LLM at import time (same eager-construction style graph.py
 # itself uses) -- load .env explicitly, here, before that import, rather than
@@ -206,7 +217,7 @@ async def main() -> int:
     model_provider = os.getenv("LLM_PROVIDER", "ollama")
     model_name = _resolve_model_name(model_provider)
 
-    print(f"Running agent_eval against {model_provider}:{model_name}\n")
+    print(_c(f"Running agent_eval against {model_provider}:{model_name}\n", "1;36"))
     await prewarm()
 
     records = []
@@ -214,13 +225,32 @@ async def main() -> int:
         for phrasing in case.phrasings:
             record = await _run_one(case, phrasing, model_provider, model_name)
             records.append(record)
-            status = "PASS" if record["overall_pass"] else "FAIL"
+            if record["overall_pass"]:
+                status = _c("PASS", "32")
+            else:
+                status = _c("FAIL", "1;31")
             print(f"[{status}] {case.id!r} — {phrasing!r}")
             if not record["overall_pass"]:
-                print(f"       on_topic: expected={record['expected_on_topic']} actual={record['actual_on_topic']}")
-                print(f"       tool: expected={record['expected_tool']} actual={record['actual_tool']}")
-                if record["judge_reasoning"]:
-                    print(f"       judge: {record['judge_reasoning']}")
+                # Only print the field(s) that actually caused the fail -- a mismatch
+                # is often just one of these, and printing all three every time buried
+                # the one that mattered under two that already matched.
+                if not record["on_topic_correct"]:
+                    label = _c("on_topic", "1;31")
+                    print(f"       {label}: expected={record['expected_on_topic']} actual={record['actual_on_topic']}")
+                if record["tool_correct"] is False:
+                    label = _c("tool", "1;31")
+                    print(f"       {label}: expected={record['expected_tool']} actual={record['actual_tool']}")
+                if record["args_correct"] is False:
+                    label = _c("args", "1;31")
+                    print(f"       {label}: expected={record['expected_args']} actual={record['actual_args']}")
+                if record["response_correct"] is False and record["judge_reasoning"]:
+                    wrapped = textwrap.fill(
+                        record["judge_reasoning"],
+                        width=100,
+                        initial_indent="       judge: ",
+                        subsequent_indent="              ",
+                    )
+                    print(_c(wrapped, "33"))
 
     total = len(records)
     passed = sum(1 for r in records if r["overall_pass"])
@@ -240,8 +270,10 @@ async def main() -> int:
         "avg_latency_ms": round(avg_latency, 1),
     }
 
-    print(f"\n=== Summary: {model_provider}:{model_name} ===")
-    print(f"  {passed}/{total} passed ({summary['pass_rate']:.0%})")
+    print(_c(f"\n=== Summary: {model_provider}:{model_name} ===", "1;36"))
+    pass_rate_color = "32" if passed == total else ("1;31" if passed == 0 else "33")
+    pass_line = f"{passed}/{total} passed ({summary['pass_rate']:.0%})"
+    print(f"  {_c(pass_line, pass_rate_color)}")
     print(f"  total cost: ${summary['total_cost_usd']}")
     print(f"  total tokens: {summary['total_tokens']}")
     print(f"  avg latency: {summary['avg_latency_ms']} ms")
