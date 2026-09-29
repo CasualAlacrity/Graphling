@@ -97,7 +97,14 @@ general_tools = [timer_tool, check_timer_tool, travel_time_tool, best_route_tool
 
 tools = uex_backed_tools + trade_run_tools + general_tools
 
-llm = get_chat_llm().bind_tools(tools)
+# reasoning=True only here, not on classifier_llm/reject_llm -- respond is where the
+# model actually decides whether/which tool to call, the one place the missed-tool-call
+# failures showed up. classify_topic and the reject line stay reasoning-off on purpose:
+# a fast binary decision and a short in-character line don't need it, and reasoning
+# costs real latency (see docs/todo.md's agent_eval entries for what's being tested
+# against). Experimental -- the harness is what decides whether this actually helps
+# versus just costing tokens/latency.
+llm = get_chat_llm(reasoning=True).bind_tools(tools)
 classifier_llm = get_chat_llm().with_structured_output(TopicClassification)
 reject_llm = get_chat_llm().with_structured_output(RejectLine)
 
