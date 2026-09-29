@@ -26,6 +26,7 @@ import asyncio
 import csv
 import json
 import sys
+import textwrap
 import time
 import uuid
 from datetime import UTC, datetime
@@ -230,10 +231,26 @@ async def main() -> int:
                 status = _c("FAIL", "1;31")
             print(f"[{status}] {case.id!r} — {phrasing!r}")
             if not record["overall_pass"]:
-                print(f"       on_topic: expected={record['expected_on_topic']} actual={record['actual_on_topic']}")
-                print(f"       tool: expected={record['expected_tool']} actual={record['actual_tool']}")
-                if record["judge_reasoning"]:
-                    print(f"       judge: {record['judge_reasoning']}")
+                # Only print the field(s) that actually caused the fail -- a mismatch
+                # is often just one of these, and printing all three every time buried
+                # the one that mattered under two that already matched.
+                if not record["on_topic_correct"]:
+                    label = _c("on_topic", "1;31")
+                    print(f"       {label}: expected={record['expected_on_topic']} actual={record['actual_on_topic']}")
+                if record["tool_correct"] is False:
+                    label = _c("tool", "1;31")
+                    print(f"       {label}: expected={record['expected_tool']} actual={record['actual_tool']}")
+                if record["args_correct"] is False:
+                    label = _c("args", "1;31")
+                    print(f"       {label}: expected={record['expected_args']} actual={record['actual_args']}")
+                if record["response_correct"] is False and record["judge_reasoning"]:
+                    wrapped = textwrap.fill(
+                        record["judge_reasoning"],
+                        width=100,
+                        initial_indent="       judge: ",
+                        subsequent_indent="              ",
+                    )
+                    print(_c(wrapped, "33"))
 
     total = len(records)
     passed = sum(1 for r in records if r["overall_pass"])
