@@ -37,25 +37,23 @@ from voice.timer_tool import CheckTimerTool, StartTimerTool
 class State(BaseModel):
     messages: Annotated[list[BaseMessage], add_messages]
     on_topic: bool = True
-    decline_line_str: str | None = None
+    reason: str | None = None
 
 
 class TopicClassification(BaseModel):
     on_topic: bool
-    decline_line_str: str | None = None
     reason: str
 
 
-class DeclineLine(BaseModel):
-    id: int
-    tag: str
-    text: str
+class RejectLine(BaseModel):
+    line: str
 
 
 load_dotenv()
 
 PERSONA_TEMPLATE = load_prompt("alice-persona")
 CLASSIFY_TEMPLATE = load_prompt("topic-classification")
+REJECT_TEMPLATE = load_prompt("topic-reject-voice")
 
 uex_client = UEXCorpClient(
     api_key=os.getenv("UEXCORP_API_KEY"),
@@ -101,43 +99,65 @@ tools = uex_backed_tools + trade_run_tools + general_tools
 
 llm = get_chat_llm().bind_tools(tools)
 classifier_llm = get_chat_llm().with_structured_output(TopicClassification)
+reject_llm = get_chat_llm().with_structured_output(RejectLine)
+
+# name -> (llm instance, its static system-prompt template). Only a content-invariant
+# system prompt is worth prewarming at all: Ollama's cache is keyed on exact prompt
+# text, so a template that interpolates per-turn variables into the system message
+# (unlike these three) would never match a real call's prompt anyway — see
+# decline_topic's own note on why REJECT_TEMPLATE stays variable-free for this reason.
+_PREWARM_TARGETS = [
+    ("persona", llm, PERSONA_TEMPLATE),
+    ("classifier", classifier_llm, CLASSIFY_TEMPLATE),
+    ("reject", reject_llm, REJECT_TEMPLATE),
+]
+
+_warmed: set[str] = set()
 
 
 async def prewarm() -> None:
-    """Fires one throwaway call through each bound LLM at the exact prompt shape it'll
-    see for real, so Ollama's prompt-prefix cache is warm before the pilot's first turn
-    lands on it instead of during it. Only meaningful for LLM_PROVIDER=ollama — measured
-    2026-09-22: the persona's tool-bound prompt (persona + every tool schema, ~9,700
-    tokens) cost ~30s of pure prompt-eval on its first call, dropping to well under a
-    second on every call afterward that shares the same prefix. A generic "ping the
-    model" warmup wouldn't fix this — load_duration was already ~2ms even on that cold
-    call, so it was never a model-loading cost, and Ollama's cache is keyed on the
-    actual prompt content — which is why this replays the real persona/classifier
-    prompts rather than sending something arbitrary. Hosted providers don't have this
-    cold-start cost, so this is a no-op for them rather than spending real money on a
-    call that buys nothing.
+    """Fires one throwaway call through each not-yet-warmed LLM at the exact prompt
+    shape it'll see for real, so Ollama's prompt-prefix cache is warm before the
+    pilot's first turn lands on it instead of during it. Only meaningful for
+    LLM_PROVIDER=ollama — measured 2026-09-22: the persona's tool-bound prompt
+    (persona + every tool schema, ~9,700 tokens) cost ~30s of pure prompt-eval on its
+    first call, dropping to well under a second on every call afterward that shares
+    the same prefix. A generic "ping the model" warmup wouldn't fix this —
+    load_duration was already ~2ms even on that cold call, so it was never a
+    model-loading cost, and Ollama's cache is keyed on the actual prompt content —
+    which is why this replays the real prompts rather than sending something
+    arbitrary. Hosted providers don't have this cold-start cost, so this is a no-op
+    for them rather than spending real money on a call that buys nothing.
 
-    Best-effort: a prewarm failure shouldn't block startup, only means the pilot's
-    first message pays the cold-start cost this was meant to hide."""
+    Idempotent via _warmed — safe to call more than once; only targets not already
+    warmed this process do real work. Adding a future model (a tool-family router,
+    a second reasoning-tier model, whatever's next) is a one-line addition to
+    _PREWARM_TARGETS, not an edit to this function.
+
+    Best-effort per target: one target failing to warm shouldn't block the others or
+    startup — it only means that specific call pays the cold-start cost for real."""
     if os.getenv("LLM_PROVIDER", "ollama") != "ollama":
         return
     if os.getenv("PREWARM_OLLAMA", "true").strip().lower() == "false":
         return
 
+    to_warm = [(name, model, tmpl) for name, model, tmpl in _PREWARM_TARGETS if name not in _warmed]
+    if not to_warm:
+        return
+
     warmup_turn = [HumanMessage(content="(warmup)")]
-    try:
-        await asyncio.gather(
-            llm.ainvoke(
-                PERSONA_TEMPLATE.invoke({}).to_messages() + warmup_turn,
-                config={"run_name": "prewarm-persona", "tags": ["warmup"]},
-            ),
-            classifier_llm.ainvoke(
-                CLASSIFY_TEMPLATE.invoke({}).to_messages() + warmup_turn,
-                config={"run_name": "prewarm-classifier", "tags": ["warmup"]},
-            ),
-        )
-    except Exception as exc:
-        print(f"[ALICE] Prewarm failed ({exc}) — the first real message will be slow instead.")
+
+    async def _warm_one(name: str, model, template) -> None:
+        try:
+            await model.ainvoke(
+                template.invoke({}).to_messages() + warmup_turn,
+                config={"run_name": f"prewarm-{name}", "tags": ["warmup"]},
+            )
+            _warmed.add(name)
+        except Exception as exc:
+            print(f"[ALICE] Prewarm failed for {name!r} ({exc}) — its first real call will be slow instead.")
+
+    await asyncio.gather(*[_warm_one(name, model, tmpl) for name, model, tmpl in to_warm])
 
 
 async def respond(state: State) -> dict:
@@ -149,14 +169,22 @@ async def respond(state: State) -> dict:
 async def classify_topic(state: State) -> dict:
     messages = CLASSIFY_TEMPLATE.invoke({}).to_messages()
     response = await classifier_llm.ainvoke(messages + state.messages)
-    return {
-        "on_topic": response.on_topic,
-        "decline_line_str": response.decline_line_str
-    }
+    return {"on_topic": response.on_topic, "reason": response.reason}
 
 
 async def decline_topic(state: State) -> dict:
-    return {"messages": [AIMessage(state.decline_line_str)]}
+    # REJECT_TEMPLATE.invoke({}) takes no variables on purpose — utterance/reason are
+    # appended as a separate HumanMessage instead of interpolated into the system
+    # prompt, so the system prompt stays content-invariant and prewarm() can actually
+    # warm it (a template with per-turn variables baked into its system message would
+    # never match a real call's prompt text, so warming it with dummy content
+    # wouldn't help — see _PREWARM_TARGETS' note).
+    context = HumanMessage(
+        content=f"Pilot said: {state.messages[-1].content}\nWhy it's off-topic: {state.reason}"
+    )
+    messages = REJECT_TEMPLATE.invoke({}).to_messages() + [context]
+    response = await reject_llm.ainvoke(messages)
+    return {"messages": [AIMessage(response.line)]}
 
 
 def route_topic(state: State) -> str:
