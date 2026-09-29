@@ -1,0 +1,1 @@
+model_provider,model_name,case_id,phrasing,expected_on_topic,actual_on_topic,on_topic_correct,expected_tool,actual_tool,tool_correct,expected_args,actual_args,args_correct,response_correct,overall_pass,latency_ms,tokens_in,tokens_out,tokens_total,cost_usd,final_response,judge_reasoning
