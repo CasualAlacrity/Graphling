@@ -90,6 +90,82 @@ directly.
       `delete_run`. **Decided 2026-09-24: staying that way, on purpose.** Abandoning a
       run is purely a pilot-run action — no voice path, no confirmed-only exception. Not
       implicit anymore.
+- [ ] **URGENT — recorded leg values can't be edited (found 2026-09-29).** Once a
+      purchase/sale is recorded — overlay *or* voice — it's permanent: `record_purchase`/
+      `record_sale` (`app/server/ledger_service.py`) refuse a second record, no update
+      endpoint exists, Mark Done and Finalize Run show read-only recaps
+      (`build_recap_grid`), and Abandon disappears once anything is bought
+      (`_can_abandon`). The overlay Buy/Sell form before submit is the only edit window,
+      and the voice path skips it entirely — so one Whisper mishearing (614 for 640) is a
+      permanent wrong ledger entry today. Blocks the voice readback decided in
+      `docs/intent/voice-latency.md` ("640 at 14.2, logged" is pointless if "no, 614" has
+      nowhere to go).
+    - [ ] **Ledger edit path — server + overlay** (Claude implements, per the split above).
+          **Spec: `docs/ledger-edit-path.md`**; wider design: `docs/intent/run-model.md`.
+          Quantity, price, transfer type, and fee editable on any recorded leg **until the
+          run is finalized**: from the leg's Mark Done review and from the Finalize Run
+          step, both legs. Run Finalize stays the lock point and stays manual-only.
+    - [ ] **Voice correction tool** on top of it (Jeff's — tool + schema). "No, it was 614"
+          / "actually 14.5 a unit" right after a readback. Scope from
+          `docs/ledger-trust-and-corrections.md`'s voice-corrections design, cut down to
+          editing recorded values — not the shelved per-value provenance system.
+    - **Decided 2026-09-29 (Jeff):**
+        - **A bought quantity carries forward to the sale leg.** Correcting (or recording)
+          the buy as 614 means the sale leg's planned quantity is 614 — you can only sell
+          what you bought. Not true today even without edits: `_apply_transaction` only
+          touches its own leg, so buying 614 against a 640 plan leaves the sale leg at
+          640, and "sold it all" / the Sell form default to 640.
+        - **Editing a done leg keeps it done** — only its values change. Done legs must be
+          editable, or the Finalize Run step is a rubber stamp with nothing to review.
+    - [ ] **Quantity reconciliation before Finalize Run.** Bought 640, sold 614 → the run
+          isn't finished; 26 SCU are unaccounted for. Today nothing checks this: the Sell
+          quantity box allows up to 100,000 and the server never compares legs, so selling
+          *more* than was bought records fine and inflates profit. Needs:
+          - sold > bought → rejected (or forces a correction of one leg);
+          - sold < bought → Finalize Run blocked until the remainder is accounted for.
+          **Why a remainder exists — Jeff, 2026-09-29:**
+          1. *Wrong buy amount, no real cargo left* → a ledger edit before Finalize; this
+             is exactly what the manual Finalize step is for (edit path above).
+          2. *Waiting to sell here later* — most likely the terminal's demand filled up
+             mid-sale. Wait-vs-move-on stays the pilot's call (`trade_advisor` already
+             refuses to weigh in on it).
+          3. *Selling the rest somewhere else* — and probably asking ALICE where.
+          Plus one Claude added: 4. *Cargo is gone* (death, piracy, crash) — common in
+          SC, and currently unfinalizable since Abandon disappears after a purchase.
+
+          **Resulting model (proposed):** a run is **one buy leg + N sale legs**;
+          remainder = bought − Σ sold; the run stays open (in progress, remainder shown)
+          while remainder > 0; **Finalize Run requires remainder = 0**. Cases 2 and 3 are
+          both "add another sale leg" (same terminal, or a new one); case 4 is a
+          **write-off** with a reason — kept only for real loss, not as the general way to
+          close a remainder. This replaces "only ever one sibling per run"
+          (`advance_leg`'s sibling-start logic, overlay leg rendering, profit math all
+          assume it) and also closes the "sold 300, keeping the rest" partial-sale gap.
+          - [ ] Schema + server + overlay for N sale legs and remainder (Claude).
+          - [ ] Write-off for lost cargo (Claude, overlay; voice path TBD — same
+                pilot-only question as Abandon).
+          - [ ] AI: "where can I sell the other 26?" + "add a sale leg there" (Jeff —
+                tools). Close cousin of `find_detour_pickup`, which also appends a leg to
+                an existing run.
+    - [ ] **Sell-only runs — a run with no buy leg** (Jeff's idea, 2026-09-29). For cargo
+          that never came from a terminal: miners (refined ore), salvagers (RMC/CMAT),
+          pirates (hot cargo, sellable only at no-questions-asked terminals). Opens the
+          ledger to whole player groups the buy→sell model excludes. Same model as above,
+          generalized: every run = **a cargo source + N sale legs**, profit = Σ sales −
+          cost basis. Source is either a buy leg (cost basis = price × SCU) or
+          mined/salvaged/looted (cost basis 0). Not a separate trade type — a run whose
+          source isn't a purchase.
+          - Kept distinct from leftover trade cargo: a trade run's remainder gets another
+            sale leg *on the same run*, so one trade keeps one honest profit figure.
+            Moving a remainder into a fresh sell-only run would book a loss on the
+            original and a fake 100% margin on the new one. A carry-over (remainder moves
+            to a later run *with* its cost basis) is possible later if "sell it next
+            session" turns out to be common — not needed now.
+          - AI side already half-exists: `commodity_price_lookup`'s `best_to_sell` answers
+            "where do I sell 32 SCU of Quant?" — what's missing is committing it as a run
+            (a sell-only `start_trade_run` path, Jeff's).
+          - Open: does "hot" cargo need its own flag, so lookups only suggest terminals that
+            will actually take it? Depends on whether UEX exposes that.
 
 ## Phase 2 — Multi-tenancy (shared backend, per-user client)
 
@@ -389,6 +465,7 @@ outputs stay consistent.
           cases (items 1/3 above) — `ledger_client` needs faking first for the
           cross-turn one.
 - [ ] **Dataset of representative pilot utterances → expected tool call(s) + args.**
+      Candidate phrasings per tool, plus uncovered gaps, in `docs/utterance-coverage.md`.
       Seed from real LangSmith traces plus tricky cases from git history (RMC matching,
       "is travel time included", cross-system routes, ambiguous ship names, compound
       "loaded it, what's the ETA"). Two concrete seed cases from designing `start_trade_run`
@@ -461,6 +538,10 @@ outputs stay consistent.
       ~0.23s, and steady-state generation held ~28 tokens/sec regardless. Both numbers are
       levers this harness should keep visible: tool-schema bulk (bind fewer/smaller tools,
       or delegate to `agent-roles.md`'s datarunner) and raw hardware throughput.
+- [ ] **Voice stage timing — whisper → graph stages → TTS → playback, per live turn**
+      (Claude — instrumentation only). Spec: `docs/voice-stage-timing.md`. First step of
+      `docs/intent/voice-latency.md`; measured against the latency tiers in
+      `docs/utterance-coverage.md`. `latency_ms` above is graph-only, a lower bound.
 
 - [ ] **Travel-time model covers only horizontal distance.** Measured 2026-09-18: Orison
       TDD to Admin - Seraphim, a climb out of atmosphere, estimates at 0.1 min because
