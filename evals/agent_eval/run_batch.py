@@ -53,17 +53,23 @@ CONFIGS: list[tuple[str, dict[str, str]]] = [
         "OLLAMA_CHAT_MODEL": "gemma4:12b",
         "OLLAMA_CLASSIFICATION_MODEL": "gemma4",
     }),
-    # MoE, 4B active params despite 26B total -- untested until now, the Mac's
-    # unified memory made it impractical to even try alongside everything else.
+    # MoE, 4B active params despite 26B total. Tied with gemma4:12b on accuracy/
+    # latency at reasoning-off (2026-09-29, two clean 100% runs each), but its
+    # smallest quant (16GB QAT) leaves no VRAM headroom for concurrent KV cache on
+    # the FrankenLab 4080 (16GB) the way 12b's 7.6GB does -- kept for comparison,
+    # not currently the practical choice for that box.
     ("gemma4:26B MoE", {"OLLAMA_CHAT_MODEL": "gemma4:26b"}),
-    # The only model in this lineup with real graduated reasoning levels
-    # (langchain_ollama's reasoning='low'/'medium'/'high' -- confirmed everything
-    # else here just treats any non-empty string as a flat on/off). Runs with
-    # OLLAMA_REASONING's plain true/false for now, same as every other config;
-    # exercising its actual low/medium/high levels needs get_chat_llm() to support
-    # a string reasoning value, which is a separate change from just adding it here.
-    ("gpt-oss", {"OLLAMA_CHAT_MODEL": "gpt-oss"}),
 ]
+
+# gpt-oss was tried here (real graduated reasoning levels, unlike everything above
+# which just treats any non-empty reasoning string as a flat on/off) and dropped
+# 2026-09-29: it doesn't reliably honor Ollama's json_schema structured-output
+# constraint -- classify_topic crashed on non-JSON output ("on_topic: true\nreason:
+# ...") despite that being langchain_ollama's default (and most reliable) method.
+# Confirmed this isn't a fixable config on our end: with_structured_output() was
+# already on its strictest method with no override. Also lower priority now that
+# reasoning-off has been shown to beat reasoning-on for 12B+ models anyway, which
+# was the original reason to want gpt-oss's tunable levels in the first place.
 
 
 def _ollama_pull(model: str) -> None:
