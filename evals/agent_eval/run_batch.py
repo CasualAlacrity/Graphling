@@ -53,6 +53,16 @@ CONFIGS: list[tuple[str, dict[str, str]]] = [
         "OLLAMA_CHAT_MODEL": "gemma4:12b",
         "OLLAMA_CLASSIFICATION_MODEL": "gemma4",
     }),
+    # MoE, 4B active params despite 26B total -- untested until now, the Mac's
+    # unified memory made it impractical to even try alongside everything else.
+    ("gemma4:26B MoE", {"OLLAMA_CHAT_MODEL": "gemma4:26b"}),
+    # The only model in this lineup with real graduated reasoning levels
+    # (langchain_ollama's reasoning='low'/'medium'/'high' -- confirmed everything
+    # else here just treats any non-empty string as a flat on/off). Runs with
+    # OLLAMA_REASONING's plain true/false for now, same as every other config;
+    # exercising its actual low/medium/high levels needs get_chat_llm() to support
+    # a string reasoning value, which is a separate change from just adding it here.
+    ("gpt-oss", {"OLLAMA_CHAT_MODEL": "gpt-oss"}),
 ]
 
 
