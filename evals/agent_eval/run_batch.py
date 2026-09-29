@@ -26,6 +26,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 APP_DIR = REPO_ROOT / "app"
 RUN_SCRIPT = REPO_ROOT / "evals" / "agent_eval" / "run.py"
+RESULTS_DIR = REPO_ROOT / "evals" / "agent_eval" / "results"
 
 # Judge stays fixed across the whole batch -- every run in one batch needs to be
 # graded the same way to be comparable to every other, and to earlier batches from
@@ -72,11 +73,21 @@ def _models_needed() -> set[str]:
 def _run_one_config(label: str, overrides: dict[str, str]) -> bool:
     print(f"\n{'=' * 60}\nRunning: {label}\n{'=' * 60}")
     env = {**os.environ, **BASE_ENV, **JUDGE_ENV, **overrides, "PYTHONPATH": "."}
+    before = set(RESULTS_DIR.glob("*.json"))
     result = subprocess.run([sys.executable, str(RUN_SCRIPT)], cwd=str(APP_DIR), env=env)
     # run.py's own exit code is 0 (all cases passed) or 1 (some failed) -- neither
     # means the run itself crashed. Anything else means it genuinely errored out.
     if result.returncode not in (0, 1):
         print(f"WARNING: {label!r} exited {result.returncode} -- likely crashed, not just failed cases.")
+        return False
+    # An uncaught exception inside run.py also exits 1 (Python's default), which is
+    # indistinguishable from "ran fine, some cases failed" by returncode alone --
+    # the likely explanation for a 2026-09-29 batch run whose commit message
+    # credited all 3 configs as complete while only 1 report file actually landed.
+    # Requiring a new file to have appeared closes that gap regardless of cause.
+    after = set(RESULTS_DIR.glob("*.json"))
+    if not (after - before):
+        print(f"WARNING: {label!r} exited {result.returncode} but wrote no new report file -- treating as failed.")
         return False
     return True
 
