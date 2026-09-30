@@ -3,7 +3,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 
 from db.models import User
-from ledger_schemas import CreateRunRequest, RecordTransactionRequest, TradeLegOut, TradeRunOut
+from ledger_schemas import (
+    CreateRunRequest,
+    RecordTransactionRequest,
+    TradeLegOut,
+    TradeRunOut,
+    UpdateTransactionRequest,
+)
 from server import ledger_service
 from server.dependencies import get_current_user
 
@@ -62,6 +68,16 @@ async def record_sale(leg_id: UUID, body: RecordTransactionRequest, user: User =
     try:
         return await ledger_service.record_sale(
             leg_id, body.quantity_scu, body.price_per_unit, body.cargo_transfer_type, body.cargo_transfer_fee,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.patch("/legs/{leg_id}/transaction", response_model=TradeLegOut)
+async def update_transaction(leg_id: UUID, body: UpdateTransactionRequest, user: User = Depends(get_current_user)):
+    try:
+        return await ledger_service.update_transaction(
+            leg_id, body.quantity_scu, body.price_per_unit, body.cargo_transfer_fee, body.cargo_transfer_type,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

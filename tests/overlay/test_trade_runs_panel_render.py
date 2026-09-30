@@ -317,6 +317,141 @@ def test_abandon_button_hidden_once_cargo_is_bought(trade_runs_panel):
     assert card.findChild(QPushButton, "abandonRunButton") is None
 
 
+def test_edit_button_shown_on_a_recorded_leg_of_an_unfinalized_run(trade_runs_panel):
+    # The acquisition leg is finalized (so it's the non-current leg, rendered via the
+    # bare-recap path) and has a recorded transaction -- Edit should be offered there,
+    # even though the run itself is still in progress (sale leg not yet touched).
+    now = datetime.now(UTC)
+    finalized_leg = make_trade_leg(
+        LegType.ACQUISITION, started_at=now, reached_at=now,
+        transaction_completed_at=now, transferred_at=now, finalized_at=now,
+    )
+    run = make_trade_run(legs=[finalized_leg, make_trade_leg(LegType.SALE)])
+    card = trade_runs_panel._build_run_card(run, 0)
+    assert card.findChild(QPushButton, "editButton") is not None
+
+
+def test_edit_button_absent_on_an_unrecorded_leg(trade_runs_panel):
+    run = make_trade_run(legs=[make_trade_leg(LegType.ACQUISITION), make_trade_leg(LegType.SALE)])
+    card = trade_runs_panel._build_run_card(run, 0)
+    assert card.findChild(QPushButton, "editButton") is None
+
+
+def test_edit_button_absent_on_a_finalized_run(trade_runs_panel):
+    now = datetime.now(UTC)
+
+    def _finished(leg_type):
+        return make_trade_leg(
+            leg_type, started_at=now, reached_at=now, transaction_completed_at=now,
+            transferred_at=now, finalized_at=now,
+        )
+
+    run = make_trade_run(legs=[_finished(LegType.ACQUISITION), _finished(LegType.SALE)], finalized_at=now)
+    card = trade_runs_panel._build_run_card(run, 0)
+    assert card.findChild(QPushButton, "editButton") is None
+
+
+def test_edit_button_click_starts_editing_the_real_leg(trade_runs_panel):
+    now = datetime.now(UTC)
+    finalized_leg = make_trade_leg(
+        LegType.ACQUISITION, started_at=now, reached_at=now,
+        transaction_completed_at=now, transferred_at=now, finalized_at=now,
+    )
+    run = make_trade_run(legs=[finalized_leg, make_trade_leg(LegType.SALE)])
+    captured = []
+    trade_runs_panel._on_start_edit = lambda leg_id: captured.append(leg_id)
+
+    card = trade_runs_panel._build_run_card(run, 0)
+    card.findChild(QPushButton, "editButton").click()
+
+    assert captured == [finalized_leg.id]
+
+
+def test_editing_a_leg_shows_the_prefilled_transaction_widget(trade_runs_panel):
+    now = datetime.now(UTC)
+    finalized_leg = make_trade_leg(
+        LegType.ACQUISITION, started_at=now, reached_at=now, transaction_completed_at=now,
+        transferred_at=now, finalized_at=now, quantity_scu=640, price_per_unit=14,
+    )
+    run = make_trade_run(legs=[finalized_leg, make_trade_leg(LegType.SALE)])
+    trade_runs_panel._leg_editing[finalized_leg.id] = True
+
+    card = trade_runs_panel._build_run_card(run, 0)
+
+    widget = card.findChild(BuyCargoWidget)
+    assert widget is not None
+    assert widget.quantity_input.value() == 640
+    assert widget.price_input.value() == 14
+    assert widget.confirm_button.text() == "Save changes"
+    assert card.findChild(QPushButton, "cancelButton") is not None
+    # Not shown as a plain recap while editing.
+    assert card.findChild(QPushButton, "editButton") is None
+
+
+def test_editing_a_sale_leg_shows_the_sell_cargo_widget(trade_runs_panel):
+    now = datetime.now(UTC)
+    finalized_leg = make_trade_leg(LegType.ACQUISITION, started_at=now, reached_at=now, finalized_at=now)
+    sold_leg = make_trade_leg(
+        LegType.SALE, started_at=now, reached_at=now, transaction_completed_at=now,
+        transferred_at=now, finalized_at=now, quantity_scu=700,
+    )
+    run = make_trade_run(legs=[finalized_leg, sold_leg])
+    trade_runs_panel._leg_editing[sold_leg.id] = True
+
+    card = trade_runs_panel._build_run_card(run, 0)
+
+    widget = card.findChild(SellCargoWidget)
+    assert widget is not None
+    assert widget.quantity_input.value() == 700
+
+
+def test_cancel_click_stops_editing_the_real_leg(trade_runs_panel):
+    now = datetime.now(UTC)
+    finalized_leg = make_trade_leg(
+        LegType.ACQUISITION, started_at=now, reached_at=now, transaction_completed_at=now,
+        transferred_at=now, finalized_at=now,
+    )
+    run = make_trade_run(legs=[finalized_leg, make_trade_leg(LegType.SALE)])
+    trade_runs_panel._leg_editing[finalized_leg.id] = True
+    captured = []
+    trade_runs_panel._on_cancel_edit = lambda leg_id: captured.append(leg_id)
+
+    card = trade_runs_panel._build_run_card(run, 0)
+    card.findChild(QPushButton, "cancelButton").click()
+
+    assert captured == [finalized_leg.id]
+
+
+def test_edit_button_shown_on_the_current_legs_mark_done_view(trade_runs_panel):
+    # Single-leg run, fully advanced but not yet leg-finalized -- this is the *other*
+    # Edit call site (_build_leg_dialog's Mark Done branch), distinct from the
+    # non-current-leg recap tests above.
+    now = datetime.now(UTC)
+    leg = make_trade_leg(
+        LegType.ACQUISITION, started_at=now, reached_at=now,
+        transaction_completed_at=now, transferred_at=now,
+    )
+    run = make_trade_run(legs=[leg])
+    card = trade_runs_panel._build_run_card(run, 0)
+    assert card.findChild(QPushButton, "editButton") is not None
+    assert card.findChild(QPushButton, "markDoneButton") is not None
+
+
+def test_editing_the_current_legs_mark_done_view_hides_mark_done(trade_runs_panel):
+    now = datetime.now(UTC)
+    leg = make_trade_leg(
+        LegType.ACQUISITION, started_at=now, reached_at=now,
+        transaction_completed_at=now, transferred_at=now,
+    )
+    run = make_trade_run(legs=[leg])
+    trade_runs_panel._leg_editing[leg.id] = True
+
+    card = trade_runs_panel._build_run_card(run, 0)
+
+    assert card.findChild(BuyCargoWidget) is not None
+    assert card.findChild(QPushButton, "markDoneButton") is None
+
+
 def test_ledger_row_marks_profitable_run(trade_ledger_panel):
     now = datetime.now(UTC)
     acquisition = make_trade_leg(

@@ -50,3 +50,12 @@ class RecordTransactionRequest(BaseModel):
     price_per_unit: int
     cargo_transfer_type: CargoTransferType
     cargo_transfer_fee: int
+
+
+class UpdateTransactionRequest(BaseModel):
+    # All optional -- a caller only sends the fields it's actually changing;
+    # update_transaction leaves anything left as None untouched.
+    quantity_scu: int | None = None
+    price_per_unit: int | None = None
+    cargo_transfer_type: CargoTransferType | None = None
+    cargo_transfer_fee: int | None = None

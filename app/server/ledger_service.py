@@ -165,6 +165,22 @@ async def record_purchase(
             leg, quantity_scu, price_per_unit, cargo_transfer_type, cargo_transfer_fee,
             also_stamp_transferred=False,
         )
+
+        # Carry-forward: the sale leg's planned quantity follows what was actually
+        # bought, so a pilot who later says "sold it all" sells what was really
+        # purchased, not a stale planned amount (docs/todo.md's 614-vs-640 bug). A
+        # default for the common case, not a constraint -- the pilot can still record
+        # a different sale quantity, including more than was bought (selling from
+        # inventory carried over from earlier play is a real, allowed case). Only
+        # touches the sale leg's *plan*; update_transaction is the path for correcting
+        # an already-recorded sale.
+        result = await session.execute(
+            select(TradeLeg).where(TradeLeg.run_id == leg.run_id, TradeLeg.id != leg.id)
+        )
+        sale_leg = result.scalar_one_or_none()
+        if sale_leg is not None and sale_leg.transaction_completed_at is None:
+            sale_leg.quantity_scu = quantity_scu
+
         await session.commit()
         return leg
 
@@ -190,6 +206,50 @@ async def record_sale(
             leg, quantity_scu, price_per_unit, cargo_transfer_type, cargo_transfer_fee,
             also_stamp_transferred=leg.transferred_at is None,
         )
+        await session.commit()
+        return leg
+
+
+async def update_transaction(
+        leg_id: UUID, quantity_scu: int | None = None, price_per_unit: int | None = None,
+        cargo_transfer_fee: int | None = None, cargo_transfer_type: CargoTransferType | None = None,
+) -> TradeLeg:
+    """Corrects a leg's already-recorded quantity/price/fee/transfer-type, up until its
+    run is finalized -- for a Whisper mishearing or any other after-the-fact fix. Doesn't
+    touch transaction_completed_at/transferred_at/finalized_at: editing a done leg keeps
+    it done, only its values change. No cross-check against the sibling leg's quantity --
+    a sale exceeding its own run's acquisition is a real case (cargo sold from inventory
+    carried over from earlier play), not something to reject."""
+    async with SessionLocal() as session:
+        leg = await session.get(TradeLeg, leg_id)
+        if leg is None:
+            raise ValueError(f"No trade leg with id {leg_id}")
+        if leg.transaction_completed_at is None:
+            raise ValueError(
+                f"Trade leg {leg_id} has no recorded transaction yet -- "
+                "use record_purchase/record_sale instead"
+            )
+
+        result = await session.execute(select(TradeRun.finalized_at).where(TradeRun.id == leg.run_id))
+        if result.scalar_one_or_none() is not None:
+            raise ValueError(f"Trade run {leg.run_id} is already finalized")
+
+        for value, label in (
+            (quantity_scu, "quantity_scu"), (price_per_unit, "price_per_unit"),
+            (cargo_transfer_fee, "cargo_transfer_fee"),
+        ):
+            if value is not None and value < 0:
+                raise ValueError(f"{label} can't be negative")
+
+        if quantity_scu is not None:
+            leg.quantity_scu = quantity_scu
+        if price_per_unit is not None:
+            leg.price_per_unit = price_per_unit
+        if cargo_transfer_fee is not None:
+            leg.cargo_transfer_fee = cargo_transfer_fee
+        if cargo_transfer_type is not None:
+            leg.cargo_transfer_type = cargo_transfer_type
+
         await session.commit()
         return leg
 

@@ -67,6 +67,48 @@ def test_list_in_progress_runs_returns_the_service_result(monkeypatch):
     assert len(body[0]["legs"]) == 1
 
 
+def test_update_transaction_returns_the_updated_leg(monkeypatch):
+    fake_user = User(id=uuid.uuid4(), discord_id="123")
+    app.dependency_overrides[get_current_user] = lambda: fake_user
+    leg_id = uuid.uuid4()
+
+    async def fake_update_transaction(given_leg_id, quantity_scu, price_per_unit, cargo_transfer_fee, cargo_transfer_type):
+        assert given_leg_id == leg_id
+        assert quantity_scu == 99
+        return _make_leg(id=leg_id, quantity_scu=99, transaction_completed_at=datetime.now(UTC))
+
+    monkeypatch.setattr(ledger_service, "update_transaction", fake_update_transaction)
+
+    try:
+        client = TestClient(app)
+        response = client.patch(f"/trade-runs/legs/{leg_id}/transaction", json={"quantity_scu": 99})
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert response.status_code == 200
+    assert response.json()["quantity_scu"] == 99
+
+
+def test_update_transaction_surfaces_a_value_error_as_400(monkeypatch):
+    fake_user = User(id=uuid.uuid4(), discord_id="123")
+    app.dependency_overrides[get_current_user] = lambda: fake_user
+    leg_id = uuid.uuid4()
+
+    async def fake_update_transaction(*args, **kwargs):
+        raise ValueError(f"Trade leg {leg_id} has no recorded transaction yet")
+
+    monkeypatch.setattr(ledger_service, "update_transaction", fake_update_transaction)
+
+    try:
+        client = TestClient(app)
+        response = client.patch(f"/trade-runs/legs/{leg_id}/transaction", json={"quantity_scu": 99})
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert response.status_code == 400
+    assert "has no recorded transaction yet" in response.json()["detail"]
+
+
 def test_advance_leg_surfaces_a_value_error_as_400(monkeypatch):
     fake_user = User(id=uuid.uuid4(), discord_id="123")
     app.dependency_overrides[get_current_user] = lambda: fake_user

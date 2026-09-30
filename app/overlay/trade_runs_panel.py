@@ -202,6 +202,10 @@ def _is_ready_to_finalize(run):
     return all(leg.finalized_at is not None for leg in run.legs)
 
 
+def _can_edit_transaction(run, leg):
+    return leg.transaction_completed_at is not None and run.finalized_at is None
+
+
 def _leg_values(leg, draft):
     if draft is not None:
         return draft["quantity_scu"], draft["price_per_unit"], draft["cargo_transfer_fee"]
@@ -240,6 +244,10 @@ class TradeRunsPanel(HudWindow):
         # instead of freezing at whatever was true the first time it was ever seen.
         self._run_expanded = {}
         self._leg_expanded = {}
+        # Keyed by leg id — a leg with a recorded transaction, on an unfinalized run,
+        # swaps its recap for an editable Buy/Sell form while its id is in here. Cleared
+        # on Cancel or a successful save, same lifecycle as _draft_purchase below.
+        self._leg_editing = {}
         # Keyed by leg id — survives a refresh() (which the canvas triggers on every tab
         # switch, not just after a mutating action) so a pilot mid-typing in Buy/Sell Cargo
         # doesn't lose it by tabbing away and back.
@@ -408,7 +416,7 @@ class TradeRunsPanel(HudWindow):
             body_layout.addWidget(build_leg_breadcrumb(leg))
             body_layout.addWidget(self._build_leg_dialog(run, leg))
         else:
-            body_layout.addWidget(build_recap_grid(leg))
+            body_layout.addWidget(self._build_recap_or_edit(run, leg))
         # Reparent before setVisible() — see the note in _build_run_card.
         layout.addWidget(body)
         body.setVisible(expanded)
@@ -486,15 +494,58 @@ class TradeRunsPanel(HudWindow):
         # leg's own recap (what was actually bought/sold, fees, timestamps) still belongs
         # here — otherwise the one step every leg passes through renders as a bare button
         # with no information at all, unlike every other leg state.
+        if self._leg_editing.get(leg.id):
+            # Editing replaces this whole view, not just the recap — Mark Done doesn't
+            # belong alongside an in-progress edit of the same leg's values.
+            return self._build_recap_or_edit(run, leg)
+
         button_row = QWidget()
         button_layout = QVBoxLayout(button_row)
         button_layout.setContentsMargins(0, 8, 0, 0)
         button_layout.setSpacing(8)
-        button_layout.addWidget(build_recap_grid(leg))
+        button_layout.addWidget(self._build_recap_or_edit(run, leg))
         mark_done_button = QPushButton(parent=button_row, text="Mark Done", objectName="markDoneButton")
         mark_done_button.clicked.connect(lambda checked=False, lid=leg.id: self._on_advance(lid))
         button_layout.addWidget(mark_done_button)
         return button_row
+
+    def _build_recap_or_edit(self, run, leg):
+        """A recorded leg's recap, with an Edit affordance while its run isn't finalized
+        — used both for a non-current leg's collapsed body and the current leg's own
+        Mark Done view, so Edit appears everywhere the spec calls for it from one place.
+        Swaps to the live Buy/Sell form in edit mode instead of a partial in-place patch,
+        matching this panel's existing full-rerender-from-state convention (_toggle_leg)."""
+        if self._leg_editing.get(leg.id):
+            widget_cls = BuyCargoWidget if leg.leg_type == LegType.ACQUISITION else SellCargoWidget
+            return widget_cls(
+                leg,
+                run=run,
+                on_change=lambda draft, lid=leg.id, rid=run.id: self._on_draft_changed(lid, rid, draft),
+                on_submit=lambda *values, lid=leg.id: self._on_update_transaction(lid, *values),
+                edit_mode=True,
+                on_cancel=lambda lid=leg.id: self._on_cancel_edit(lid),
+            )
+
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        layout.addWidget(build_recap_grid(leg))
+        if _can_edit_transaction(run, leg):
+            edit_button = QPushButton(parent=container, text="Edit", objectName="editButton")
+            edit_button.setProperty("small", True)
+            edit_button.clicked.connect(lambda checked=False, lid=leg.id: self._on_start_edit(lid))
+            layout.addWidget(edit_button)
+        return container
+
+    def _on_start_edit(self, leg_id):
+        self._leg_editing[leg_id] = True
+        self.render_runs(self._last_runs)
+
+    def _on_cancel_edit(self, leg_id):
+        self._leg_editing.pop(leg_id, None)
+        self._draft_purchase.pop(leg_id, None)
+        self.render_runs(self._last_runs)
 
     @staticmethod
     def _build_upcoming_finalize_row():
@@ -567,6 +618,20 @@ class TradeRunsPanel(HudWindow):
         except Exception as exc:
             self.show_message(f"Couldn't record sale — {exc}")
             return
+        self._draft_purchase.pop(leg_id, None)
+        await self.refresh()
+
+    @asyncSlot(object, object, object, object, object)
+    async def _on_update_transaction(self, leg_id, quantity_scu, price_per_unit, cargo_transfer_type, cargo_transfer_fee):
+        try:
+            await ledger_client.update_transaction(
+                leg_id, quantity_scu=quantity_scu, price_per_unit=price_per_unit,
+                cargo_transfer_fee=cargo_transfer_fee, cargo_transfer_type=cargo_transfer_type,
+            )
+        except Exception as exc:
+            self.show_message(f"Couldn't update transaction — {exc}")
+            return
+        self._leg_editing.pop(leg_id, None)
         self._draft_purchase.pop(leg_id, None)
         await self.refresh()
 

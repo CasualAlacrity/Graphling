@@ -99,15 +99,24 @@ class _TransactionWidget(QWidget):
     FEE_LABEL = ""
     ACTION_VERB = ""
 
-    def __init__(self, leg, on_change, on_submit, run=None, parent=None):
+    def __init__(self, leg, on_change, on_submit, run=None, parent=None, edit_mode=False, on_cancel=None):
         super().__init__(parent)
         self._leg = leg
         self._run = run
         self._on_change = on_change
         self._on_submit = on_submit
+        self._edit_mode = edit_mode
+        self._on_cancel = on_cancel
         self._build_ui()
         self._wire_signals()
         self._recompute_total()
+        if self._edit_mode:
+            # Overrides whatever a subclass's own _build_ui set (BuyCargoWidget's
+            # "Confirm purchase", SellCargoWidget's dynamic partial/full-sale label) --
+            # editing an already-recorded leg is always "Save changes", not a fresh
+            # confirm. SellCargoWidget's _update_confirm_label short-circuits in edit
+            # mode too, so this doesn't get clobbered the next time the quantity changes.
+            self.confirm_button.setText("Save changes")
 
     def _action_line_text(self):
         # Restates the planned action as a plain sentence — orientation for a pilot who
@@ -123,7 +132,8 @@ class _TransactionWidget(QWidget):
         layout.setContentsMargins(0, 8, 0, 0)
         layout.setSpacing(8)
 
-        layout.addWidget(QLabel(parent=self, text=self.DIALOG_TITLE, objectName="dialogTitle"))
+        title_text = f"Edit \N{EM DASH} {self.DIALOG_TITLE}" if self._edit_mode else self.DIALOG_TITLE
+        layout.addWidget(QLabel(parent=self, text=title_text, objectName="dialogTitle"))
         action_line = QLabel(parent=self, text=self._action_line_text(), objectName="dialogActionLine")
         action_line.setWordWrap(True)
         layout.addWidget(action_line)
@@ -161,6 +171,10 @@ class _TransactionWidget(QWidget):
         self.confirm_button = QPushButton(parent=self, objectName="confirmButton")
         layout.addWidget(self.confirm_button)
 
+        if self._edit_mode:
+            self.cancel_button = QPushButton(parent=self, text="Cancel", objectName="cancelButton")
+            layout.addWidget(self.cancel_button)
+
         self._update_toggle_labels()
         self._update_fee_visibility()
 
@@ -185,6 +199,8 @@ class _TransactionWidget(QWidget):
         self.fee_input.valueChanged.connect(self._on_field_changed)
         self.toggle.toggled.connect(self._on_toggle_changed)
         self.confirm_button.clicked.connect(self._on_confirm_clicked)
+        if self._edit_mode:
+            self.cancel_button.clicked.connect(lambda: self._on_cancel())
 
     def _on_toggle_changed(self, _checked):
         self._update_toggle_labels()
@@ -277,6 +293,11 @@ class SellCargoWidget(_TransactionWidget):
         self.quantity_input.valueChanged.connect(self._update_confirm_label)
 
     def _update_confirm_label(self, *_args):
+        if self._edit_mode:
+            # Edit mode's button always reads "Save changes" (set once in __init__) --
+            # partial/full-sale phrasing is about a fresh sale in progress, not a
+            # correction to an already-recorded one.
+            return
         quantity = self.quantity_input.value()
         if quantity <= 0:
             self.confirm_button.setText("Confirm — nothing sold")

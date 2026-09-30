@@ -234,6 +234,125 @@ async def test_record_sale_raises_if_already_recorded(monkeypatch):
         await ledger_service.record_sale(leg.id, 1, 1, CargoTransferType.MANUAL, 0)
 
 
+async def test_record_purchase_carries_quantity_forward_to_unrecorded_sale(monkeypatch):
+    # The 614-vs-640 bug: a corrected/real buy quantity should become the sale leg's
+    # new planned quantity, not leave it at a stale earlier estimate.
+    run_id = uuid.uuid4()
+    acquisition = _make_leg(LegType.ACQUISITION)
+    acquisition.run_id = run_id
+    sale = _make_leg(LegType.SALE, quantity_scu=999)
+    sale.run_id = run_id
+    session = _FakeSession(get_value=acquisition, execute_value=sale)
+    monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
+
+    await ledger_service.record_purchase(acquisition.id, 614, 10, CargoTransferType.MANUAL, 0)
+
+    assert sale.quantity_scu == 614
+
+
+async def test_record_purchase_does_not_touch_an_already_recorded_sale(monkeypatch):
+    # Carry-forward only sets a *plan*; an already-recorded sale is a fact, not a
+    # default to overwrite. Buying less than an already-sold quantity is allowed --
+    # the inventory-sale case, not something to reject.
+    run_id = uuid.uuid4()
+    acquisition = _make_leg(LegType.ACQUISITION)
+    acquisition.run_id = run_id
+    sale = _make_leg(LegType.SALE, quantity_scu=700, transaction_completed_at=datetime.now(UTC))
+    sale.run_id = run_id
+    session = _FakeSession(get_value=acquisition, execute_value=sale)
+    monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
+
+    await ledger_service.record_purchase(acquisition.id, 614, 10, CargoTransferType.MANUAL, 0)
+
+    assert sale.quantity_scu == 700
+
+
+async def test_update_transaction_edits_a_recorded_leg(monkeypatch):
+    now = datetime.now(UTC)
+    leg = _make_leg(LegType.ACQUISITION, transaction_completed_at=now)
+    session = _FakeSession(get_value=leg, execute_value=None)  # run not finalized
+    monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
+
+    result = await ledger_service.update_transaction(leg.id, price_per_unit=99)
+
+    assert result.price_per_unit == 99
+    assert result.transaction_completed_at == now
+    assert session.committed
+
+
+async def test_update_transaction_on_a_done_leg_keeps_it_done(monkeypatch):
+    now = datetime.now(UTC)
+    leg = _make_leg(LegType.ACQUISITION, transaction_completed_at=now, finalized_at=now)
+    session = _FakeSession(get_value=leg, execute_value=None)
+    monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
+
+    result = await ledger_service.update_transaction(leg.id, quantity_scu=99)
+
+    assert result.quantity_scu == 99
+    assert result.finalized_at == now
+
+
+async def test_update_transaction_rejects_on_a_finalized_run(monkeypatch):
+    leg = _make_leg(LegType.ACQUISITION, transaction_completed_at=datetime.now(UTC))
+    session = _FakeSession(get_value=leg, execute_value=datetime.now(UTC))
+    monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
+
+    with pytest.raises(ValueError, match="already finalized"):
+        await ledger_service.update_transaction(leg.id, quantity_scu=1)
+
+
+async def test_update_transaction_rejects_before_anything_recorded(monkeypatch):
+    leg = _make_leg(LegType.ACQUISITION)
+    monkeypatch.setattr(ledger_service, "SessionLocal", lambda: _FakeSession(get_value=leg))
+
+    with pytest.raises(ValueError, match="record_purchase/record_sale"):
+        await ledger_service.update_transaction(leg.id, quantity_scu=1)
+
+
+async def test_update_transaction_raises_when_leg_not_found(monkeypatch):
+    monkeypatch.setattr(ledger_service, "SessionLocal", lambda: _FakeSession(get_value=None))
+
+    with pytest.raises(ValueError, match="No trade leg"):
+        await ledger_service.update_transaction(uuid.uuid4(), quantity_scu=1)
+
+
+async def test_update_transaction_rejects_negative_values(monkeypatch):
+    leg = _make_leg(LegType.ACQUISITION, transaction_completed_at=datetime.now(UTC))
+    session = _FakeSession(get_value=leg, execute_value=None)
+    monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
+
+    with pytest.raises(ValueError, match="can't be negative"):
+        await ledger_service.update_transaction(leg.id, price_per_unit=-5)
+
+
+async def test_update_transaction_edits_transfer_type_without_touching_transferred_at(monkeypatch):
+    transferred_at = datetime.now(UTC)
+    leg = _make_leg(
+        LegType.SALE, CargoTransferType.MANUAL,
+        transaction_completed_at=datetime.now(UTC), transferred_at=transferred_at,
+    )
+    session = _FakeSession(get_value=leg, execute_value=None)
+    monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
+
+    result = await ledger_service.update_transaction(leg.id, cargo_transfer_type=CargoTransferType.AUTOLOAD)
+
+    assert result.cargo_transfer_type == CargoTransferType.AUTOLOAD
+    assert result.transferred_at == transferred_at
+
+
+async def test_update_transaction_allows_sale_quantity_above_bought(monkeypatch):
+    # The inventory-sale case (buy 640, sell 700 because 60 came from storage) is a
+    # real, allowed manual entry -- regression guard against a cross-leg quantity check
+    # creeping back in.
+    leg = _make_leg(LegType.SALE, transaction_completed_at=datetime.now(UTC))
+    session = _FakeSession(get_value=leg, execute_value=None)
+    monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
+
+    result = await ledger_service.update_transaction(leg.id, quantity_scu=99999)
+
+    assert result.quantity_scu == 99999
+
+
 async def test_finalize_run_raises_when_a_leg_is_unfinished(monkeypatch):
     finished_leg = _make_leg(
         LegType.ACQUISITION, started_at=datetime.now(UTC), reached_at=datetime.now(UTC),

@@ -93,6 +93,21 @@ async def record_sale(
         return TradeLegOut.model_validate(response.json())
 
 
+async def update_transaction(
+        leg_id: UUID, quantity_scu: int | None = None, price_per_unit: int | None = None,
+        cargo_transfer_fee: int | None = None, cargo_transfer_type: CargoTransferType | None = None,
+) -> TradeLegOut:
+    body = {
+        "quantity_scu": quantity_scu, "price_per_unit": price_per_unit,
+        "cargo_transfer_fee": cargo_transfer_fee,
+        "cargo_transfer_type": cargo_transfer_type.value if cargo_transfer_type is not None else None,
+    }
+    async with await authenticated_client() as client:
+        response = await client.patch(f"/trade-runs/legs/{leg_id}/transaction", json=body)
+        raise_for_status(response)
+        return TradeLegOut.model_validate(response.json())
+
+
 async def finalize_run(run_id: UUID) -> TradeRunOut:
     async with await authenticated_client() as client:
         response = await client.post(f"/trade-runs/{run_id}/finalize")
