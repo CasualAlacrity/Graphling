@@ -1,8 +1,10 @@
 # Intent — trade-run model: corrections, remainders, and sell-only runs
 
-**Status:** not started (2026-09-29). The first executable slice — editing recorded leg
-values — is specced in `docs/ledger-edit-path.md`. Everything else here is still design.
-Tracked in `docs/todo.md` Phase 1 ("URGENT — recorded leg values can't be edited").
+**Status:** the first executable slice — editing recorded leg values, specced in
+`docs/ledger-edit-path.md` — is **built** (2026-09-29): server, client, overlay, 30 new
+tests, full suite passing. Not yet verified against a live server/Postgres/overlay run.
+Everything else here (N sale legs, write-off, sell-only runs) is still design. Tracked
+in `docs/todo.md` Phase 1 ("URGENT — recorded leg values can't be edited").
 
 ## Problem
 
@@ -50,7 +52,17 @@ quantity, typed or spoken correctly the first time. Real play breaks all of that
 - **A bought quantity carries forward to the sale leg** (Jeff, 2026-09-29). Correcting or
   recording the buy as 614 means the sale is planned at 614 — you can only sell what you
   bought.
-- **Selling more than was bought is rejected.** It inflates profit and can't be true.
+- **Selling more than was bought is allowed** (revised 2026-09-29, same day — the
+  original call here was "rejected, it inflates profit and can't be true"). Real case:
+  cargo sold from inventory carried over from earlier play, e.g. buying 640 this run but
+  selling 700 because 60 came from storage — a manual entry the pilot makes knowingly,
+  not a bug. `update_transaction`/`record_sale` do no cross-check against the
+  acquisition leg's quantity, either direction. This is also what resolves carry-over
+  case 2 below — no separate storage-tracking feature needed for it.
+- **Transfer type (manual ↔ autoload) is editable on a recorded leg**, alongside
+  quantity/price/fee (`docs/ledger-edit-path.md`'s original spec excluded it; reversed
+  once scoped — see that open question below for why it's safe). Same edit path, same
+  "editing a done leg keeps it done" rule.
 - **Why a remainder exists — four cases** (Jeff's 1–3, 2026-09-29; Claude added 4):
   1. *Wrong buy amount, no real cargo left* → a ledger edit before Finalize. This is what
      the manual Finalize step is for.
@@ -91,17 +103,30 @@ quantity, typed or spoken correctly the first time. Real play breaks all of that
 
 ## Open questions
 
-- **Write-off voice path.** "I got pirated, write it off" is natural mid-flight, but
-  write-off is close to Abandon, which is decided overlay-only (2026-09-24). Leaning
-  overlay-only for consistency; Jeff's call.
-- **Editing transfer type** (manual ↔ autoload) on a recorded leg changes which milestones
-  the leg should have had (a manual sale has a separate unload step). Excluded from the
-  first edit slice; is it ever needed?
-- **Hot cargo.** Does it need a flag so lookups only suggest terminals that will take it?
-  Depends on whether UEX exposes that.
+- **Resolved 2026-09-29 — write-off voice path.** No voice path — overlay-only,
+  consistent with Abandon. Still belongs to the N-sale-legs/write-off work above, not
+  built yet.
+- **Resolved 2026-09-29 — editing transfer type.** Needed, and built. Turned out safe to
+  edit post-hoc: `transferred_at` is already stamped by record time regardless of
+  transfer type (`record_sale`'s existing `also_stamp_transferred=leg.transferred_at is
+  None` logic guarantees this), so switching manual↔autoload on an already-recorded leg
+  never needs to retroactively add or remove a milestone — it's a value+fee change only.
+  See the Decided section above.
+- **Hot cargo — confirmed a real gap (2026-09-29), still open.** Wanted: a toggle
+  alongside the existing space-only/autoload-only route-search filters, for "no
+  questions asked" terminals that'll buy hot goods. This is a route-search feature, not
+  a ledger-editing one — separate work, not built as part of the edit-path slice.
 - **What a mining or salvage session actually looks like** for Jeff — refine then haul, or
   sell raw? Several refinery jobs per session? RMC picked up in stages? Refinery jobs take
   hours, a wait trading doesn't have; that may shape the sell-only model more than trading
-  did. Ask before designing.
-- **Carry-over** of a remainder into a later run, with its cost basis — only if real use
-  asks for it.
+  did. Ask before designing. Still open, deferred as its own module (2026-09-29).
+- **Resolved 2026-09-29 — carry-over**, simpler than expected once broken into its three
+  real cases:
+  1. *Wait to sell here later* — no work needed, the run just stays open/unfinalized
+     until the pilot does.
+  2. *Selling more than this run bought* (inventory from storage) — solved by the
+     "selling more than was bought is allowed" decision above. Buy 640, sell 700 is just
+     a valid manual entry now, no separate carry-over feature needed.
+  3. *A later stand-alone sell-only leg for stored cargo* — genuinely deferred, folded
+     into the still-open mining/salvage module above (sell-only runs sourced from
+     mined/salvaged/stored cargo) rather than solved here.
