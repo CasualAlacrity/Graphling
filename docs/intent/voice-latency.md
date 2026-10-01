@@ -67,6 +67,7 @@ answers the "Reasoning off" open question below):
 - **Stage timing comes first.** Without per-stage numbers, every other change here is
   guesswork about which stage to attack. Stages: Whisper, classify, respond #1 (to tool
   call), tool execution, respond #2 (to final text), TTS time-to-first-byte, playback start.
+  **Built 2026-10-01** — see `docs/voice-stage-timing.md`.
 - **Heavy-compute acks confirm the request** (Jeff, 2026-09-29). e.g. "Find me the best
   route near Crusader in my Conny" → *"Searching for the best routes near Crusader in your
   Constellation Taurus. This will take a sec — grab a Cruz."* Two jobs at once:
@@ -194,7 +195,8 @@ answers the "Reasoning off" open question below):
   two runs each. See Model evidence and Decided above: 12B and 26B both hit 100% and get
   fast enough to fit tier budgets; 8B needs reasoning on to hold its own accuracy.
 - **The 26B's 26–29s outliers** had *fewer* output tokens than its 10s cases. Prompt eval?
-  Cache eviction? Unexplained until stage timing exists.
+  Cache eviction? Stage timing now exists (`docs/voice-stage-timing.md`, built
+  2026-10-01) to actually answer this — just not yet pointed at a 26B rerun to check.
 - **Ack timing depends on respond #1.** An ack fired on tool-call emission still waits for
   Whisper + classify + the first model call. Is that under 2s? If not, is there a safe
   earlier trigger — without acking something ALICE then declines?

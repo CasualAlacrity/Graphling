@@ -59,7 +59,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage  # noqa
 
 from graph import State, graph, prewarm  # noqa: E402
 from harness.fakes import install_fakes  # noqa: E402
-from turn_metrics import compute_turn_metrics  # noqa: E402
+from turn_metrics import TurnTimingsCallback, compute_turn_metrics  # noqa: E402
 
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
 
@@ -75,6 +75,7 @@ CSV_FIELDS = [
     "expected_args", "actual_args", "args_correct",
     "response_correct", "overall_pass",
     "latency_ms", "tokens_in", "tokens_out", "tokens_total", "cost_usd",
+    "classify_ms", "decline_ms", "respond_ms", "tool_ms",
     "final_response", "judge_reasoning",
 ]
 
@@ -87,6 +88,8 @@ def _write_csv(records: list[dict], path: Path) -> None:
             row = dict(record)
             row["expected_args"] = json.dumps(row["expected_args"])
             row["actual_args"] = json.dumps(row["actual_args"])
+            row["respond_ms"] = "+".join(f"{ms:.0f}" for ms in row["respond_ms"])
+            row["tool_ms"] = ", ".join(f"{name}={ms:.0f}" for name, ms in row["tool_ms"])
             writer.writerow(row)
 
 MODEL_NAME_ENV_VAR = {
@@ -132,10 +135,15 @@ async def _run_one(case: HarnessCase, phrasing: str, model_provider: str, model_
     thread_id = str(uuid.uuid4())
     config = {"configurable": {"thread_id": thread_id}}
 
+    timings_callback = TurnTimingsCallback()
     with install_fakes():
         start = time.monotonic()
-        result = await graph.ainvoke(State(messages=[HumanMessage(content=phrasing)]), config=config)
+        result = await graph.ainvoke(
+            State(messages=[HumanMessage(content=phrasing)]),
+            config={**config, "callbacks": [timings_callback]},
+        )
         latency_ms = (time.monotonic() - start) * 1000
+    timings = timings_callback.timings
 
     messages = result["messages"]
     actual_on_topic = result["on_topic"]
@@ -164,6 +172,10 @@ async def _run_one(case: HarnessCase, phrasing: str, model_provider: str, model_
         "tokens_out": None,
         "tokens_total": None,
         "cost_usd": None,
+        "classify_ms": round(timings.classify_ms, 1) if timings.classify_ms is not None else None,
+        "decline_ms": round(timings.decline_ms, 1) if timings.decline_ms is not None else None,
+        "respond_ms": [round(ms, 1) for ms in timings.respond_ms],
+        "tool_ms": [(name, round(ms, 1)) for name, ms in timings.tool_ms],
     }
 
     on_topic_correct = actual_on_topic == case.expected_on_topic

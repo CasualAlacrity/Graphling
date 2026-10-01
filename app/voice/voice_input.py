@@ -9,6 +9,7 @@ load_whisper() is slow (~5s first call). Call it once at startup.
 """
 import os
 import threading
+import time
 
 import numpy as np
 import sounddevice as sd
@@ -108,8 +109,10 @@ def record_until_release(hotkey: str | None = None) -> np.ndarray:
     return np.concatenate(frames, axis=0).flatten()
 
 
-def transcribe(audio: np.ndarray, initial_prompt: str | None = None) -> str:
-    """Run Whisper on a float32 16kHz numpy array. Returns transcribed text.
+def transcribe(audio: np.ndarray, initial_prompt: str | None = None) -> tuple[str, float]:
+    """Run Whisper on a float32 16kHz numpy array. Returns (transcribed text, whisper_ms)
+    -- whisper_ms times only the model.transcribe() call itself (docs/voice-stage-timing.md),
+    not the silence/duration gates above it, and is 0.0 for any early return.
 
     initial_prompt seeds Whisper's decoder with expected vocabulary (e.g. ship names) —
     it biases recognition toward correctly rendering unusual proper nouns, it doesn't
@@ -119,7 +122,7 @@ def transcribe(audio: np.ndarray, initial_prompt: str | None = None) -> str:
         raise RuntimeError("Whisper model not loaded — call load_whisper() at startup")
 
     if len(audio) == 0:
-        return ""
+        return "", 0.0
 
     duration_seconds = len(audio) / SAMPLE_RATE
     rms = float(np.sqrt(np.mean(np.square(audio))))
@@ -127,27 +130,30 @@ def transcribe(audio: np.ndarray, initial_prompt: str | None = None) -> str:
 
     if duration_seconds < MIN_SPEECH_SECONDS:
         print(f"[Voice] Ignored — shorter than {MIN_SPEECH_SECONDS}s")
-        return ""
+        return "", 0.0
 
     if rms < SILENCE_RMS_THRESHOLD:
         print(f"[Voice] Ignored — quieter than {SILENCE_RMS_THRESHOLD}")
-        return ""
+        return "", 0.0
 
+    start = time.monotonic()
     result = _model.transcribe(audio, fp16=False, language="en", initial_prompt=initial_prompt)
+    whisper_ms = (time.monotonic() - start) * 1000
     text = result["text"].strip()
     print(f"[Voice] Transcribed: {text!r}")
-    return text
+    return text, whisper_ms
 
 
-def listen_once(hotkey: str | None = None, initial_prompt: str | None = None) -> str:
+def listen_once(hotkey: str | None = None, initial_prompt: str | None = None) -> tuple[str, float]:
     """
-    Full PTT cycle: wait for key → record → transcribe → return text.
+    Full PTT cycle: wait for key → record → transcribe → return (text, whisper_ms).
     Falls back to typed input if PTT_MODE=text (useful when the OS hasn't
     granted the running process Accessibility permission yet — e.g. PyCharm
-    on macOS, until it's added under System Settings > Privacy & Security).
+    on macOS, until it's added under System Settings > Privacy & Security) —
+    whisper_ms is 0.0 in that case, since no model call happens.
     """
     if os.getenv("PTT_MODE", "hotkey") == "text":
-        return input("[Voice] Type your query: ").strip()
+        return input("[Voice] Type your query: ").strip(), 0.0
 
     audio = record_until_release(hotkey)
     return transcribe(audio, initial_prompt=initial_prompt)

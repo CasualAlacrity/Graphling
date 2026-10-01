@@ -1,0 +1,315 @@
+{
+  "summary": {
+    "model_provider": "ollama",
+    "model_name": "gemma4",
+    "timestamp": "2026-10-01T11:07:20.198152+00:00",
+    "total_cases": 9,
+    "passed": 6,
+    "pass_rate": 0.667,
+    "total_cost_usd": 0.009296,
+    "total_tokens": 91451,
+    "avg_latency_ms": 26038.1
+  },
+  "records": [
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "What's the cheapest place to buy Laranite?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": null,
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": null,
+      "final_response": "What is the star system, moon, or specific terminal you are looking in? If you are not specifying a location, I can look up the best global price, but results might be far afield.",
+      "judge_reasoning": "The copilot's response does not provide the specific information requested by the pilot. It asks for more details instead of directly answering the question about the cheapest place to buy Laranite. The correct response should have mentioned Baijini Point as the cheapest terminal to buy Laranite, around 3.15 aUEC.",
+      "latency_ms": 5598.7,
+      "tokens_in": 10039,
+      "tokens_out": 41,
+      "tokens_total": 10080,
+      "cost_usd": 0.0002220807187923759,
+      "classify_ms": 2080.6,
+      "decline_ms": null,
+      "respond_ms": [
+        3494.8
+      ],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "tool_correct": false,
+      "args_correct": false,
+      "response_correct": false,
+      "overall_pass": false
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "Where can I get Laranite for less?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": null,
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": null,
+      "final_response": "commodity_price_lookup{commodity:<|\"|>Laranite<|\"|>}",
+      "judge_reasoning": "The copilot's response does not convey any useful information about where to buy Laranite or the price. It simply repeats the commodity name in a format that is not helpful to the pilot.",
+      "latency_ms": 37871.3,
+      "tokens_in": 10037,
+      "tokens_out": 15,
+      "tokens_total": 10052,
+      "cost_usd": 0.0015022300497095885,
+      "classify_ms": 5641.0,
+      "decline_ms": null,
+      "respond_ms": [
+        32203.4
+      ],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "tool_correct": false,
+      "args_correct": false,
+      "response_correct": false,
+      "overall_pass": false
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "I need to buy some Laranite, where's it cheap?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": null,
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": null,
+      "final_response": "commodity_price_lookup{commodity:<|\"|>Laranite<|\"|>}",
+      "judge_reasoning": "The copilot's response does not convey any useful information about where to buy Laranite or the price. It simply repeats the commodity name in a format that is not helpful to the pilot.",
+      "latency_ms": 41580.6,
+      "tokens_in": 10042,
+      "tokens_out": 15,
+      "tokens_total": 10057,
+      "cost_usd": 0.0016493648544589877,
+      "classify_ms": 8686.9,
+      "decline_ms": null,
+      "respond_ms": [
+        32875.6
+      ],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "tool_correct": false,
+      "args_correct": false,
+      "response_correct": false,
+      "overall_pass": false
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Where's the cheapest place to buy a Cutlass Black?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "The cheapest place to buy a Cutlass Black is at Baijini Point, in orbit around Pyro I, paying 1,190,000.0 aUEC.",
+      "judge_reasoning": "The copilot's response correctly identifies Baijini Point as the cheapest place to buy a Cutlass Black and accurately states the price as 1,190,000 aUEC. It also mentions the correct location, in orbit around Pyro I, which is consistent with the tool result.",
+      "latency_ms": 43902.2,
+      "tokens_in": 20343,
+      "tokens_out": 59,
+      "tokens_total": 20402,
+      "cost_usd": 0.001741454925000065,
+      "classify_ms": 8302.5,
+      "decline_ms": null,
+      "respond_ms": [
+        32997.4,
+        2544.6
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          8.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": true,
+      "overall_pass": true
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "I want to buy a Cutlass Black, what's the best price?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "The cheapest place to buy a Cutlass Black is at Baijini Point, in orbit around Pyro I, for 1,190,000.0 aUEC.\n\nAlternatively, Port Tressler, on Crusader, is selling it for 1,225,000.0 aUEC.",
+      "judge_reasoning": "The copilot's response correctly identifies Baijini Point as the cheapest terminal to buy a Cutlass Black, and it accurately reports the price as 1,190,000 aUEC. Additionally, it provides alternative information about Port Tressler, which is also supported by the tool result.",
+      "latency_ms": 44830.5,
+      "tokens_in": 20349,
+      "tokens_out": 91,
+      "tokens_total": 20440,
+      "cost_usd": 0.001778276645457771,
+      "classify_ms": 5910.3,
+      "decline_ms": null,
+      "respond_ms": [
+        34861.2,
+        4023.4
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          2.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": true,
+      "overall_pass": true
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Find me a good deal on a Cutlass Black.",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "The Cutlass Black is cheapest to buy at Baijini Point, on Pyro I, for 1,190,000 aUEC. An alternative option is Port Tressler, on Crusader, for 1,225,000 aUEC.",
+      "judge_reasoning": "The copilot's response correctly identifies Baijini Point as the cheapest terminal to buy a Cutlass Black, and it accurately states the price as 1,190,000 aUEC. Additionally, it provides an alternative option, Port Tressler, with its price, which is also supported by the tool result. All key information is conveyed accurately.",
+      "latency_ms": 43302.8,
+      "tokens_in": 20339,
+      "tokens_out": 81,
+      "tokens_total": 20420,
+      "cost_usd": 0.0017176772986660666,
+      "classify_ms": 5513.5,
+      "decline_ms": null,
+      "respond_ms": [
+        34211.3,
+        3553.3
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          1.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": true,
+      "overall_pass": true
+    },
+    {
+      "case_id": "off_topic_greeting",
+      "phrasing": "Good morning.",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": false,
+      "actual_on_topic": false,
+      "expected_tool": null,
+      "actual_tool": null,
+      "expected_args": null,
+      "actual_args": null,
+      "final_response": "We are working. State your operational query.",
+      "judge_reasoning": null,
+      "latency_ms": 10336.8,
+      "tokens_in": 0,
+      "tokens_out": 0,
+      "tokens_total": 0,
+      "cost_usd": 0.0004100246497083196,
+      "classify_ms": 8880.9,
+      "decline_ms": 1433.7,
+      "respond_ms": [],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": null,
+      "response_correct": null,
+      "overall_pass": true
+    },
+    {
+      "case_id": "off_topic_greeting",
+      "phrasing": "Hey, how are you?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": false,
+      "actual_on_topic": false,
+      "expected_tool": null,
+      "actual_tool": null,
+      "expected_args": null,
+      "actual_args": null,
+      "final_response": "My diagnostics report on cargo manifests. What are the manifest details?",
+      "judge_reasoning": null,
+      "latency_ms": 3539.4,
+      "tokens_in": 0,
+      "tokens_out": 0,
+      "tokens_total": 0,
+      "cost_usd": 0.0001403948430826446,
+      "classify_ms": 1989.5,
+      "decline_ms": 1538.8,
+      "respond_ms": [],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": null,
+      "response_correct": null,
+      "overall_pass": true
+    },
+    {
+      "case_id": "off_topic_greeting",
+      "phrasing": "Morning, hope you're doing well.",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": false,
+      "actual_on_topic": false,
+      "expected_tool": null,
+      "actual_tool": null,
+      "expected_args": null,
+      "actual_args": null,
+      "final_response": "Focus on the manifest. We have a schedule to keep.",
+      "judge_reasoning": null,
+      "latency_ms": 3380.7,
+      "tokens_in": 0,
+      "tokens_out": 0,
+      "tokens_total": 0,
+      "cost_usd": 0.00013410063724867845,
+      "classify_ms": 1855.4,
+      "decline_ms": 1513.3,
+      "respond_ms": [],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": null,
+      "response_correct": null,
+      "overall_pass": true
+    }
+  ]
+}

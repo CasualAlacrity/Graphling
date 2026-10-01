@@ -1,6 +1,15 @@
 # Voice stage timing — measuring where a turn's time goes
 
-**Status:** proposal, ready to build (2026-09-29). First item under "Decided" in
+**Status:** built (2026-10-01) — `app/turn_metrics.py`'s `TurnTimingsCallback`, wired into
+both `voice/__init__.py` and `evals/agent_eval/run.py`, 11 new tests, full suite passing.
+Confirmed live against the real graph (not just mocked): `metadata["langgraph_node"]` is
+genuinely how LangGraph tags each node's LLM calls (verified directly before writing the
+handler, not assumed), and a real harness run against local Ollama showed `classify_ms` +
+`respond_ms` summing almost exactly to the already-existing `latency_ms` on every case —
+including a turn whose respond↔tools round trip correctly produced two separate
+`respond_ms` entries. One real addition beyond this doc's original stage table:
+`decline_ms` (the `decline` node's `reject_llm` call) — a real, measurable stage that was
+otherwise silently missing from any declined turn's timings. First item under "Decided" in
 `docs/intent/voice-latency.md` ("Stage timing comes first"): every other latency change
 there is guesswork until this exists. Targets it measures against: the latency tiers in
 `docs/utterance-coverage.md`.

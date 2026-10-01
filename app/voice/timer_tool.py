@@ -18,7 +18,9 @@ _timers: dict[str, dict] = {}
 
 
 async def _speak(text: str) -> None:
-    audio = await synthesize(text)
+    # A timer notification isn't part of any measured turn, so the first-chunk timing
+    # synthesize() now also returns (docs/voice-stage-timing.md) is discarded here.
+    audio, _first_chunk_ms = await synthesize(text)
     play_audio(audio)
 
 

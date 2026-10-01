@@ -8,12 +8,14 @@ The supported way to run is `alice` (scripts/mac/run-alice.sh,
 scripts/windows/run-alice.bat), which starts this loop alongside the overlay.
 """
 import asyncio
+import time
 import uuid
 
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 
 from auth.discord_identity import get_pilot_session
+from turn_metrics import TurnTimingsCallback, log_turn_timings
 from voice.audio_output import play_audio
 from voice.tts import synthesize
 from voice.voice_input import listen_once, load_whisper
@@ -63,7 +65,13 @@ async def run() -> None:
     print("[ALICE] Ready. Hold PTT key to speak.")
 
     while True:
-        text = listen_once(initial_prompt=ship_name_prompt)
+        text, whisper_ms = listen_once(initial_prompt=ship_name_prompt)
+        # PTT release is approximately now, minus however long whisper itself took --
+        # listen_once() returns right after transcribing, and that gap is the only
+        # unaccounted time between release and this point. round_trip_ms
+        # (docs/voice-stage-timing.md) starts at release, not at whenever
+        # listen_once() happens to return.
+        round_trip_start = time.monotonic() - (whisper_ms / 1000)
 
         if not text:
             print("[ALICE] Nothing transcribed, listening again...")
@@ -71,13 +79,27 @@ async def run() -> None:
 
         print(f"[ALICE] You: {text!r}")
 
+        timings_callback = TurnTimingsCallback()
         state_input = State(messages=[HumanMessage(content=text)])
-        result = await graph.ainvoke(state_input, config=config)
+        graph_start = time.monotonic()
+        result = await graph.ainvoke(state_input, config={**config, "callbacks": [timings_callback]})
+        timings = timings_callback.timings
+        timings.whisper_ms = whisper_ms
+        timings.graph_ms = (time.monotonic() - graph_start) * 1000
         response_text = result["messages"][-1].content
 
         print(f"[ALICE] ALICE: {response_text!r}")
 
-        audio = await synthesize(response_text)
+        tts_start = time.monotonic()
+        audio, tts_first_chunk_ms = await synthesize(response_text)
+        timings.tts_first_chunk_ms = tts_first_chunk_ms
+        timings.tts_total_ms = (time.monotonic() - tts_start) * 1000
+
+        # round_trip_ms stops here, at play_audio starting -- it blocks until playback
+        # finishes (voice/audio_output.py), which is not part of this metric.
+        timings.round_trip_ms = (time.monotonic() - round_trip_start) * 1000
+        log_turn_timings(timings)
+
         play_audio(audio)
 
 
