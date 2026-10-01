@@ -68,3 +68,10 @@ between it and `tts_total_ms` is exactly what streaming playback would win back.
 
 Streaming playback, pre-recorded acks, earcons, stage-update voice lines — all later items
 in `docs/intent/voice-latency.md`, and they need these numbers first.
+
+**Also deferred (confirmed 2026-10-01, not now):** sending these logs to a server-side
+analytics DB on the Hetzner box and an "ALICE health" Grafana dashboard on top of it.
+The only thing a server-side copy buys over today's local-only file is fleet-level
+visibility across many pilots, which doesn't exist yet with one real user — revisit once
+real multi-pilot usage does. Likely reuses the existing Hetzner Postgres (one new table)
+and the same best-effort client pattern already established for other server calls.
