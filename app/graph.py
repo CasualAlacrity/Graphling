@@ -3,7 +3,7 @@ import os
 from typing import Annotated
 
 from dotenv import load_dotenv
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import START, StateGraph
 from langgraph.graph.message import add_messages
@@ -38,6 +38,14 @@ class State(BaseModel):
     messages: Annotated[list[BaseMessage], add_messages]
     on_topic: bool = True
     reason: str | None = None
+    # Set by respond() whenever a readback-producing tool (mark_cargo_acquired,
+    # mark_cargo_sold -- stated numbers are always read back, docs/intent/voice-latency.md)
+    # just ran, so the pilot's next utterance (a correction like "no, 614") skips
+    # classify_topic entirely instead of asking a small, fast classifier to correctly
+    # weigh a short, keyword-free reply against buried context -- the same failure shape
+    # that already broke it once ("Let's do it.", docs/todo.md Phase 3 seed #4).
+    # Self-clears every time respond() runs, whichever path got it there.
+    pending_confirmation: bool = False
 
 
 class TopicClassification(BaseModel):
@@ -166,10 +174,33 @@ async def prewarm() -> None:
     await asyncio.gather(*[_warm_one(name, model, tmpl) for name, model, tmpl in to_warm])
 
 
+# Tools whose result is a spoken readback of a stated number (docs/intent/voice-latency.md)
+# -- a correction following one of these ("no, 614") is what pending_confirmation exists
+# to protect, by skipping classify_topic on the very next turn.
+_CONFIRMATION_PRONE_TOOLS = {"mark_cargo_acquired", "mark_cargo_sold"}
+
+
+def _just_ran_confirmation_prone_tool(messages: list[BaseMessage]) -> bool:
+    """True if the ToolMessage(s) now at the end of `messages` came from this turn's own
+    tool round trip, not an old one -- state.messages spans the whole thread (MemorySaver),
+    so this only looks at the current trailing run: messages[-1] is a ToolMessage only while
+    respond() is being called back after tools (a completed turn always ends on a plain
+    AIMessage), so scanning back from there for the triggering AIMessage.tool_calls is
+    turn-scoped by construction, not a fixed-size lookback guess."""
+    if not messages or not isinstance(messages[-1], ToolMessage):
+        return False
+    for message in reversed(messages):
+        if isinstance(message, AIMessage):
+            names = {call["name"] for call in (message.tool_calls or [])}
+            return bool(names & _CONFIRMATION_PRONE_TOOLS)
+    return False
+
+
 async def respond(state: State) -> dict:
     messages = PERSONA_TEMPLATE.invoke({}).to_messages()
     response = await llm.ainvoke(messages + state.messages)
-    return {"messages": [response]}
+    pending_confirmation = _just_ran_confirmation_prone_tool(state.messages)
+    return {"messages": [response], "pending_confirmation": pending_confirmation}
 
 
 async def classify_topic(state: State) -> dict:
@@ -197,12 +228,19 @@ def route_topic(state: State) -> str:
     return "respond" if state.on_topic else "decline"
 
 
+def route_start(state: State) -> str:
+    # Skips classify_topic entirely (not just overriding its verdict) when the pilot's
+    # utterance is a reply to ALICE's own immediately preceding readback -- a real
+    # classifier call saved, not just a wasted one ignored.
+    return "respond" if state.pending_confirmation else "classify_topic"
+
+
 graph_builder = StateGraph(State)
 graph_builder.add_node("classify_topic", classify_topic)
 graph_builder.add_node("respond", respond)
 graph_builder.add_node("decline", decline_topic)
 
-graph_builder.add_edge(START, "classify_topic")
+graph_builder.add_conditional_edges(START, route_start)
 graph_builder.add_conditional_edges("classify_topic", route_topic)
 
 tool_node = ToolNode(tools)

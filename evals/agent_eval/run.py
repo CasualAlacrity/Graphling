@@ -57,7 +57,7 @@ from cases import CASES, HarnessCase  # noqa: E402
 from judge import judge_response  # noqa: E402
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage  # noqa: E402
 
-from graph import State, graph, prewarm  # noqa: E402
+from graph import graph, prewarm  # noqa: E402
 from harness.fakes import install_fakes  # noqa: E402
 from turn_metrics import TurnTimingsCallback, compute_turn_metrics  # noqa: E402
 
@@ -139,7 +139,11 @@ async def _run_one(case: HarnessCase, phrasing: str, model_provider: str, model_
     with install_fakes():
         start = time.monotonic()
         result = await graph.ainvoke(
-            State(messages=[HumanMessage(content=phrasing)]),
+            # A plain dict, not State(...) -- see voice/__init__.py's note on why a
+            # full pydantic instance would clobber checkpointed fields with defaults.
+            # Harmless here (a fresh thread_id every call means nothing to clobber),
+            # but this is the pattern everything should follow regardless.
+            {"messages": [HumanMessage(content=phrasing)]},
             config={**config, "callbacks": [timings_callback]},
         )
         latency_ms = (time.monotonic() - start) * 1000

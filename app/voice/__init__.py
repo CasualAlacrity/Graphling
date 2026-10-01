@@ -28,7 +28,7 @@ async def run() -> None:
     # submodule of this package), which would otherwise trigger this file's own
     # execution mid-way through graph.py's initialization, circling back on a
     # not-yet-finished module.
-    from graph import State, graph, prewarm, uex_client
+    from graph import graph, prewarm, uex_client
 
     print("=" * 40)
     print("  ALICE — Push to talk")
@@ -80,7 +80,12 @@ async def run() -> None:
         print(f"[ALICE] You: {text!r}")
 
         timings_callback = TurnTimingsCallback()
-        state_input = State(messages=[HumanMessage(content=text)])
+        # A plain dict, not a full State(...) object -- a pydantic instance's
+        # model_dump() materializes every field's default (on_topic, reason,
+        # pending_confirmation), which would overwrite the checkpointed values from
+        # the *previous* turn before this turn's nodes ever run. A bare dict only
+        # updates the key actually given, leaving everything else to the checkpoint.
+        state_input = {"messages": [HumanMessage(content=text)]}
         graph_start = time.monotonic()
         result = await graph.ainvoke(state_input, config={**config, "callbacks": [timings_callback]})
         timings = timings_callback.timings

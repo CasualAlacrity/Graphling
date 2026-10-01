@@ -39,7 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "app"))
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage  # noqa: E402
 
-from graph import State, graph  # noqa: E402
+from graph import graph  # noqa: E402
 
 ORIGIN = "Crusader"   # a system/planet name, so "near X" is a real phrase — "near
                       # Orison" doesn't test anything, since Orison is itself a specific
@@ -64,7 +64,11 @@ def _tool_result_for(messages: list, tool_call_id: str) -> str | None:
 async def _run_turn(label: str, text: str, thread_id: str) -> list:
     print(f"\n=== {label}: {text!r} ===")
     config = {"configurable": {"thread_id": thread_id}}
-    result = await graph.ainvoke(State(messages=[HumanMessage(content=text)]), config=config)
+    # A plain dict, not State(...) -- see voice/__init__.py's note on why a full
+    # pydantic instance would clobber checkpointed fields (on_topic, reason,
+    # pending_confirmation) with their defaults on every turn. This file reuses the
+    # same thread_id across calls, so this one actually matters, not just consistency.
+    result = await graph.ainvoke({"messages": [HumanMessage(content=text)]}, config=config)
     messages = result["messages"]
 
     # Walk backwards for the most recent AIMessage(s) with tool calls from this turn,
