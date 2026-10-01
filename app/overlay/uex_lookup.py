@@ -130,6 +130,11 @@ def _terminal_is_auto_load(terminal_id):
     return terminal.is_auto_load if terminal else 0
 
 
+def _terminal_is_nqa(terminal_id):
+    terminal = find_terminal_by_id(terminal_id)
+    return terminal.is_nqa if terminal else 0
+
+
 def find_commodity(name):
     return _find(uex_cache.commodities, "name", name)
 
@@ -241,6 +246,7 @@ async def search_routes(
     max_destination_code,
     space_only,
     require_autoload,
+    nqa_only=False,
 ) -> list[UEXTradeRoute]:
     # Tracing off for the whole overlay path. These fetches run from Qt, outside any graph
     # invocation, so every traced client call becomes its own *root* trace with no
@@ -251,7 +257,7 @@ async def search_routes(
     with tracing_context(enabled=False):
         return await _search_routes(
             commodity_id, source_terminal_id, destination_terminal_id,
-            min_source_code, max_destination_code, space_only, require_autoload,
+            min_source_code, max_destination_code, space_only, require_autoload, nqa_only,
         )
 
 
@@ -263,6 +269,7 @@ async def _search_routes(
     max_destination_code,
     space_only,
     require_autoload,
+    nqa_only=False,
 ) -> list[UEXTradeRoute]:
     if commodity_id is not None:
         # The full route set for a commodity is cached as one unit regardless of origin/
@@ -301,6 +308,8 @@ async def _search_routes(
         route.model_copy(update={
             "is_auto_load_origin": _terminal_is_auto_load(route.origin_terminal_id),
             "is_auto_load_destination": _terminal_is_auto_load(route.destination_terminal_id),
+            "is_nqa_origin": _terminal_is_nqa(route.origin_terminal_id),
+            "is_nqa_destination": _terminal_is_nqa(route.destination_terminal_id),
         })
         for route in routes
     ]
@@ -316,6 +325,11 @@ async def _search_routes(
     constrain_destination_to_space = space_only and destination_terminal_id is None
     constrain_origin_to_autoload = require_autoload and source_terminal_id is None
     constrain_destination_to_autoload = require_autoload and destination_terminal_id is None
+    # NQA ("no questions asked" — UEX's own field name for a terminal that'll buy hot/
+    # stolen cargo without checking) only ever constrains the destination: it's about
+    # where the pilot sells, not where they bought. Unlike Space Only/Autoload, there's
+    # no origin-side equivalent to apply.
+    constrain_destination_to_nqa = nqa_only and destination_terminal_id is None
 
     return [
         route for route in routes
@@ -325,4 +339,5 @@ async def _search_routes(
         and (not constrain_destination_to_space or route.is_on_ground_destination == 0)
         and (not constrain_origin_to_autoload or route.is_auto_load_origin == 1)
         and (not constrain_destination_to_autoload or route.is_auto_load_destination == 1)
+        and (not constrain_destination_to_nqa or route.is_nqa_destination == 1)
     ]

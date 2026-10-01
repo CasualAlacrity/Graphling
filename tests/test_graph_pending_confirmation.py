@@ -3,14 +3,31 @@ run-model.md's voice correction tool discussion, 2026-10-01): _just_ran_confirma
 prone_tool's turn-scoping logic, and route_start's routing decision. The actual
 graph-level behavior (classify_topic genuinely skipped, flag self-clears, the State(...)
 vs plain-dict input gotcha this surfaced) was verified live against the real compiled
-graph before writing these -- not duplicated here since that needs a real LLM."""
+graph before writing these -- not duplicated here since that needs a real LLM.
+
+Also covers last_touched_leg_id's resolution helpers (_confirmation_tool_call,
+_resolve_last_touched_leg_id) -- the leg-resolution design resolved 2026-10-01, see
+run-model.md's leg-resolution note."""
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from graph import State, _just_ran_confirmation_prone_tool, route_start
+from db.models import LegType
+from graph import (
+    State,
+    _confirmation_tool_call,
+    _just_ran_confirmation_prone_tool,
+    _resolve_last_touched_leg_id,
+    resolver,
+    route_start,
+)
 
 
-def _tool_call_ai_message(tool_name: str) -> AIMessage:
-    return AIMessage(content="", tool_calls=[{"name": tool_name, "args": {}, "id": "call_1"}])
+def _tool_call_ai_message(tool_name: str, args: dict | None = None) -> AIMessage:
+    return AIMessage(content="", tool_calls=[{"name": tool_name, "args": args or {}, "id": "call_1"}])
+
+
+class _FakeLeg:
+    def __init__(self, leg_id):
+        self.id = leg_id
 
 
 def test_detects_mark_cargo_acquired_just_ran():
@@ -83,3 +100,104 @@ def test_route_start_skips_classify_when_pending_confirmation():
 def test_route_start_goes_to_classify_topic_normally():
     state = State(messages=[HumanMessage("What's the cheapest Laranite?")], pending_confirmation=False)
     assert route_start(state) == "classify_topic"
+
+
+# --- _confirmation_tool_call -------------------------------------------------
+
+def test_confirmation_tool_call_returns_the_triggering_call():
+    ai_message = _tool_call_ai_message("mark_cargo_acquired", args={"commodity": "Laranite"})
+    messages = [
+        HumanMessage("Bought 640 at 14.2"),
+        ai_message,
+        ToolMessage(content="Recorded.", tool_call_id="call_1"),
+    ]
+    assert _confirmation_tool_call(messages) is ai_message.tool_calls[0]
+
+
+def test_confirmation_tool_call_none_for_an_unrelated_tool():
+    messages = [
+        HumanMessage("Cheapest Laranite?"),
+        _tool_call_ai_message("commodity_price_lookup"),
+        ToolMessage(content="Baijini Point.", tool_call_id="call_1"),
+    ]
+    assert _confirmation_tool_call(messages) is None
+
+
+def test_confirmation_tool_call_none_when_last_message_is_not_a_tool_message():
+    messages = [
+        HumanMessage("Bought 640 at 14.2"),
+        _tool_call_ai_message("mark_cargo_acquired"),
+        ToolMessage(content="Recorded.", tool_call_id="call_1"),
+        AIMessage(content="Got it — 640 at 14.2, logged."),
+    ]
+    assert _confirmation_tool_call(messages) is None
+
+
+def test_confirmation_tool_call_none_for_empty_messages():
+    assert _confirmation_tool_call([]) is None
+
+
+# --- _resolve_last_touched_leg_id --------------------------------------------
+
+async def test_resolve_last_touched_leg_id_uses_the_triggering_calls_own_args(monkeypatch):
+    captured = {}
+
+    async def fake_resolve_leg(leg_type=None, commodity=None, terminal=None):
+        captured["leg_type"] = leg_type
+        captured["commodity"] = commodity
+        captured["terminal"] = terminal
+        return _FakeLeg(leg_id=42)
+
+    monkeypatch.setattr(resolver, "resolve_leg", fake_resolve_leg)
+
+    messages = [
+        HumanMessage("Bought 640 of Laranite at Baijini"),
+        _tool_call_ai_message("mark_cargo_acquired", args={"commodity": "Laranite", "terminal": "Baijini"}),
+        ToolMessage(content="Recorded.", tool_call_id="call_1"),
+    ]
+    leg_id = await _resolve_last_touched_leg_id(messages)
+
+    assert leg_id == 42
+    assert captured == {"leg_type": LegType.ACQUISITION, "commodity": "Laranite", "terminal": "Baijini"}
+
+
+async def test_resolve_last_touched_leg_id_none_when_no_confirmation_tool_ran(monkeypatch):
+    async def fail_if_called(**kwargs):
+        raise AssertionError("resolve_leg should never be called here")
+
+    monkeypatch.setattr(resolver, "resolve_leg", fail_if_called)
+
+    messages = [
+        HumanMessage("Cheapest Laranite?"),
+        _tool_call_ai_message("commodity_price_lookup"),
+        ToolMessage(content="Baijini Point.", tool_call_id="call_1"),
+    ]
+    assert await _resolve_last_touched_leg_id(messages) is None
+
+
+async def test_resolve_last_touched_leg_id_none_on_ambiguous_match(monkeypatch):
+    async def fake_resolve_leg(**kwargs):
+        raise resolver.AmbiguousLegError([])
+
+    monkeypatch.setattr(resolver, "resolve_leg", fake_resolve_leg)
+
+    messages = [
+        HumanMessage("Bought 640"),
+        _tool_call_ai_message("mark_cargo_acquired"),
+        ToolMessage(content="Which run do you mean?", tool_call_id="call_1"),
+    ]
+    assert await _resolve_last_touched_leg_id(messages) is None
+
+
+async def test_resolve_last_touched_leg_id_none_on_value_error(monkeypatch):
+    async def fake_resolve_leg(**kwargs):
+        raise ValueError("no run with that leg")
+
+    monkeypatch.setattr(resolver, "resolve_leg", fake_resolve_leg)
+
+    messages = [
+        HumanMessage("Sold it all"),
+        _tool_call_ai_message("mark_cargo_sold"),
+        ToolMessage(content="No matching leg.", tool_call_id="call_1"),
+    ]
+    assert await _resolve_last_touched_leg_id(messages) is None

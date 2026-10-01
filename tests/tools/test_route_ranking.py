@@ -55,14 +55,14 @@ class _FakeUexClient:
 
 def _cache():
     terminals = [
-        SimpleNamespace(id=100, is_auto_load=1),
-        SimpleNamespace(id=200, is_auto_load=1),
-        SimpleNamespace(id=201, is_auto_load=0),
+        SimpleNamespace(id=100, is_auto_load=1, is_nqa=0),
+        SimpleNamespace(id=200, is_auto_load=1, is_nqa=0),
+        SimpleNamespace(id=201, is_auto_load=0, is_nqa=1),
     ]
     return SimpleNamespace(terminals=terminals)
 
 
-async def _rank(monkeypatch, rows, ship_scu=200):
+async def _rank(monkeypatch, rows, ship_scu=200, **kwargs):
     async def _fixed_travel(*args, **kwargs):
         return FIXED_TRAVEL_SECONDS
 
@@ -74,7 +74,7 @@ async def _rank(monkeypatch, rows, ship_scu=200):
     # it in the path here would drag a live Postgres session into every ranking assertion.
     monkeypatch.setattr("tools.route_ranking._route_rows_for", _rows_for)
     return await find_best_route(
-        _FakeUexClient(rows), None, [100], "Railen", ship_scu, _cache(), commodity_id=1,
+        _FakeUexClient(rows), None, [100], "Railen", ship_scu, _cache(), commodity_id=1, **kwargs,
     )
 
 
@@ -134,6 +134,17 @@ async def test_autoload_is_patched_onto_both_routes(monkeypatch):
     assert result.best.is_auto_load_origin == 1
     assert result.best.is_auto_load_destination == 1
     assert result.runner_up.is_auto_load_destination == 0
+
+
+async def test_require_nqa_excludes_non_nqa_destinations(monkeypatch):
+    """WINNER's destination (200) isn't an NQA terminal; RUNNER_UP's (201) is. Without
+    the filter, WINNER (the higher-margin route) would win on profit alone — require_nqa
+    has to actually exclude it, not just get patched onto the result like is_auto_load."""
+    result = await _rank(monkeypatch, [WINNER, RUNNER_UP], require_nqa=True)
+
+    assert result.best.commodity_name == "Aluminium"
+    assert result.best.destination_terminal_id == 201
+    assert result.runner_up is None
 
 
 # --- live-fetch budgeting / lazy cache population ----------------------------

@@ -72,6 +72,7 @@ class CachedTerminal(CachedBase):
     outpost_name:str|None
     city_name:str|None
     is_auto_load: int
+    is_nqa: int
 
 
 class CachedMoon(CachedBase):

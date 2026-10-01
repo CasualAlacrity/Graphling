@@ -112,10 +112,32 @@ quantity, typed or spoken correctly the first time. Real play breaks all of that
   None` logic guarantees this), so switching manual↔autoload on an already-recorded leg
   never needs to retroactively add or remove a milestone — it's a value+fee change only.
   See the Decided section above.
-- **Hot cargo — confirmed a real gap (2026-09-29), still open.** Wanted: a toggle
-  alongside the existing space-only/autoload-only route-search filters, for "no
-  questions asked" terminals that'll buy hot goods. This is a route-search feature, not
-  a ledger-editing one — separate work, not built as part of the edit-path slice.
+- **Resolved 2026-10-01 — hot cargo.** Confirmed via UEX's own API docs: terminals carry
+  `is_nqa` ("no questions asked" — UEX's own field name). Built on the data/overlay side:
+  `CachedTerminal.is_nqa` (reference_cache.py), `UEXTradeRoute.is_nqa_origin/destination`
+  (trade_data.py, filled in post-hoc from the terminal cache same as `is_auto_load_*`),
+  a third filter-panel toggle (mask icon, Font Awesome Free), and `find_best_route`'s
+  `require_nqa` param (route_ranking.py) — destination-only, no origin-side equivalent,
+  since it's about where the pilot sells, not where they bought. **Still open:**
+  `best_route_tool.py`'s `BestRouteArgs` Field for voice ("sell at an NQA terminal") —
+  that's the AI-facing schema, Jeff's to add.
+- **Resolved 2026-10-01 — voice correction tool's leg resolution.** The gap:
+  `resolver.resolve_leg()` is stateless and matches on commodity/terminal hints, but the
+  exact case `pending_confirmation` protects ("no, 614") carries no hint at all — with
+  one active run that's fine (matches on `leg_type` alone), but with two concurrent runs
+  it has no way to pick and raises `AmbiguousLegError`, forcing the pilot to repeat
+  context they just gave seconds ago. Resolved by adding recency as a fallback, not a
+  replacement: `resolve_leg()` still decides first whenever it has a real hint or only
+  one candidate; only when it's ambiguous *and* `State.last_touched_leg_id` is set does
+  recency break the tie. Built: `last_touched_leg_id` (graph.py) — set, best-effort,
+  alongside `pending_confirmation` by re-resolving the triggering `mark_cargo_acquired`/
+  `mark_cargo_sold` call's own args (the tool itself already resolved this same leg a
+  moment ago but only returns a spoken string, not its id); doesn't self-clear, so it
+  persists as a recency hint until a newer confirmation-prone call overwrites it; run
+  concurrently with the LLM call (`asyncio.gather`) rather than before it, so it costs
+  ~0 added latency on the turn that's already latency-sensitive. **Still open:** the
+  voice correction tool itself, which is what actually consumes `last_touched_leg_id` —
+  not built, Jeff's to write.
 - **What a mining or salvage session actually looks like** for Jeff — refine then haul, or
   sell raw? Several refinery jobs per session? RMC picked up in stages? Refinery jobs take
   hours, a wait trading doesn't have; that may shape the sell-only model more than trading

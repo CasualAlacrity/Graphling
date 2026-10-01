@@ -134,10 +134,17 @@ def _terminal_is_auto_load(cache, terminal_id: int) -> bool:
     return bool(terminal and terminal.is_auto_load)
 
 
+def _terminal_is_nqa(cache, terminal_id: int) -> bool:
+    # Same story as is_auto_load above — is_nqa ("no questions asked") lives on the
+    # terminals endpoint too, not per-route.
+    terminal = next((t for t in cache.terminals if t.id == terminal_id), None)
+    return bool(terminal and terminal.is_nqa)
+
+
 async def find_best_route(
         uex_client, scw_client, origin_terminal_ids: list[int], ship: str, ship_scu: float, cache, *,
         commodity_id: int | None = None, exclude_destination_terminal_name: str | None = None,
-        exclude_ground: bool = False, require_autoload: bool = False,
+        exclude_ground: bool = False, require_autoload: bool = False, require_nqa: bool = False,
         destination_terminal_ids: set[int] | None = None, rank_by: str = "profit",
 ) -> RouteSearch | None:
     """Searches commodity routes from every terminal in origin_terminal_ids and ranks
@@ -171,10 +178,12 @@ async def find_best_route(
     cross-system, none reach a usable SCU amount, or the ground/autoload filters
     excluded everything that was left).
 
-    exclude_ground and require_autoload only ever constrain the destination — the origin
-    is always the pilot's own pinned starting point(s) here (unlike the overlay's filter
-    panel, where either end can be open), so filtering it by its own ground/autoload
-    status would wrongly exclude routes just because of where the pilot already is.
+    exclude_ground, require_autoload, and require_nqa only ever constrain the destination
+    — the origin is always the pilot's own pinned starting point(s) here (unlike the
+    overlay's filter panel, where either end can be open), so filtering it by its own
+    ground/autoload/nqa status would wrongly exclude routes just because of where the
+    pilot already is. require_nqa has no origin-side equivalent regardless, same as the
+    overlay's filter — it's about where the pilot sells hot cargo, not where they bought it.
     destination_terminal_ids is the analogous containment constraint for a bare "in X"/
     "on X" request where BOTH ends stay in the named region — None means destination is
     open, same as before this existed.
@@ -212,6 +221,8 @@ async def find_best_route(
         if exclude_ground and route.is_on_ground_destination:
             continue
         if require_autoload and not _terminal_is_auto_load(cache, route.destination_terminal_id):
+            continue
+        if require_nqa and not _terminal_is_nqa(cache, route.destination_terminal_id):
             continue
 
         scu = reachable_scu(route, int(ship_scu))

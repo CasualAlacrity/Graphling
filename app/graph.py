@@ -10,10 +10,12 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 from pydantic import BaseModel
 
+from db.models import LegType
 from llm import get_chat_llm, get_classification_llm
 from prompt_loader import load_prompt
 from tools.best_route_tool import BestRouteTool
 from tools.starcitizenwiki.client import StarCitizenWikiClient
+from tools.trade_run import resolver
 from tools.trade_run.cargo_packing_tool import CargoPackingTool
 from tools.trade_run.confirm_cargo_loaded import ConfirmCargoLoadedTool
 from tools.trade_run.confirm_cargo_unloaded import ConfirmCargoUnloadedTool
@@ -46,6 +48,15 @@ class State(BaseModel):
     # that already broke it once ("Let's do it.", docs/todo.md Phase 3 seed #4).
     # Self-clears every time respond() runs, whichever path got it there.
     pending_confirmation: bool = False
+    # Set (best-effort) alongside pending_confirmation whenever a confirmation-prone tool
+    # just ran -- re-resolves the same leg via resolver.resolve_leg(), using the
+    # triggering call's own args, since the tool itself only returns a spoken string, not
+    # its leg id. Unlike pending_confirmation, this does NOT self-clear: it's a recency
+    # hint for the eventual voice correction tool's leg lookup (resolve_leg() alone is
+    # ambiguous exactly when the pilot gives no commodity/terminal hint and has more than
+    # one active run -- see docs/intent/run-model.md's leg-resolution note), not a
+    # one-turn flag, so it persists until a newer confirmation-prone call overwrites it.
+    last_touched_leg_id: int | None = None
 
 
 class TopicClassification(BaseModel):
@@ -196,11 +207,81 @@ def _just_ran_confirmation_prone_tool(messages: list[BaseMessage]) -> bool:
     return False
 
 
+def _confirmation_tool_call(messages: list[BaseMessage]) -> dict | None:
+    """Same turn-scoping as _just_ran_confirmation_prone_tool (reversed scan for the
+    triggering AIMessage, stopping cold if messages[-1] isn't a ToolMessage) but returns
+    the actual tool_call dict instead of a bool -- last_touched_leg_id needs the args the
+    pilot's confirmation-prone call used, not just whether one ran. Kept separate from
+    _just_ran_confirmation_prone_tool rather than having one call the other, so neither
+    changes the other's already-tested behavior."""
+    if not messages or not isinstance(messages[-1], ToolMessage):
+        return None
+    for message in reversed(messages):
+        if isinstance(message, AIMessage):
+            for call in (message.tool_calls or []):
+                if call["name"] in _CONFIRMATION_PRONE_TOOLS:
+                    return call
+            return None
+    return None
+
+
+_LEG_TYPE_BY_CONFIRMATION_TOOL = {
+    "mark_cargo_acquired": LegType.ACQUISITION,
+    "mark_cargo_sold": LegType.SALE,
+}
+
+
+async def _resolve_last_touched_leg_id(messages: list[BaseMessage]) -> int | None:
+    """Best-effort re-resolution of the exact leg the triggering confirmation-prone tool
+    call just touched, using that call's own commodity/terminal args -- the tool itself
+    already resolved this same leg a moment ago (resolver.resolve_leg(), same args) but
+    only returns a spoken string (UplinkTool's plain-string return, not a Command), never
+    its id. Re-resolving is the cheapest way to recover it without touching a tool file.
+
+    Returns None on any resolution failure, including a genuinely ambiguous match -- which
+    means the tool's own call didn't record anything either, so there's nothing new to
+    remember. respond() keeps the previous last_touched_leg_id rather than clobbering it
+    with a failed lookup."""
+    call = _confirmation_tool_call(messages)
+    if call is None:
+        return None
+    args = call.get("args") or {}
+    try:
+        leg = await resolver.resolve_leg(
+            leg_type=_LEG_TYPE_BY_CONFIRMATION_TOOL[call["name"]],
+            commodity=args.get("commodity"),
+            terminal=args.get("terminal"),
+        )
+    except (ValueError, resolver.AmbiguousLegError):
+        return None
+    return leg.id
+
+
 async def respond(state: State) -> dict:
     messages = PERSONA_TEMPLATE.invoke({}).to_messages()
-    response = await llm.ainvoke(messages + state.messages)
     pending_confirmation = _just_ran_confirmation_prone_tool(state.messages)
-    return {"messages": [response], "pending_confirmation": pending_confirmation}
+
+    # Run the leg re-resolution alongside the LLM call rather than before it. It's a real
+    # network round trip (resolve_leg -> ledger_client.get_in_progress_runs()), and this
+    # is already the turn the pilot is waiting on a spoken reply for -- the whole reason
+    # pending_confirmation exists at all is to save time on this exact turn. An LLM
+    # completion is reliably slower than one HTTP call to our own ledger server, so
+    # running them concurrently adds ~0 wall-clock time instead of adding it serially.
+    if pending_confirmation:
+        response, resolved_leg_id = await asyncio.gather(
+            llm.ainvoke(messages + state.messages),
+            _resolve_last_touched_leg_id(state.messages),
+        )
+    else:
+        response = await llm.ainvoke(messages + state.messages)
+        resolved_leg_id = None
+
+    last_touched_leg_id = resolved_leg_id if resolved_leg_id is not None else state.last_touched_leg_id
+    return {
+        "messages": [response],
+        "pending_confirmation": pending_confirmation,
+        "last_touched_leg_id": last_touched_leg_id,
+    }
 
 
 async def classify_topic(state: State) -> dict:

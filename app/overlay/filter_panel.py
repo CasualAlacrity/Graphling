@@ -199,10 +199,17 @@ class FilterPanel(HudWindow):
         self.autoload_filter_toggle.setIconSize(QSize(16, 16))
         self.autoload_filter_toggle.setToolTip("Autoload-capable terminals only")
 
+        self.nqa_filter_toggle = QPushButton(parent=self, objectName="filterIconToggle")
+        self.nqa_filter_toggle.setCheckable(True)
+        self.nqa_filter_toggle.setIcon(theme.load_icon("mask", theme.TEXT_DISABLED))
+        self.nqa_filter_toggle.setIconSize(QSize(16, 16))
+        self.nqa_filter_toggle.setToolTip("No-questions-asked terminals only (sells hot cargo)")
+
         self.options_caption = QLabel(parent=self, objectName="filterOptionsCaption")
 
         options_row.addWidget(self.space_only_filter_toggle)
         options_row.addWidget(self.autoload_filter_toggle)
+        options_row.addWidget(self.nqa_filter_toggle)
         options_row.addWidget(self.options_caption)
         options_row.addStretch()
 
@@ -232,6 +239,9 @@ class FilterPanel(HudWindow):
         self.space_only_filter_toggle.toggled.connect(lambda _: self.refresh_filters())
         self.autoload_filter_toggle.toggled.connect(
             lambda checked: self._on_toggle_changed(self.autoload_filter_toggle, "cart-flatbed", checked)
+        )
+        self.nqa_filter_toggle.toggled.connect(
+            lambda checked: self._on_toggle_changed(self.nqa_filter_toggle, "mask", checked)
         )
 
         self.commodity_input.textChanged.connect(
@@ -266,9 +276,13 @@ class FilterPanel(HudWindow):
     def _update_options_caption(self):
         space_only = self.space_only_filter_toggle.isChecked()
         autoload_only = self.autoload_filter_toggle.isChecked()
+        nqa_only = self.nqa_filter_toggle.isChecked()
         terminal_clause = "Space stations only" if space_only else "Any terminal"
         loading_clause = "autoload-capable only" if autoload_only else "any loading type"
-        self.options_caption.setText(f"{terminal_clause}, {loading_clause}")
+        caption = f"{terminal_clause}, {loading_clause}"
+        if nqa_only:
+            caption += ", NQA sell only"
+        self.options_caption.setText(caption)
 
     def _on_ship_selected(self, name):
         vehicle = find_vehicle(name)
@@ -445,6 +459,7 @@ class FilterPanel(HudWindow):
         max_destination_code = inventory_code_for(self.max_destination_inventory_input.currentText(), "sell")
         space_only = self.space_only_filter_toggle.isChecked()
         require_autoload = self.autoload_filter_toggle.isChecked()
+        nqa_only = self.nqa_filter_toggle.isChecked()
 
         self.search_button.setEnabled(False)
         self.search_button.setText("SEARCHING…")
@@ -457,6 +472,7 @@ class FilterPanel(HudWindow):
                 max_destination_code=max_destination_code,
                 space_only=space_only,
                 require_autoload=require_autoload,
+                nqa_only=nqa_only,
             )
         except requests.exceptions.RequestException as exc:
             self.search_rejected.emit(f"Search failed — {exc}")

@@ -34,14 +34,14 @@ BAIJINI_POINT = CachedTerminal(
     id=201, name="Baijini Point", type=TerminalType.COMMODITY, star_system_name="Pyro",
     orbit_name="Pyro I", moon_name=None, planet_name=None, displayname="Baijini Point",
     nickname="Baijini", space_station_name="Baijini Point", outpost_name=None, city_name=None,
-    is_auto_load=0,
+    is_auto_load=0, is_nqa=0,
 )
 
 PORT_TRESSLER = CachedTerminal(
     id=202, name="Port Tressler", type=TerminalType.COMMODITY, star_system_name="Stanton",
     orbit_name="Crusader", moon_name=None, planet_name=None, displayname="Port Tressler",
     nickname="Tressler", space_station_name="Port Tressler", outpost_name=None, city_name=None,
-    is_auto_load=0,
+    is_auto_load=0, is_nqa=0,
 )
 
 CUTLASS_BLACK = CachedVehicle(id=301, name="Cutlass Black", name_full="Drake Cutlass Black", scu=46.0, is_concept=0)

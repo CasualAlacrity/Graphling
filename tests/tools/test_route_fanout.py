@@ -33,11 +33,18 @@ FAKE_ROUTES_BY_COMMODITY = {
 # defaults to autoload-capable; tests that need otherwise override this per-terminal.
 TERMINAL_AUTOLOAD = {100: 1, 101: 1, 200: 1, 201: 1, 202: 1}
 
+# Same story as TERMINAL_AUTOLOAD, for is_nqa — every terminal referenced above defaults
+# to not-NQA; no test in this file exercises nqa_only itself (that's covered where the
+# filter logic lives, test_filter_results_integration.py / test_route_ranking.py), this
+# just needs to not crash the real find_terminal_by_id/uex_cache path.
+TERMINAL_NQA = {100: 0, 101: 0, 200: 0, 201: 0, 202: 0}
+
 SEARCH_DEFAULTS = {
     "min_source_code": None,
     "max_destination_code": None,
     "space_only": False,
     "require_autoload": False,
+    "nqa_only": False,
 }
 
 
@@ -67,6 +74,7 @@ def fake_route_source(monkeypatch, call_log):
     monkeypatch.setattr(uex_lookup.uex_cache_client, "get_commodity_route_rows", fake_get_commodity_route_rows)
     monkeypatch.setattr(uex_lookup, "commodity_ids_at", fake_commodity_ids_at)
     monkeypatch.setattr(uex_lookup, "_terminal_is_auto_load", lambda terminal_id: TERMINAL_AUTOLOAD.get(terminal_id, 0))
+    monkeypatch.setattr(uex_lookup, "_terminal_is_nqa", lambda terminal_id: TERMINAL_NQA.get(terminal_id, 0))
 
 
 async def test_commodity_specified_search_does_a_single_cached_fetch(call_log):

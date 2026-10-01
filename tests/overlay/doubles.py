@@ -19,19 +19,19 @@ TERMINALS = [
         id=1, name="Orison TDD", type=TerminalType.COMMODITY, star_system_name="Stanton",
         orbit_name="Stanton", moon_name=None, planet_name="Crusader", displayname="Orison TDD",
         nickname="Orison TDD", space_station_name=None, outpost_name=None, city_name="Orison",
-        is_auto_load=1,
+        is_auto_load=1, is_nqa=0,
     ),
     CachedTerminal(
         id=2, name="Seraphim Station", type=TerminalType.COMMODITY, star_system_name="Stanton",
         orbit_name="Stanton", moon_name=None, planet_name="Crusader", displayname="Seraphim Station",
         nickname="Seraphim Station", space_station_name="Seraphim Station", outpost_name=None, city_name=None,
-        is_auto_load=1,
+        is_auto_load=1, is_nqa=0,
     ),
     CachedTerminal(
         id=3, name="Baijini Point", type=TerminalType.COMMODITY, star_system_name="Stanton",
         orbit_name="Stanton", moon_name=None, planet_name=None, displayname="Baijini Point",
         nickname="Baijini Point", space_station_name="Baijini Point", outpost_name=None, city_name=None,
-        is_auto_load=1,
+        is_auto_load=1, is_nqa=0,
     ),
 ]
 

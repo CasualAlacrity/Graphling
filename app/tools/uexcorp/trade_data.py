@@ -45,6 +45,11 @@ class UEXTradeRoute(BaseModel):
     # fills these in via a terminal lookup after validating the raw route row.
     is_auto_load_origin: int = 0
     is_auto_load_destination: int = 0
+    # Same story as is_auto_load_* above — is_nqa ("no questions asked", UEX's own field
+    # name for a terminal that'll buy stolen/illegal cargo) also lives on the terminals
+    # endpoint, not commodities_routes. Filled in the same way, post-validation.
+    is_nqa_origin: int = 0
+    is_nqa_destination: int = 0
     # CSV strings from UEX, e.g. "1,2,4,8,16,24,32" — confirmed live these have real gaps
     # per terminal (not just "every size up to some max"), so they can't be derived from
     # a simpler terminal-level field and have to come from the route row itself.
