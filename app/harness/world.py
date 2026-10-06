@@ -30,6 +30,13 @@ LARANITE = CachedCommodity(
     ids_star_systems=[1], ids_planets=[], ids_moons=[], ids_orbits=[], ids_poi=[], is_buyable=1,
 )
 
+# Second commodity, for the "cheaper terminal is out of stock" case -- see
+# COMMODITY_PRICE_ROWS below.
+AGRICIUM = CachedCommodity(
+    id=102, name="Agricium", code="AGRI", id_parent=0, is_raw=True, is_refined=False,
+    ids_star_systems=[1], ids_planets=[], ids_moons=[], ids_orbits=[], ids_poi=[], is_buyable=1,
+)
+
 BAIJINI_POINT = CachedTerminal(
     id=201, name="Baijini Point", type=TerminalType.COMMODITY, star_system_name="Pyro",
     orbit_name="Pyro I", moon_name=None, planet_name=None, displayname="Baijini Point",
@@ -48,7 +55,7 @@ CUTLASS_BLACK = CachedVehicle(id=301, name="Cutlass Black", name_full="Drake Cut
 
 REFERENCE_CACHE = UexReferenceCache(
     fetched_at=datetime.now(UTC),
-    commodities=[LARANITE],
+    commodities=[LARANITE, AGRICIUM],
     star_systems=[],
     orbits=[],
     terminals=[BAIJINI_POINT, PORT_TRESSLER],
@@ -71,12 +78,26 @@ COMMODITY_PRICE_ROWS: dict[int, list[dict]] = {
         {
             "id_terminal": BAIJINI_POINT.id, "terminal_name": BAIJINI_POINT.name,
             "star_system_name": "Pyro", "orbit_name": "Pyro I", "moon_name": None, "planet_name": None,
-            "price_buy": 3.15, "price_sell": 2.85, "status_buy": 1, "status_sell": 1,
+            "price_buy": 3.15, "price_sell": 2.85, "status_buy": 4, "status_sell": 4,
         },
         {
             "id_terminal": PORT_TRESSLER.id, "terminal_name": PORT_TRESSLER.name,
             "star_system_name": "Stanton", "orbit_name": "Crusader", "moon_name": None, "planet_name": None,
-            "price_buy": 3.42, "price_sell": 3.10, "status_buy": 1, "status_sell": 1,
+            "price_buy": 3.42, "price_sell": 3.10, "status_buy": 4, "status_sell": 4,
+        },
+    ],
+    # status_buy 1 is UEX's "Out of Stock (Empty)" (7 = full). Baijini Point is the
+    # cheaper price but has nothing to sell; Port Tressler is dearer but in stock.
+    AGRICIUM.id: [
+        {
+            "id_terminal": BAIJINI_POINT.id, "terminal_name": BAIJINI_POINT.name,
+            "star_system_name": "Pyro", "orbit_name": "Pyro I", "moon_name": None, "planet_name": None,
+            "price_buy": 25.40, "price_sell": 24.10, "status_buy": 1, "status_sell": 4,
+        },
+        {
+            "id_terminal": PORT_TRESSLER.id, "terminal_name": PORT_TRESSLER.name,
+            "star_system_name": "Stanton", "orbit_name": "Crusader", "moon_name": None, "planet_name": None,
+            "price_buy": 26.10, "price_sell": 24.80, "status_buy": 4, "status_sell": 4,
         },
     ],
 }

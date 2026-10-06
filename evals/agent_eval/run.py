@@ -25,6 +25,7 @@ os.environ.setdefault("LANGSMITH_TRACING", "false")
 import asyncio
 import csv
 import json
+import re
 import sys
 import textwrap
 import time
@@ -54,10 +55,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "app"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from cases import CASES, HarnessCase  # noqa: E402
-from judge import judge_response  # noqa: E402
+from judge import extract_claims, judge_response  # noqa: E402
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage  # noqa: E402
 
 from graph import graph, prewarm  # noqa: E402
+from graph import tools as graph_tools  # noqa: E402
 from harness.fakes import install_fakes  # noqa: E402
 from turn_metrics import TurnTimingsCallback, compute_turn_metrics  # noqa: E402
 
@@ -73,10 +75,24 @@ CSV_FIELDS = [
     "expected_on_topic", "actual_on_topic", "on_topic_correct",
     "expected_tool", "actual_tool", "tool_correct",
     "expected_args", "actual_args", "args_correct",
-    "response_correct", "overall_pass",
+    "location_correct", "price_correct", "unit_correct", "claims_supported", "response_correct", "overall_pass",
     "latency_ms", "tokens_in", "tokens_out", "tokens_total", "cost_usd",
     "classify_ms", "decline_ms", "respond_ms", "tool_ms",
+    "recommended_terminal", "stated_price", "unsupported_claims",
     "final_response", "judge_reasoning",
+]
+
+# Independently scored, so a failure says WHICH thing broke. None = not applicable to the
+# case (a greeting has no price). overall_pass is all applicable dimensions at once.
+DIMENSIONS = [
+    ("on_topic_correct", "right topic gate"),
+    ("tool_correct", "right tool"),
+    ("args_correct", "right arguments"),
+    ("location_correct", "right location"),
+    ("price_correct", "right price"),
+    ("unit_correct", "right unit"),
+    ("claims_supported", "no unsupported claims"),
+    ("response_correct", "free-text judge"),
 ]
 
 
@@ -87,6 +103,7 @@ def _write_csv(records: list[dict], path: Path) -> None:
         for record in records:
             row = dict(record)
             row["expected_args"] = json.dumps(row["expected_args"])
+            row["unsupported_claims"] = json.dumps(row.get("unsupported_claims"))
             row["actual_args"] = json.dumps(row["actual_args"])
             row["respond_ms"] = "+".join(f"{ms:.0f}" for ms in row["respond_ms"])
             row["tool_ms"] = ", ".join(f"{name}={ms:.0f}" for name, ms in row["tool_ms"])
@@ -131,6 +148,41 @@ def _tool_result_for(messages: list, tool_call_id: str) -> str | None:
     return None
 
 
+def _schema_defaults(tool_name: str) -> dict:
+    for tool in graph_tools:
+        if tool.name == tool_name:
+            return {name: field.default for name, field in tool.args_schema.model_fields.items()}
+    return {}
+
+
+def _set_args(args: dict | None, defaults: dict) -> dict:
+    """The args that actually say something: a tool call may or may not spell out an arg
+    it left at its schema default (omitted vs `"require_autoload": false`), and those
+    must compare equal."""
+    result = {}
+    for key, value in (args or {}).items():
+        if value is None or value == "" or (key in defaults and value == defaults[key]):
+            continue
+        # Letters and digits only: the model may normalize a spoken name ("Grim Hex" ->
+        # "GrimHEX"), and the tools fuzzy-match names anyway, so spacing/case aren't a miss.
+        result[key] = "".join(ch for ch in str(value).lower() if ch.isalnum())
+    return result
+
+
+def _args_match(expected: dict | None, actual: dict | None, tool_name: str, exact: bool) -> bool:
+    defaults = _schema_defaults(tool_name)
+    wanted = _set_args(expected, defaults)
+    got = _set_args(actual, defaults)
+    # An expected value equal to the default means "must NOT be set" -- _set_args drops it,
+    # so without this an expected {"sell_at_nqa_only": False} would pass vacuously.
+    must_be_unset = [key for key, value in (expected or {}).items() if key in defaults and value == defaults[key]]
+    if any(key in got for key in must_be_unset):
+        return False
+    if exact:
+        return got == wanted
+    return all(got.get(key) == value for key, value in wanted.items())
+
+
 async def _run_one(case: HarnessCase, phrasing: str, model_provider: str, model_name: str) -> dict:
     thread_id = str(uuid.uuid4())
     config = {"configurable": {"thread_id": thread_id}}
@@ -167,10 +219,15 @@ async def _run_one(case: HarnessCase, phrasing: str, model_provider: str, model_
         "actual_on_topic": actual_on_topic,
         "expected_tool": case.expected_tool,
         "actual_tool": actual_tool,
-        "expected_args": case.expected_args,
+        "expected_args": case.expected_args_for(phrasing),
         "actual_args": actual_args,
         "final_response": final_response,
         "judge_reasoning": None,
+        # Every scored dimension exists on every record (None = not applicable), so
+        # readers never have to guess whether a missing key means "skipped" or "bug".
+        "tool_correct": None, "args_correct": None, "location_correct": None, "price_correct": None,
+        "unit_correct": None, "claims_supported": None, "response_correct": None,
+        "recommended_terminal": None, "stated_price": None, "unsupported_claims": None,
         "latency_ms": round(latency_ms, 1),
         "tokens_in": None,
         "tokens_out": None,
@@ -210,9 +267,8 @@ async def _run_one(case: HarnessCase, phrasing: str, model_provider: str, model_
 
     if case.expected_tool is not None:
         tool_correct = actual_tool == case.expected_tool
-        args_correct = tool_correct and actual_args is not None and all(
-            str(actual_args.get(key, "")).lower() == str(value).lower()
-            for key, value in (case.expected_args or {}).items()
+        args_correct = tool_correct and actual_args is not None and _args_match(
+            case.expected_args_for(phrasing), actual_args, case.expected_tool, case.exact_args,
         )
     else:
         tool_correct = actual_tool is None
@@ -221,12 +277,119 @@ async def _run_one(case: HarnessCase, phrasing: str, model_provider: str, model_
     record["tool_correct"] = tool_correct
     record["args_correct"] = args_correct
 
-    verdict = await judge_response(phrasing, case.expected_outcome, tool_result, final_response)
-    record["response_correct"] = verdict.response_correct
-    record["judge_reasoning"] = verdict.reasoning
+    if case.args_only:
+        record["response_correct"] = None
+        record["overall_pass"] = tool_correct and args_correct
+        return record
 
-    record["overall_pass"] = tool_correct and args_correct and verdict.response_correct
+    if not case.structured_reply:
+        verdict = await judge_response(phrasing, case.expected_outcome, tool_result, final_response)
+        record["response_correct"] = verdict.response_correct
+        record["judge_reasoning"] = verdict.reasoning
+        record["overall_pass"] = tool_correct and args_correct and verdict.response_correct
+        return record
+
+    if not tool_correct:
+        # The reply was built from the wrong tool's result (or none), so location/price/
+        # unit/claims would all fail as a cascade of the tool miss and bury it. Left None
+        # = not evaluated; tool_correct already carries the failure.
+        record["overall_pass"] = False
+        return record
+
+    claims = await extract_claims(phrasing, tool_result, final_response)
+    record["recommended_terminal"] = claims.recommended_terminal
+    record["stated_price"] = claims.price_for_recommended_terminal
+    record["unsupported_claims"] = claims.unsupported_claims
+
+    record["location_correct"] = (
+        None if case.expected_location is None else _same_name(case.expected_location, claims.recommended_terminal)
+    )
+    record["price_correct"] = (
+        None if case.expected_price is None
+        else _price_matches(case.expected_price, claims.price_for_recommended_terminal)
+    )
+    record["unit_correct"] = None if case.expected_unit is None else _says_unit(case.expected_unit, final_response)
+    record["claims_supported"] = not claims.unsupported_claims
+
+    checked = [record[key] for key, _ in DIMENSIONS if record.get(key) is not None]
+    record["overall_pass"] = all(checked)
     return record
+
+
+def _same_name(expected: str, actual: str | None) -> bool:
+    """Either name containing the other, letters/digits only -- the reply may say
+    "Baijini Point in Pyro" for "Baijini Point"."""
+    if not actual:
+        return False
+    want = "".join(ch for ch in expected.lower() if ch.isalnum())
+    got = "".join(ch for ch in actual.lower() if ch.isalnum())
+    return want in got or got in want
+
+
+def _price_matches(expected: float, actual: float | None, tolerance: float = 0.01) -> bool:
+    return actual is not None and abs(actual - expected) <= expected * tolerance
+
+
+def _says_unit(unit: str, response: str) -> bool:
+    return re.search(rf"\b{re.escape(unit)}\b", response, re.IGNORECASE) is not None
+
+
+TABLE_COLUMNS = [
+    ("on_topic_correct", "topic"),
+    ("tool_correct", "tool"),
+    ("args_correct", "args"),
+    ("location_correct", "location"),
+    ("price_correct", "price"),
+    ("unit_correct", "unit"),
+    ("claims_supported", "grounded"),
+    ("response_correct", "judge"),
+    ("overall_pass", "PASS"),
+]
+PHRASING_WIDTH = 46
+CELL_WIDTH = 9
+
+
+def _cell(value) -> str:
+    if value is None:
+        return _c("-".center(CELL_WIDTH), "2")
+    if value:
+        return _c("\u2713".center(CELL_WIDTH), "32")
+    return _c("\u2717".center(CELL_WIDTH), "1;31")
+
+
+def render_table(records: list[dict]) -> str:
+    """One row per phrasing run, grouped under its case, a column per scored dimension:
+    \u2713 passed, \u2717 failed, - not applicable (or not evaluated after a tool miss). The
+    bottom row is passed/total per column. "grounded" is the unsupported-claims check
+    (\u2713 = nothing the reply said went beyond the tool result). Columns nothing scored
+    (the free-text judge, today) are dropped."""
+    columns = [
+        (key, label) for key, label in TABLE_COLUMNS
+        if any(record.get(key) is not None for record in records)
+    ]
+    header = " " * (PHRASING_WIDTH + 2) + "".join(label.center(CELL_WIDTH) for _, label in columns)
+    lines = [_c(header, "1")]
+
+    current_case = None
+    for record in records:
+        if record["case_id"] != current_case:
+            current_case = record["case_id"]
+            lines.append(_c(current_case, "1;36"))
+        phrasing = record["phrasing"]
+        if len(phrasing) > PHRASING_WIDTH:
+            phrasing = phrasing[: PHRASING_WIDTH - 1] + "\u2026"
+        row = "  " + phrasing.ljust(PHRASING_WIDTH)
+        lines.append(row + "".join(_cell(record.get(key)) for key, _ in columns))
+
+    totals = "  " + _c("passed / total".ljust(PHRASING_WIDTH), "1")
+    for key, _ in columns:
+        applicable = [record[key] for record in records if record.get(key) is not None]
+        text = f"{sum(applicable)}/{len(applicable)}"
+        color = "32" if sum(applicable) == len(applicable) else "33"
+        totals += _c(text.center(CELL_WIDTH), color)
+    lines.append("-" * (PHRASING_WIDTH + 2 + CELL_WIDTH * len(columns)))
+    lines.append(totals)
+    return "\n".join(lines)
 
 
 async def main() -> int:
@@ -236,8 +399,17 @@ async def main() -> int:
     print(_c(f"Running agent_eval against {model_provider}:{model_name}\n", "1;36"))
     await prewarm()
 
+    # Optional case-id filter -- `run.py some_case other_case` -- for iterating on one
+    # case without paying for the whole suite.
+    wanted_ids = set(sys.argv[1:])
+    cases = [case for case in CASES if not wanted_ids or case.id in wanted_ids]
+    unknown_ids = wanted_ids - {case.id for case in CASES}
+    if unknown_ids:
+        print(_c(f"Unknown case id(s): {', '.join(sorted(unknown_ids))}", "1;31"))
+        return 2
+
     records = []
-    for case in CASES:
+    for case in cases:
         for phrasing in case.phrasings:
             record = await _run_one(case, phrasing, model_provider, model_name)
             records.append(record)
@@ -259,7 +431,18 @@ async def main() -> int:
                 if record["args_correct"] is False:
                     label = _c("args", "1;31")
                     print(f"       {label}: expected={record['expected_args']} actual={record['actual_args']}")
-                if record["response_correct"] is False and record["judge_reasoning"]:
+                for key in ("location_correct", "price_correct", "unit_correct"):
+                    if record.get(key) is False:
+                        label = _c(key.removesuffix("_correct"), "1;31")
+                        print(
+                            f"       {label}: expected location/price/unit="
+                            f"{case.expected_location}/{case.expected_price}/{case.expected_unit}, reply gave "
+                            f"{record.get('recommended_terminal')!r} at {record.get('stated_price')!r}"
+                        )
+                if record.get("claims_supported") is False:
+                    label = _c("claims", "1;31")
+                    print(f"       {label}: unsupported: {record['unsupported_claims']}")
+                if record.get("response_correct") is False and record["judge_reasoning"]:
                     wrapped = textwrap.fill(
                         record["judge_reasoning"],
                         width=100,
@@ -274,7 +457,14 @@ async def main() -> int:
     total_tokens = sum(r["tokens_total"] or 0 for r in records)
     avg_latency = sum(r["latency_ms"] for r in records) / total if total else 0
 
+    dimension_scores = {}
+    for key, _label in DIMENSIONS:
+        applicable = [r[key] for r in records if r.get(key) is not None]
+        if applicable:
+            dimension_scores[key] = {"passed": sum(applicable), "total": len(applicable)}
+
     summary = {
+        "dimensions": dimension_scores,
         "model_provider": model_provider,
         "model_name": model_name,
         "timestamp": datetime.now(UTC).isoformat(),
@@ -287,6 +477,9 @@ async def main() -> int:
     }
 
     print(_c(f"\n=== Summary: {model_provider}:{model_name} ===", "1;36"))
+    print()
+    print(render_table(records))
+    print()
     pass_rate_color = "32" if passed == total else ("1;31" if passed == 0 else "33")
     pass_line = f"{passed}/{total} passed ({summary['pass_rate']:.0%})"
     print(f"  {_c(pass_line, pass_rate_color)}")
