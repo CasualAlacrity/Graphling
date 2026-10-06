@@ -10,6 +10,12 @@ from tools.uexcorp.trade_data import UEXTradeData
 from tools.uplink_tool import UEXBackedTool
 
 
+# UEX's commodities_status table, buy side: code 1 is "Out of Stock (Empty)", 7 is full. A
+# terminal in that state has the lowest-looking price and nothing to sell, so it can't be
+# "the cheapest place to buy".
+OUT_OF_STOCK_STATUS = 1
+
+
 class TradePriceTool(UEXBackedTool):
 
     async def _lookup(self, query: str, catalog_selector: Callable[[UexReferenceCache], list],
@@ -17,7 +23,7 @@ class TradePriceTool(UEXBackedTool):
                       star_system: str | None = None, orbit: str | None = None,
                       terminal: str | None = None, moon: str | None = None,
                       near: str | None = None, max_distance: float | None = None,
-                      scorer: Any = fuzz.WRatio,
+                      scorer: Any = fuzz.WRatio, skip_out_of_stock: bool = False,
                       ) -> dict[str, Any] | str:
         cache = await self.client.get_uex_cache()
 
@@ -30,7 +36,13 @@ class TradePriceTool(UEXBackedTool):
             rows, cache, self.client, star_system, orbit, terminal, moon, near, max_distance,
         )
 
-        buy_rows = [r for r in rows if r.price_you_pay_to_acquire is not None]
+        # Opt-in: only commodity rows carry a real inventory status. Vehicle/item rows
+        # don't, and a status_buy there doesn't mean stock.
+        buy_rows = [
+            r for r in rows
+            if r.price_you_pay_to_acquire is not None
+            and not (skip_out_of_stock and r.status_buy == OUT_OF_STOCK_STATUS)
+        ]
         sell_rows = [r for r in rows if r.price_you_receive_when_selling is not None]
 
         cheapest_to_buy = min(buy_rows, key=attrgetter("price_you_pay_to_acquire"), default=None)

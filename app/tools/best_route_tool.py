@@ -86,6 +86,14 @@ class BestRouteArgs(BaseModel):
         description="Set true if the pilot asks for auto-load-only, or wants to avoid "
                     "manually unloading cargo at the destination."
     )
+    sell_at_nqa_only: bool = Field(
+        default=False,
+        description="Set true if the pilot wants to sell at a terminal that doesn't ask "
+                    "where the cargo came from. They may say NQA, no questions asked, hot "
+                    "cargo, stolen, pirated, looted, boosted, dirty, black market, fence, "
+                    "shady, or hint at it ('goods of questionable provenance', 'somewhere "
+                    "that won't ask where I got it')."
+    )
 
 
 class BestRouteTool(UplinkTool):
@@ -119,6 +127,7 @@ class BestRouteTool(UplinkTool):
             self, origin: str, origin_mode: str = "exact", ship: str | None = None, commodity: str | None = None,
             destination_region: str | None = None, rank_by: str = "profit",
             exclude_ground_stations: bool = False, require_autoload: bool = False,
+            sell_at_nqa_only: bool = False,
             *args: Any, **kwargs: Any,
     ) -> Any:
         if ship is None:
@@ -135,7 +144,7 @@ class BestRouteTool(UplinkTool):
         return await self._safe_run(
             self._find_and_report(
                 origin, origin_mode, ship, commodity, destination_region, rank_by,
-                exclude_ground_stations, require_autoload,
+                exclude_ground_stations, require_autoload, sell_at_nqa_only,
             )
         )
 
@@ -204,6 +213,7 @@ class BestRouteTool(UplinkTool):
     async def _find_and_report(
             self, origin: str, origin_mode: str, ship: str, commodity: str | None, destination_region: str | None,
             rank_by: str = "profit", exclude_ground_stations: bool = False, require_autoload: bool = False,
+            sell_at_nqa_only: bool = False,
     ) -> str:
         cache = await self.uex_client.get_uex_cache()
 
@@ -255,6 +265,7 @@ class BestRouteTool(UplinkTool):
         result = await find_best_route(
             self.uex_client, self.scw_client, [t.id for t in origin_terminals], ship, vehicle.scu, cache,
             commodity_id=commodity_id, exclude_ground=exclude_ground_stations, require_autoload=require_autoload,
+            require_nqa=sell_at_nqa_only,
             destination_terminal_ids=destination_terminal_ids, rank_by=rank_by,
         )
         if result is None:
@@ -263,6 +274,8 @@ class BestRouteTool(UplinkTool):
                 qualifiers.append("excluding ground stations")
             if require_autoload:
                 qualifiers.append("auto-load only")
+            if sell_at_nqa_only:
+                qualifiers.append("selling at no-questions-asked terminals only")
             if destination_region is not None:
                 qualifiers.append(f"staying within {destination_region}")
             suffix = f" ({', '.join(qualifiers)})" if qualifiers else ""

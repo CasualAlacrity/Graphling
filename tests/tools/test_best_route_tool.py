@@ -333,3 +333,35 @@ async def test_no_route_found_lists_active_qualifiers(tool, monkeypatch):
         "No usable in-system route turned up from Orison TDD "
         "(excluding ground stations, auto-load only, staying within Crusader)."
     )
+
+
+async def test_sell_at_nqa_only_reaches_find_best_route_as_require_nqa(tool, monkeypatch):
+    captured = {}
+
+    async def fake_find_best_route(*args, **kwargs):
+        captured.update(kwargs)
+        return None
+
+    monkeypatch.setattr(best_route_tool_module, "find_best_route", fake_find_best_route)
+
+    message = await tool._arun(origin="Orison TDD", ship="Railen", sell_at_nqa_only=True)
+
+    assert captured["require_nqa"] is True
+    assert message == (
+        "No usable in-system route turned up from Orison TDD "
+        "(selling at no-questions-asked terminals only)."
+    )
+
+
+async def test_require_nqa_defaults_off(tool, monkeypatch):
+    captured = {}
+
+    async def fake_find_best_route(*args, **kwargs):
+        captured.update(kwargs)
+        return None
+
+    monkeypatch.setattr(best_route_tool_module, "find_best_route", fake_find_best_route)
+
+    await tool._arun(origin="Orison TDD", ship="Railen")
+
+    assert captured["require_nqa"] is False
