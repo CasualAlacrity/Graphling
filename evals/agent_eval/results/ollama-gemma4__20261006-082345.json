@@ -1,0 +1,1195 @@
+{
+  "summary": {
+    "model_provider": "ollama",
+    "model_name": "gemma4",
+    "timestamp": "2026-10-06T08:23:45.434314+00:00",
+    "total_cases": 29,
+    "passed": 23,
+    "pass_rate": 0.793,
+    "total_cost_usd": 0.019857,
+    "total_tokens": 545710,
+    "avg_latency_ms": 17262.2
+  },
+  "records": [
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "What's the cheapest place to buy Laranite?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, in the Pyro star system, is buying Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": "The copilot's spoken response correctly identifies Baijini Point as the terminal where Laranite can be bought for 3.15 aUEC per SCU, and includes the relevant details about the terminal location (orbit and star system), which matches the expected outcome.",
+      "latency_ms": 13184.8,
+      "tokens_in": 20754,
+      "tokens_out": 209,
+      "tokens_total": 20963,
+      "cost_usd": 0.0005229963625832752,
+      "classify_ms": 1983.1,
+      "decline_ms": null,
+      "respond_ms": [
+        4870.1,
+        6228.9
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "mentions_correct": true,
+      "response_correct": true,
+      "overall_pass": true
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "Where can I get Laranite for less?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, in the Pyro star system, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": "The copilot correctly identified Baijini Point as the terminal selling Laranite for 3.15 aUEC per SCU, which is the correct substance information required in response to the pilot's inquiry.",
+      "latency_ms": 14479.3,
+      "tokens_in": 20752,
+      "tokens_out": 236,
+      "tokens_total": 20988,
+      "cost_usd": 0.0005743471781254,
+      "classify_ms": 2263.8,
+      "decline_ms": null,
+      "respond_ms": [
+        4980.0,
+        7218.0
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "mentions_correct": true,
+      "response_correct": true,
+      "overall_pass": true
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "I need to buy some Laranite, where's it cheap?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is buying Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": "The actual response from the copilot inaccurately states the prices as if Baijini Point is buying Laranite for 3.15 aUEC per SCU, rather than correctly identifying that this price is for purchasing Laranite, not selling. The correct information is that Baijini Point is selling Laranite for 3.15 aUEC per SCU, not buying. Thus, while the terminal identification and orbit location are correct, the crucial information about the pricing is misleading.",
+      "latency_ms": 16652.9,
+      "tokens_in": 20757,
+      "tokens_out": 272,
+      "tokens_total": 21029,
+      "cost_usd": 0.0006605641953750067,
+      "classify_ms": 2190.9,
+      "decline_ms": null,
+      "respond_ms": [
+        5193.8,
+        9250.9
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "mentions_correct": true,
+      "response_correct": false,
+      "overall_pass": false
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "What's the cheapest place to buy Agricium?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I on Pyro, is buying Agricium for 25.4 aUEC per SCU.",
+      "judge_reasoning": "The copilot's response incorrectly conveys information by stating that Baijini Point is buying Agricium for 25.4 aUEC per SCU. However, it fails to mention that Baijini Point is out of stock for Agricium (status_buy 1) and therefore cannot be recommended as a buying location. Additionally, it does not provide the correct alternative terminal (Port Tressler) that actually has stock available at the higher price of 26.10 aUEC per SCU. Thus, the response does not meet the requirements as it lacks necessary information regarding the availability of stock.",
+      "latency_ms": 15000.2,
+      "tokens_in": 20770,
+      "tokens_out": 242,
+      "tokens_total": 21012,
+      "cost_usd": 0.000595007863916515,
+      "classify_ms": 1848.9,
+      "decline_ms": null,
+      "respond_ms": [
+        5958.3,
+        7176.8
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "mentions_correct": false,
+      "response_correct": false,
+      "overall_pass": false
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "Where can I get Agricium for less?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Baijini Point, on Pyro I, in the Pyro star system, is selling Agricium for 25.4 aUEC per SCU.\n\nPort Tressler, on Crusader, in the Stanton star system, is the best place to sell it for 24.8 aUEC per SCU.",
+      "judge_reasoning": "The copilot's response fails to adequately convey that Baijini Point is out of stock for Agricium and therefore should not be recommended as a place to buy. It only states the price for Agricium at Baijini Point without mentioning the stock status (status_buy 1), which is crucial information the pilot asked for. Furthermore, it does not mention Port Tressler as the recommended alternative for buying Agricium, which is the correct place to procure it at about 26.10 aUEC per SCU. Overall, the critical details about availability and recommendations are missing, leading to an incomplete and misleading response.",
+      "latency_ms": 17429.0,
+      "tokens_in": 20686,
+      "tokens_out": 266,
+      "tokens_total": 20952,
+      "cost_usd": 0.0006913491102516807,
+      "classify_ms": 2372.9,
+      "decline_ms": null,
+      "respond_ms": [
+        2701.3,
+        12340.5
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "mentions_correct": true,
+      "response_correct": false,
+      "overall_pass": false
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "I need to buy some Agricium, where's it cheap?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Baijini Point at Pyro I, in Pyro, is buying Agricium for 25.4 aUEC per SCU.",
+      "judge_reasoning": "The copilot's response incorrectly suggests that Baijini Point is a viable option for purchasing Agricium at 25.4 aUEC, while it is actually out of stock. The response fails to inform the pilot about the actual cheapest terminal with stock (Port Tressler at 26.1 aUEC) and therefore does not convey the correct and adequate information needed.",
+      "latency_ms": 21804.7,
+      "tokens_in": 20866,
+      "tokens_out": 398,
+      "tokens_total": 21264,
+      "cost_usd": 0.0008649180461249102,
+      "classify_ms": 2127.7,
+      "decline_ms": null,
+      "respond_ms": [
+        9544.1,
+        10115.8
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "mentions_correct": false,
+      "response_correct": false,
+      "overall_pass": false
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Where's the cheapest place to buy a Cutlass Black?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "The cheapest place to buy a Cutlass Black is at Baijini Point, in orbit around Pyro I, in the Pyro star system, for 1,190,000 aUEC. Port Tressler on Crusader is slightly more expensive at 1,225,000 aUEC.",
+      "judge_reasoning": "The copilot's response correctly identifies Baijini Point as the cheapest terminal to buy a Cutlass Black at the price of 1,190,000 aUEC, which aligns perfectly with the expected information. It also accurately compares the price to Port Tressler, noting that it is more expensive, which adds context without contradicting the main point.",
+      "latency_ms": 17760.7,
+      "tokens_in": 20616,
+      "tokens_out": 306,
+      "tokens_total": 20922,
+      "cost_usd": 0.0007045096012500725,
+      "classify_ms": 2617.4,
+      "decline_ms": null,
+      "respond_ms": [
+        5851.6,
+        9277.4
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.3
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "mentions_correct": true,
+      "response_correct": true,
+      "overall_pass": true
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "I want to buy a Cutlass Black, what's the best price?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "The cheapest place to buy a Cutlass Black is at Baijini Point, in Pyro I, for 1,190,000 aUEC.\n\nA slightly more expensive alternative is at Port Tressler, in Crusader, for 1,225,000 aUEC.",
+      "judge_reasoning": "The copilot's response correctly states that Baijini Point is the cheapest place to buy a Cutlass Black at the price of 1,190,000 aUEC. It also accurately mentions Port Tressler as a slightly more expensive option at 1,225,000 aUEC. All relevant information is conveyed accurately without contradictions or unsupported claims.",
+      "latency_ms": 15039.1,
+      "tokens_in": 20610,
+      "tokens_out": 257,
+      "tokens_total": 20867,
+      "cost_usd": 0.0005965515782073489,
+      "classify_ms": 2117.9,
+      "decline_ms": null,
+      "respond_ms": [
+        5026.2,
+        7877.0
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "mentions_correct": true,
+      "response_correct": true,
+      "overall_pass": true
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Find me a good deal on a Cutlass Black.",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "The Cutlass Black is cheapest to buy at Baijini Point, in orbit around Pyro I, for 1,190,000 aUEC. A more expensive option is at Port Tressler, on Crusader, for 1,225,000 aUEC.",
+      "judge_reasoning": "The copilot's response correctly identifies Baijini Point as the cheapest place to purchase a Cutlass Black at the price of 1,190,000 aUEC. Additionally, it correctly states the alternative location, Port Tressler, along with the correct price information. Therefore, the response conveys the expected information accurately.",
+      "latency_ms": 21778.8,
+      "tokens_in": 20682,
+      "tokens_out": 443,
+      "tokens_total": 21125,
+      "cost_usd": 0.0008638912711659263,
+      "classify_ms": 2003.1,
+      "decline_ms": null,
+      "respond_ms": [
+        7941.3,
+        11818.4
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "mentions_correct": true,
+      "response_correct": true,
+      "overall_pass": true
+    },
+    {
+      "case_id": "off_topic_greeting",
+      "phrasing": "Good morning.",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": false,
+      "actual_on_topic": false,
+      "expected_tool": null,
+      "actual_tool": null,
+      "expected_args": null,
+      "actual_args": null,
+      "final_response": "Get to the point. What's the manifest?",
+      "judge_reasoning": null,
+      "latency_ms": 3438.7,
+      "tokens_in": 0,
+      "tokens_out": 0,
+      "tokens_total": 0,
+      "cost_usd": 0.00013640252033325184,
+      "classify_ms": 1930.3,
+      "decline_ms": 1494.7,
+      "respond_ms": [],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": null,
+      "response_correct": null,
+      "overall_pass": true
+    },
+    {
+      "case_id": "off_topic_greeting",
+      "phrasing": "Hey, how are you?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": false,
+      "actual_on_topic": false,
+      "expected_tool": null,
+      "actual_tool": null,
+      "expected_args": null,
+      "actual_args": null,
+      "final_response": "Focus on the manifest. What needs to be loaded.",
+      "judge_reasoning": null,
+      "latency_ms": 3479.9,
+      "tokens_in": 0,
+      "tokens_out": 0,
+      "tokens_total": 0,
+      "cost_usd": 0.00013803680020943283,
+      "classify_ms": 1962.8,
+      "decline_ms": 1506.0,
+      "respond_ms": [],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": null,
+      "response_correct": null,
+      "overall_pass": true
+    },
+    {
+      "case_id": "off_topic_greeting",
+      "phrasing": "Morning, hope you're doing well.",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": false,
+      "actual_on_topic": false,
+      "expected_tool": null,
+      "actual_tool": null,
+      "expected_args": null,
+      "actual_args": null,
+      "final_response": "Focus on the manifest. We have work to do.",
+      "judge_reasoning": null,
+      "latency_ms": 3491.7,
+      "tokens_in": 0,
+      "tokens_out": 0,
+      "tokens_total": 0,
+      "cost_usd": 0.0001385023017511412,
+      "classify_ms": 1986.1,
+      "decline_ms": 1493.4,
+      "respond_ms": [],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": null,
+      "response_correct": null,
+      "overall_pass": true
+    },
+    {
+      "case_id": "best_route_nqa_explicit",
+      "phrasing": "Best route from Seraphim, sell at an NQA terminal",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact",
+        "rank_by": "profit",
+        "sell_at_nqa_only": true
+      },
+      "final_response": "I need to know what ship you are flying before I can find the best route.",
+      "judge_reasoning": null,
+      "latency_ms": 22492.1,
+      "tokens_in": 20513,
+      "tokens_out": 281,
+      "tokens_total": 20794,
+      "cost_usd": 0.000892188373708433,
+      "classify_ms": 2254.6,
+      "decline_ms": null,
+      "respond_ms": [
+        10097.3,
+        2868.7
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          7253.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": null,
+      "overall_pass": true
+    },
+    {
+      "case_id": "best_route_nqa_explicit",
+      "phrasing": "Find me a route that ends at a no-questions-asked station out of Seraphim",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact",
+        "sell_at_nqa_only": true
+      },
+      "final_response": "You need to specify which ship you are flying to find a route.",
+      "judge_reasoning": null,
+      "latency_ms": 16705.7,
+      "tokens_in": 20549,
+      "tokens_out": 313,
+      "tokens_total": 20862,
+      "cost_usd": 0.0006626589441241668,
+      "classify_ms": 1890.0,
+      "decline_ms": null,
+      "respond_ms": [
+        11230.6,
+        3168.7
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          398.9
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": null,
+      "overall_pass": true
+    },
+    {
+      "case_id": "best_route_nqa_explicit",
+      "phrasing": "Best route out of Grim Hex, but only NQA",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Grim Hex",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": {
+        "origin": "Grim Hex",
+        "origin_mode": "exact",
+        "sell_at_nqa_only": true
+      },
+      "final_response": "You need to specify the ship you are flying for a route recommendation.",
+      "judge_reasoning": null,
+      "latency_ms": 21419.8,
+      "tokens_in": 20634,
+      "tokens_out": 426,
+      "tokens_total": 21060,
+      "cost_usd": 0.0008496504783741257,
+      "classify_ms": 2066.1,
+      "decline_ms": null,
+      "respond_ms": [
+        15241.1,
+        3708.8
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          387.2
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": null,
+      "overall_pass": true
+    },
+    {
+      "case_id": "best_route_nqa_slang",
+      "phrasing": "I need to dump some hot cargo, route from Grim Hex",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Grim Hex",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": {
+        "origin": "GrimHEX",
+        "origin_mode": "exact",
+        "sell_at_nqa_only": true
+      },
+      "final_response": "What ship are you flying?",
+      "judge_reasoning": null,
+      "latency_ms": 17077.3,
+      "tokens_in": 20573,
+      "tokens_out": 330,
+      "tokens_total": 20903,
+      "cost_usd": 0.0006774010987919658,
+      "classify_ms": 2006.7,
+      "decline_ms": null,
+      "respond_ms": [
+        12306.2,
+        2364.0
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          382.2
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": false,
+      "response_correct": null,
+      "overall_pass": false
+    },
+    {
+      "case_id": "best_route_nqa_slang",
+      "phrasing": "Where can I fence stuff? Route out of Seraphim",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact",
+        "sell_at_nqa_only": true
+      },
+      "final_response": "I need to know what ship you are flying to calculate the best route out of Seraphim.",
+      "judge_reasoning": null,
+      "latency_ms": 16762.7,
+      "tokens_in": 20504,
+      "tokens_out": 311,
+      "tokens_total": 20815,
+      "cost_usd": 0.0006649186467072336,
+      "classify_ms": 2217.2,
+      "decline_ms": null,
+      "respond_ms": [
+        9903.5,
+        4150.8
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          473.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": null,
+      "overall_pass": true
+    },
+    {
+      "case_id": "best_route_nqa_slang",
+      "phrasing": "Best haul out of Seraphim that ends somewhere shady",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact",
+        "sell_at_nqa_only": true
+      },
+      "final_response": "You need to specify which ship you are flying to find the best route.",
+      "judge_reasoning": null,
+      "latency_ms": 19968.0,
+      "tokens_in": 20608,
+      "tokens_out": 398,
+      "tokens_total": 21006,
+      "cost_usd": 0.0007920630000429084,
+      "classify_ms": 2075.5,
+      "decline_ms": null,
+      "respond_ms": [
+        13863.7,
+        3583.0
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          428.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": null,
+      "overall_pass": true
+    },
+    {
+      "case_id": "best_route_nqa_slang",
+      "phrasing": "Boosted cargo, route out of Grim Hex",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Grim Hex",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": {
+        "origin": "Grim Hex",
+        "origin_mode": "exact",
+        "rank_by": "profit",
+        "sell_at_nqa_only": true
+      },
+      "final_response": "You need to specify the ship you are flying to calculate the best route.",
+      "judge_reasoning": null,
+      "latency_ms": 26463.6,
+      "tokens_in": 20699,
+      "tokens_out": 559,
+      "tokens_total": 21258,
+      "cost_usd": 0.0010497235354991331,
+      "classify_ms": 2328.8,
+      "decline_ms": null,
+      "respond_ms": [
+        17474.8,
+        6242.9
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          401.0
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": null,
+      "overall_pass": true
+    },
+    {
+      "case_id": "best_route_nqa_slang",
+      "phrasing": "Best black market run from Seraphim",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact",
+        "sell_at_nqa_only": true
+      },
+      "final_response": "You need to tell me what ship you are flying.",
+      "judge_reasoning": null,
+      "latency_ms": 20487.8,
+      "tokens_in": 20588,
+      "tokens_out": 406,
+      "tokens_total": 20994,
+      "cost_usd": 0.0008126827184583234,
+      "classify_ms": 2189.6,
+      "decline_ms": null,
+      "respond_ms": [
+        13525.8,
+        4366.9
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          390.0
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": null,
+      "overall_pass": true
+    },
+    {
+      "case_id": "best_route_nqa_slang",
+      "phrasing": "Something off the books, best route from Seraphim",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact",
+        "sell_at_nqa_only": true
+      },
+      "final_response": "I need to know what ship you are flying to find the best route.",
+      "judge_reasoning": null,
+      "latency_ms": 23293.6,
+      "tokens_in": 20626,
+      "tokens_out": 481,
+      "tokens_total": 21107,
+      "cost_usd": 0.0009239809178319848,
+      "classify_ms": 2182.3,
+      "decline_ms": null,
+      "respond_ms": [
+        14471.2,
+        6233.7
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          392.0
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": null,
+      "overall_pass": true
+    },
+    {
+      "case_id": "best_route_nqa_oblique",
+      "phrasing": "I've got goods of questionable provenance, find me a route from Seraphim",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact",
+        "sell_at_nqa_only": true
+      },
+      "final_response": "I need to know which ship you are flying to find the best route.",
+      "judge_reasoning": null,
+      "latency_ms": 19771.8,
+      "tokens_in": 20581,
+      "tokens_out": 401,
+      "tokens_total": 20982,
+      "cost_usd": 0.0007842802662076429,
+      "classify_ms": 2019.9,
+      "decline_ms": null,
+      "respond_ms": [
+        12259.7,
+        5057.4
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          417.3
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": null,
+      "overall_pass": true
+    },
+    {
+      "case_id": "best_route_nqa_oblique",
+      "phrasing": "Route from Seraphim to somewhere that won't ask where I got the cargo",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact",
+        "sell_at_nqa_only": true
+      },
+      "final_response": "What ship are you flying?",
+      "judge_reasoning": null,
+      "latency_ms": 16996.5,
+      "tokens_in": 20595,
+      "tokens_out": 329,
+      "tokens_total": 20924,
+      "cost_usd": 0.0006741950586257737,
+      "classify_ms": 2025.5,
+      "decline_ms": null,
+      "respond_ms": [
+        12668.0,
+        1871.0
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          415.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": null,
+      "overall_pass": true
+    },
+    {
+      "case_id": "best_route_nqa_must_not_set",
+      "phrasing": "Best route from Seraphim",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim"
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact"
+      },
+      "final_response": "I need to know which ship you are flying to find the best route.",
+      "judge_reasoning": null,
+      "latency_ms": 14118.0,
+      "tokens_in": 20467,
+      "tokens_out": 255,
+      "tokens_total": 20722,
+      "cost_usd": 0.000560013104167893,
+      "classify_ms": 1966.9,
+      "decline_ms": null,
+      "respond_ms": [
+        8698.9,
+        3036.6
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          397.8
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": null,
+      "overall_pass": true
+    },
+    {
+      "case_id": "best_route_nqa_must_not_set",
+      "phrasing": "Best route from Seraphim, autoload only",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim",
+        "require_autoload": true
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact",
+        "require_autoload": true
+      },
+      "final_response": "I need to know which ship you are flying to calculate the best route.",
+      "judge_reasoning": null,
+      "latency_ms": 15149.3,
+      "tokens_in": 20509,
+      "tokens_out": 352,
+      "tokens_total": 20861,
+      "cost_usd": 0.000600923492749959,
+      "classify_ms": 1098.4,
+      "decline_ms": null,
+      "respond_ms": [
+        8262.6,
+        5359.0
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          410.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": null,
+      "overall_pass": true
+    },
+    {
+      "case_id": "best_route_nqa_must_not_set",
+      "phrasing": "Best route out of Seraphim, space stations only",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim",
+        "exclude_ground_stations": true
+      },
+      "actual_args": {
+        "exclude_ground_stations": true,
+        "origin": "Seraphim",
+        "origin_mode": "exact"
+      },
+      "final_response": "You need to tell me what ship you are flying to find the best route.",
+      "judge_reasoning": null,
+      "latency_ms": 16661.9,
+      "tokens_in": 20522,
+      "tokens_out": 320,
+      "tokens_total": 20842,
+      "cost_usd": 0.0006609233737100149,
+      "classify_ms": 2030.4,
+      "decline_ms": null,
+      "respond_ms": [
+        10377.5,
+        3800.6
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          437.3
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": null,
+      "overall_pass": true
+    },
+    {
+      "case_id": "best_route_nqa_must_not_set",
+      "phrasing": "Best route from Seraphim, avoid any no-questions-asked terminals",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim"
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact",
+        "sell_at_nqa_only": false
+      },
+      "final_response": "Please specify the ship you are flying to calculate the best route.",
+      "judge_reasoning": null,
+      "latency_ms": 25528.0,
+      "tokens_in": 20705,
+      "tokens_out": 536,
+      "tokens_total": 21241,
+      "cost_usd": 0.0010126095824183284,
+      "classify_ms": 2039.9,
+      "decline_ms": null,
+      "respond_ms": [
+        17560.1,
+        5514.3
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          400.0
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": null,
+      "overall_pass": true
+    },
+    {
+      "case_id": "best_route_nqa_must_not_set",
+      "phrasing": "I got pirated at Seraphim, what's the best route out of here?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim"
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact",
+        "sell_at_nqa_only": true
+      },
+      "final_response": "You need to specify which ship you are flying to find the best route.",
+      "judge_reasoning": null,
+      "latency_ms": 21282.2,
+      "tokens_in": 20649,
+      "tokens_out": 422,
+      "tokens_total": 21071,
+      "cost_usd": 0.0008441939366258885,
+      "classify_ms": 2300.5,
+      "decline_ms": null,
+      "respond_ms": [
+        15044.7,
+        3528.1
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          392.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": false,
+      "response_correct": null,
+      "overall_pass": false
+    },
+    {
+      "case_id": "best_route_nqa_must_not_set",
+      "phrasing": "Best legit route from Seraphim, somewhere reputable",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim"
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact"
+      },
+      "final_response": "You need to specify a ship for me to find a route.",
+      "judge_reasoning": null,
+      "latency_ms": 22886.5,
+      "tokens_in": 20662,
+      "tokens_out": 484,
+      "tokens_total": 21146,
+      "cost_usd": 0.0009078301849164273,
+      "classify_ms": 1888.2,
+      "decline_ms": null,
+      "respond_ms": [
+        15889.9,
+        4673.6
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          417.1
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": null,
+      "overall_pass": true
+    }
+  ]
+}

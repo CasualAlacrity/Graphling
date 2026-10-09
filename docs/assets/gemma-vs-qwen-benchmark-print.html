@@ -1,0 +1,251 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Gemma vs Qwen Benchmark</title>
+<style>
+  @page { size: Letter; margin: 18mm 16mm; }
+  :root {
+    --bg: #f3f1ec;
+    --surface: #ffffff;
+    --surface-2: #eae7de;
+    --fg: #211f1c;
+    --fg-muted: #5c584f;
+    --border: #d9d5c9;
+    --accent: #0f6e6b;
+    --good: #2f7d4f;
+    --good-bg: #e4f2e7;
+    --warn: #9a6b18;
+    --warn-bg: #f6ecd9;
+    --bad: #a33d2e;
+    --bad-bg: #f7e6e1;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body {
+    color: var(--fg);
+    margin: 0;
+    font-family: "Source Sans 3", system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .page { max-width: 720px; margin: 0 auto; }
+
+  h1, h2 { font-family: "Archivo", system-ui, sans-serif; }
+  h1 { font-size: 1.9rem; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .subtitle { color: var(--fg-muted); margin: 0 0 24px; font-size: 0.95rem; }
+  h2 {
+    font-size: 1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--accent); margin: 28px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border);
+    break-after: avoid;
+  }
+  p { margin: 0 0 12px; }
+  code, .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+
+  .meta-row { display: flex; gap: 8px; margin-bottom: 4px; }
+  .pill {
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.75rem; padding: 3px 9px;
+    border-radius: 999px; background: var(--surface-2); color: var(--fg-muted); border: 1px solid var(--border);
+  }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px; margin-bottom: 14px; break-inside: avoid;
+  }
+
+  /* Static flow diagram (no JS/mermaid dependency, so it renders correctly under
+     any HTML->PDF conversion, not just the Artifact viewer's own mermaid support) */
+  .diagram-wrap {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px 20px; margin-bottom: 14px; break-inside: avoid;
+  }
+  .flow { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .flow-box {
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.82rem; font-weight: 600;
+    border: 1.5px solid var(--border); border-radius: 8px; padding: 8px 14px; background: var(--surface-2);
+    text-align: center;
+  }
+  .flow-box.accent { border-color: var(--accent); color: var(--accent); background: var(--surface); }
+  .flow-sub { font-weight: 400; color: var(--fg-muted); font-size: 0.75rem; }
+  .flow-arrow { font-size: 0.9rem; color: var(--fg-muted); line-height: 1; }
+  .flow-split { display: flex; gap: 28px; margin: 6px 0; justify-content: center; }
+  .flow-branch { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .flow-branch-label {
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.7rem; color: var(--fg-muted);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .flow-loop-label { font-size: 0.72rem; color: var(--fg-muted); font-style: italic; margin-top: 2px; }
+
+  .rule-list { display: flex; flex-direction: column; gap: 8px; }
+  .rule { display: grid; grid-template-columns: 100px 1fr; gap: 12px; align-items: baseline; }
+  .rule .tag {
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.72rem; color: var(--accent);
+    font-weight: 600; white-space: nowrap;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; break-inside: avoid; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+  th {
+    font-family: "Archivo", system-ui, sans-serif; font-size: 0.68rem; text-transform: uppercase;
+    letter-spacing: 0.04em; color: var(--fg-muted); font-weight: 700;
+  }
+  td.model { font-family: "IBM Plex Mono", ui-monospace, monospace; font-weight: 600; }
+  td.num, th.num { text-align: right; }
+
+  .rate {
+    display: inline-block; padding: 2px 8px; border-radius: 6px; font-weight: 700;
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.8rem;
+  }
+  .rate.good { background: var(--good-bg); color: var(--good); }
+  .rate.warn { background: var(--warn-bg); color: var(--warn); }
+  .rate.bad { background: var(--bad-bg); color: var(--bad); }
+  .row-current { color: var(--fg-muted); font-size: 0.74rem; }
+
+  .fail-card {
+    background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--bad);
+    border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; break-inside: avoid;
+  }
+  .fail-card h3 { margin: 0 0 6px; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.9rem; color: var(--fg); }
+  .fail-card p { margin: 0 0 6px; font-size: 0.9rem; }
+  .fail-card p:last-child { margin-bottom: 0; }
+  blockquote {
+    margin: 8px 0 0; padding: 7px 11px; background: var(--surface-2); border-left: 2px solid var(--bad);
+    font-style: italic; font-size: 0.86rem; color: var(--fg-muted); border-radius: 0 6px 6px 0;
+  }
+
+  ul.caveats { margin: 0; padding-left: 18px; }
+  ul.caveats li { margin-bottom: 6px; }
+
+  .open-question { background: var(--surface-2); border-radius: 10px; padding: 14px 18px; margin-top: 6px; break-inside: avoid; }
+  .open-question .label {
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.7rem; text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--accent); font-weight: 700; display: block; margin-bottom: 5px;
+  }
+
+  footer { margin-top: 32px; padding-top: 14px; border-top: 1px solid var(--border); color: var(--fg-muted); font-size: 0.78rem; }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="page">
+  <div class="meta-row">
+    <span class="pill">ALICE / agent_eval</span>
+    <span class="pill">2026-09-28</span>
+  </div>
+  <h1>Gemma vs Qwen Benchmark</h1>
+  <p class="subtitle">Comparing candidate local LLMs for ALICE's LangGraph trade-copilot agent, on a small eval harness. For Dean — answers to "what are you trying to do" and "how did you define the nodes and thresholds," plus a specific question on the Qwen results.</p>
+
+  <h2>What I'm doing</h2>
+  <p>ALICE is a voice copilot for Star Citizen: a LangGraph agent that classifies whether a request is on-topic, then reasons over a bound tool set (trade prices, routes, vehicle purchases, timers, etc.) to answer. It's meant to run locally on a 4080, so I need to know which model actually holds up — not just anecdotally, but against a repeatable check — before committing to one as the default.</p>
+
+  <h2>Graph shape</h2>
+  <div class="diagram-wrap">
+    <div class="flow">
+      <div class="flow-box">Start</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-box accent">classify_topic <span class="flow-sub">(structured output)</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-split">
+        <div class="flow-branch">
+          <div class="flow-branch-label">off-topic</div>
+          <div class="flow-box">decline</div>
+        </div>
+        <div class="flow-branch">
+          <div class="flow-branch-label">on-topic</div>
+          <div class="flow-box accent">respond <span class="flow-sub">(tool-bound LLM)</span></div>
+          <div class="flow-loop-label">⇄ tools, until no more calls</div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-box">End</div>
+    </div>
+  </div>
+  <p>Only <code>classify_topic</code> and <code>respond</code> are swapped between runs — everything else in the graph stays fixed, so a model comparison is actually isolating the model, not the plumbing around it.</p>
+
+  <h2>How thresholds are defined</h2>
+  <p>Every test case is one of three shapes, run through a fixed fake world (fake terminals, commodities, prices — no live API calls, fully reproducible) so results aren't polluted by real-world data drifting between runs:</p>
+  <div class="card">
+    <div class="rule-list">
+      <div class="rule"><span class="tag">TOOL CASE</span><span>Expects a specific tool + args. Checked by exact string match — deterministic, no LLM needed.</span></div>
+      <div class="rule"><span class="tag">NO-TOOL CASE</span><span>Expects a plain reasoning answer, no tool call. Checked the same way, in reverse (asserts nothing was called).</span></div>
+      <div class="rule"><span class="tag">OFF-TOPIC CASE</span><span>Expects <code>classify_topic</code> to correctly decline. Deterministic on/off-topic match.</span></div>
+      <div class="rule"><span class="tag">JUDGE</span><span>A separate, fixed model (not whatever's under test) grades only the one thing code can't check: does the final response substantively convey the right information.</span></div>
+    </div>
+  </div>
+  <p>A case passes only if every deterministic check <em>and</em> the judge (when it runs) both pass. Pass rate is passed/total across the suite — 4 scenarios × 3 phrasings each, 12 cases per run.</p>
+
+  <h2>Results</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Model</th>
+        <th class="num">Pass rate</th>
+        <th class="num">Cost / run</th>
+        <th class="num">Avg latency</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="model">gemma4 <span class="row-current">(8B, current default)</span></td>
+        <td class="num"><span class="rate warn">75%</span></td>
+        <td class="num">$0.016</td>
+        <td class="num">~34s</td>
+      </tr>
+      <tr>
+        <td class="model">gemma4:12b</td>
+        <td class="num"><span class="rate good">100%</span></td>
+        <td class="num">$0.038</td>
+        <td class="num">~80s</td>
+      </tr>
+      <tr>
+        <td class="model">qwen2.5:14b</td>
+        <td class="num"><span class="rate bad">58%</span></td>
+        <td class="num">$0.043</td>
+        <td class="num">~91s</td>
+      </tr>
+      <tr>
+        <td class="model">qwen3.5:9b</td>
+        <td class="num"><span class="rate warn">75%</span></td>
+        <td class="num">$0.024</td>
+        <td class="num">~49s</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Same judge model across every run, so the comparison is apples-to-apples. Cost is priced by wall-clock GPU time × an estimated power draw × electricity rate, not tokens — there's no per-token bill running locally.</p>
+
+  <h2>Qwen behavior — where I'd like advice</h2>
+
+  <div class="fail-card">
+    <h3>qwen2.5:14b — misses the tool, then invents an answer</h3>
+    <p>On a plain "what's the cheapest place to buy X" lookup, it skipped the tool call entirely and answered from its own training data — wrong terminal, wrong price, no indication it was guessing.</p>
+    <blockquote>Expected: Baijini Point, 3.15 aUEC/unit. Got: "TDD at New Babbage," 960 thousand aUEC.</blockquote>
+  </div>
+
+  <div class="fail-card">
+    <h3>qwen3.5:9b — perfect tool selection, confident fabrication otherwise</h3>
+    <p>9/9 correct on every tool-selection and off-topic case. But every single "explain this game mechanic" question got a confidently wrong answer, inventing mechanics that don't exist rather than answering narrowly or admitting uncertainty.</p>
+    <blockquote>Invented a "Quantum Slipstream Key," claimed instant travel with no spool-up, referenced "portal gates" that aren't part of the game.</blockquote>
+  </div>
+
+  <p>The two failure modes look almost opposite — one under-uses tools, the other reasons fine about tools but confabulates freely on open questions. Not sure if that's a prompting fix (tighter grounding instructions), a decoding/parameter issue, or just how these particular Qwen checkpoints behave. Open to whatever angle makes sense to you.</p>
+
+  <h2>Caveats</h2>
+  <div class="card">
+    <ul class="caveats">
+      <li>Single run per model. Sampling variance is real here — gemma4 (8B) alone scored 10/12 then 9/12 across two identical runs, on a different case each time.</li>
+      <li>Small dataset: 12 cases total. Enough to catch clear signal, not enough for tight confidence intervals.</li>
+      <li>The judge is a stand-in (a local model) — the intended default judge's API key isn't usable right now, so there's a confound worth flagging even though the qwen failure <em>patterns</em> showed up consistently.</li>
+    </ul>
+  </div>
+
+  <div class="open-question">
+    <span class="label">For Dean</span>
+    You mentioned using something for the tool-selection decision itself — cheap and quick — but the name didn't come through clearly on my end. Could you spell out what you meant?
+  </div>
+
+  <footer>ALICE / Graphling — agent_eval harness, gemma4 vs qwen comparison</footer>
+</div>
+</body>
+</html>

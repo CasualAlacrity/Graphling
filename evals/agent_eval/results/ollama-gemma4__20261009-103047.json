@@ -1,0 +1,2613 @@
+{
+  "summary": {
+    "dimensions": {
+      "on_topic_correct": {
+        "passed": 45,
+        "total": 45
+      },
+      "tool_correct": {
+        "passed": 35,
+        "total": 45
+      },
+      "args_correct": {
+        "passed": 34,
+        "total": 45
+      },
+      "location_correct": {
+        "passed": 35,
+        "total": 35
+      },
+      "price_correct": {
+        "passed": 35,
+        "total": 35
+      },
+      "unit_correct": {
+        "passed": 28,
+        "total": 28
+      },
+      "claims_supported": {
+        "passed": 29,
+        "total": 35
+      }
+    },
+    "model_provider": "ollama",
+    "model_name": "gemma4",
+    "timestamp": "2026-10-09T10:30:47.524179+00:00",
+    "total_cases": 45,
+    "passed": 29,
+    "pass_rate": 0.644,
+    "total_cost_usd": 0.017842,
+    "cost_per_turn_usd": 0.000396,
+    "total_tokens": 954958,
+    "cache_hit_rate": 0.0,
+    "unpriced_calls": 0,
+    "config": {
+      "judge_provider": "openai",
+      "judge_model": "gpt-4o-mini",
+      "history_turns": 6,
+      "history_full_tool_result_turns": 2,
+      "classify_history_turns": 2,
+      "anthropic_cache_mode": "off",
+      "anthropic_cache_ttl": "5m"
+    },
+    "avg_latency_ms": 10012.3
+  },
+  "records": [
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "What's the cheapest place to buy Laranite?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 10410.8,
+      "tokens_in": 21341,
+      "tokens_out": 236,
+      "tokens_total": 21577,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000412,
+      "cost_by_node": {
+        "classify_topic": 2.4e-05,
+        "respond": 0.000389
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 592.4,
+      "decline_ms": null,
+      "respond_ms": [
+        5572.8,
+        4221.9
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "What's the cheapest place to buy Laranite?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 13240.2,
+      "tokens_in": 21481,
+      "tokens_out": 553,
+      "tokens_total": 22034,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000525,
+      "cost_by_node": {
+        "classify_topic": 2.1e-05,
+        "respond": 0.000503
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 533.3,
+      "decline_ms": null,
+      "respond_ms": [
+        4648.0,
+        8043.2
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 2
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "What's the cheapest place to buy Laranite?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, on Pyro I in the Pyro star system, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 7374.4,
+      "tokens_in": 21354,
+      "tokens_out": 264,
+      "tokens_total": 21618,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000292,
+      "cost_by_node": {
+        "classify_topic": 1.9e-05,
+        "respond": 0.000273
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 487.9,
+      "decline_ms": null,
+      "respond_ms": [
+        2032.0,
+        4839.1
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 3
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "What's the cheapest place to buy Laranite?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 13690.4,
+      "tokens_in": 21474,
+      "tokens_out": 553,
+      "tokens_total": 22027,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000542,
+      "cost_by_node": {
+        "classify_topic": 2.3e-05,
+        "respond": 0.000519
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 585.4,
+      "decline_ms": null,
+      "respond_ms": [
+        4910.6,
+        8179.2
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 4
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "What's the cheapest place to buy Laranite?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 6212.4,
+      "tokens_in": 21346,
+      "tokens_out": 221,
+      "tokens_total": 21567,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000246,
+      "cost_by_node": {
+        "classify_topic": 2.1e-05,
+        "respond": 0.000225
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 520.9,
+      "decline_ms": null,
+      "respond_ms": [
+        1963.9,
+        3712.4
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 5
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "Where can I get Laranite for less?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 7156.0,
+      "tokens_in": 21317,
+      "tokens_out": 239,
+      "tokens_total": 21556,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000283,
+      "cost_by_node": {
+        "classify_topic": 4.5e-05,
+        "respond": 0.000238
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1136.4,
+      "decline_ms": null,
+      "respond_ms": [
+        1347.3,
+        4656.4
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "Where can I get Laranite for less?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, in the Pyro star system, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 13530.6,
+      "tokens_in": 21575,
+      "tokens_out": 515,
+      "tokens_total": 22090,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000536,
+      "cost_by_node": {
+        "classify_topic": 1.7e-05,
+        "respond": 0.000519
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 423.3,
+      "decline_ms": null,
+      "respond_ms": [
+        7098.6,
+        5992.8
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 2
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "Where can I get Laranite for less?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, in the Pyro star system, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 6761.1,
+      "tokens_in": 21322,
+      "tokens_out": 240,
+      "tokens_total": 21562,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000268,
+      "cost_by_node": {
+        "classify_topic": 3.1e-05,
+        "respond": 0.000237
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 778.9,
+      "decline_ms": null,
+      "respond_ms": [
+        1558.2,
+        4408.4
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 3
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "Where can I get Laranite for less?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 14130.4,
+      "tokens_in": 21482,
+      "tokens_out": 560,
+      "tokens_total": 22042,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.00056,
+      "cost_by_node": {
+        "classify_topic": 1.7e-05,
+        "respond": 0.000543
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 424.0,
+      "decline_ms": null,
+      "respond_ms": [
+        5034.6,
+        8655.0
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 4
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "Where can I get Laranite for less?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I in the Pyro star system, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 7777.4,
+      "tokens_in": 21363,
+      "tokens_out": 312,
+      "tokens_total": 21675,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000308,
+      "cost_by_node": {
+        "classify_topic": 1.8e-05,
+        "respond": 0.000289
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 465.7,
+      "decline_ms": null,
+      "respond_ms": [
+        2326.9,
+        4968.2
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 5
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "I need to buy some Laranite, where's it cheap?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 14711.8,
+      "tokens_in": 21531,
+      "tokens_out": 594,
+      "tokens_total": 22125,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000583,
+      "cost_by_node": {
+        "classify_topic": 2.9e-05,
+        "respond": 0.000554
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 725.7,
+      "decline_ms": null,
+      "respond_ms": [
+        5630.4,
+        8338.6
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "I need to buy some Laranite, where's it cheap?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 12165.8,
+      "tokens_in": 21356,
+      "tokens_out": 485,
+      "tokens_total": 21841,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000482,
+      "cost_by_node": {
+        "classify_topic": 2.3e-05,
+        "respond": 0.000459
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 574.8,
+      "decline_ms": null,
+      "respond_ms": [
+        2186.4,
+        9387.6
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 2
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "I need to buy some Laranite, where's it cheap?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 7232.5,
+      "tokens_in": 21340,
+      "tokens_out": 274,
+      "tokens_total": 21614,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000286,
+      "cost_by_node": {
+        "classify_topic": 1.9e-05,
+        "respond": 0.000267
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 474.5,
+      "decline_ms": null,
+      "respond_ms": [
+        1486.8,
+        5254.1
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 3
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "I need to buy some Laranite, where's it cheap?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in the Pyro I orbit within the Pyro system, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 12470.4,
+      "tokens_in": 21450,
+      "tokens_out": 476,
+      "tokens_total": 21926,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000494,
+      "cost_by_node": {
+        "classify_topic": 2.5e-05,
+        "respond": 0.000469
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 619.2,
+      "decline_ms": null,
+      "respond_ms": [
+        3819.2,
+        8015.9
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 4
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "I need to buy some Laranite, where's it cheap?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit Pyro I, is selling Laranite for 3.15 aUEC per SCU. Port Tressler, in orbit Crusader, is also available at 3.42 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 6503.1,
+      "tokens_in": 21335,
+      "tokens_out": 226,
+      "tokens_total": 21561,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000257,
+      "cost_by_node": {
+        "classify_topic": 1.9e-05,
+        "respond": 0.000239
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 468.6,
+      "decline_ms": null,
+      "respond_ms": [
+        1554.9,
+        4463.8
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 5
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "What's the cheapest place to buy Agricium?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on Crusader, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 10439.5,
+      "tokens_in": 21356,
+      "tokens_out": 399,
+      "tokens_total": 21755,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000413,
+      "cost_by_node": {
+        "classify_topic": 2.6e-05,
+        "respond": 0.000387
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 658.8,
+      "decline_ms": null,
+      "respond_ms": [
+        2629.4,
+        7134.7
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "What's the cheapest place to buy Agricium?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on Crusader, in Stanton, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 13711.7,
+      "tokens_in": 21490,
+      "tokens_out": 508,
+      "tokens_total": 21998,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000543,
+      "cost_by_node": {
+        "classify_topic": 2.5e-05,
+        "respond": 0.000518
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 625.4,
+      "decline_ms": null,
+      "respond_ms": [
+        4973.0,
+        8096.9
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 2
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "What's the cheapest place to buy Agricium?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on Crusader, in Stanton, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [
+        "The copilot did not mention that Agricium is in stock at Port Tressler (in_stock is true) but it does not affirmatively state that the item is available for purchase."
+      ],
+      "latency_ms": 7300.4,
+      "tokens_in": 21344,
+      "tokens_out": 249,
+      "tokens_total": 21593,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000289,
+      "cost_by_node": {
+        "classify_topic": 2.6e-05,
+        "respond": 0.000263
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 643.7,
+      "decline_ms": null,
+      "respond_ms": [
+        2081.6,
+        4559.1
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 3
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "What's the cheapest place to buy Agricium?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on Crusader, in Stanton, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 10888.4,
+      "tokens_in": 21361,
+      "tokens_out": 409,
+      "tokens_total": 21770,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000431,
+      "cost_by_node": {
+        "classify_topic": 2.1e-05,
+        "respond": 0.000411
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 519.8,
+      "decline_ms": null,
+      "respond_ms": [
+        2082.8,
+        8270.1
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 4
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "What's the cheapest place to buy Agricium?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on Crusader, in the Stanton star system, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 13509.6,
+      "tokens_in": 21434,
+      "tokens_out": 506,
+      "tokens_total": 21940,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000535,
+      "cost_by_node": {
+        "classify_topic": 2.5e-05,
+        "respond": 0.00051
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 623.5,
+      "decline_ms": null,
+      "respond_ms": [
+        3993.3,
+        8874.4
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 5
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "Where can I get Agricium for less?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on Crusader, in Stanton, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 16805.4,
+      "tokens_in": 21501,
+      "tokens_out": 683,
+      "tokens_total": 22184,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000666,
+      "cost_by_node": {
+        "classify_topic": 2.3e-05,
+        "respond": 0.000642
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 592.2,
+      "decline_ms": null,
+      "respond_ms": [
+        5452.9,
+        10744.1
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "Where can I get Agricium for less?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on Crusader, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 9497.2,
+      "tokens_in": 21315,
+      "tokens_out": 353,
+      "tokens_total": 21668,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000376,
+      "cost_by_node": {
+        "classify_topic": 2.5e-05,
+        "respond": 0.000351
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 629.2,
+      "decline_ms": null,
+      "respond_ms": [
+        1549.7,
+        7301.9
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 2
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "Where can I get Agricium for less?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on Crusader, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 8779.8,
+      "tokens_in": 21329,
+      "tokens_out": 292,
+      "tokens_total": 21621,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000348,
+      "cost_by_node": {
+        "classify_topic": 2.5e-05,
+        "respond": 0.000323
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 621.1,
+      "decline_ms": null,
+      "respond_ms": [
+        2046.1,
+        6099.1
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 3
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "Where can I get Agricium for less?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on Crusader, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 6512.2,
+      "tokens_in": 21332,
+      "tokens_out": 223,
+      "tokens_total": 21555,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000258,
+      "cost_by_node": {
+        "classify_topic": 1.9e-05,
+        "respond": 0.000239
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 472.1,
+      "decline_ms": null,
+      "respond_ms": [
+        1856.8,
+        4167.3
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 4
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "Where can I get Agricium for less?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on Crusader, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 16741.1,
+      "tokens_in": 21481,
+      "tokens_out": 642,
+      "tokens_total": 22123,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000663,
+      "cost_by_node": {
+        "classify_topic": 2.3e-05,
+        "respond": 0.000641
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 567.5,
+      "decline_ms": null,
+      "respond_ms": [
+        4879.6,
+        11277.5
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 5
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "I need to buy some Agricium, where's it cheap?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": null,
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": null,
+      "final_response": "commodity_price_lookup{commodity:<|\"|>Agricium<|\"|>}",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": false,
+      "args_correct": false,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 2848.3,
+      "tokens_in": 10557,
+      "tokens_out": 122,
+      "tokens_total": 10679,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000113,
+      "cost_by_node": {
+        "classify_topic": 2.9e-05,
+        "respond": 8.4e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 725.9,
+      "decline_ms": null,
+      "respond_ms": [
+        2111.3
+      ],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "I need to buy some Agricium, where's it cheap?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on Crusader, in Stanton, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 6152.9,
+      "tokens_in": 21337,
+      "tokens_out": 204,
+      "tokens_total": 21541,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000243,
+      "cost_by_node": {
+        "classify_topic": 2e-05,
+        "respond": 0.000223
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 509.7,
+      "decline_ms": null,
+      "respond_ms": [
+        1761.8,
+        3865.7
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 2
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "I need to buy some Agricium, where's it cheap?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": null,
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": null,
+      "final_response": "commodity_price_lookup(commodity='Agricium')",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": false,
+      "args_correct": false,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 2276.6,
+      "tokens_in": 10557,
+      "tokens_out": 118,
+      "tokens_total": 10675,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 9e-05,
+      "cost_by_node": {
+        "classify_topic": 1.9e-05,
+        "respond": 7.1e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 480.7,
+      "decline_ms": null,
+      "respond_ms": [
+        1785.3
+      ],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 3
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "I need to buy some Agricium, where's it cheap?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler on Crusader is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 12510.0,
+      "tokens_in": 21448,
+      "tokens_out": 515,
+      "tokens_total": 21963,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000496,
+      "cost_by_node": {
+        "classify_topic": 2.2e-05,
+        "respond": 0.000473
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 557.7,
+      "decline_ms": null,
+      "respond_ms": [
+        3819.4,
+        8117.4
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 4
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "I need to buy some Agricium, where's it cheap?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on Crusader, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [
+        "The price mentioned is for selling Agricium instead of buying it, as it should be the price you pay to acquire."
+      ],
+      "latency_ms": 8742.7,
+      "tokens_in": 21371,
+      "tokens_out": 332,
+      "tokens_total": 21703,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000346,
+      "cost_by_node": {
+        "classify_topic": 2.9e-05,
+        "respond": 0.000318
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 721.6,
+      "decline_ms": null,
+      "respond_ms": [
+        2598.2,
+        5407.1
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 5
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Where's the cheapest place to buy a Cutlass Black?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "item_price_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "item": "Cutlass Black"
+      },
+      "final_response": "No listed terminal was found selling a Cutlass Black.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": false,
+      "args_correct": false,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 5405.5,
+      "tokens_in": 20982,
+      "tokens_out": 213,
+      "tokens_total": 21195,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000214,
+      "cost_by_node": {
+        "classify_topic": 2.4e-05,
+        "respond": 0.000189
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 614.1,
+      "decline_ms": null,
+      "respond_ms": [
+        2584.3,
+        2186.3
+      ],
+      "tool_ms": [
+        [
+          "item_price_lookup",
+          6.1
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 1
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Where's the cheapest place to buy a Cutlass Black?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": null,
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": null,
+      "final_response": "tool_call:vehicle_purchase_lookup{vehicle:<|\"|>Cutlass Black<|\"|>}<tool_call|>",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": false,
+      "args_correct": false,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 2145.2,
+      "tokens_in": 10555,
+      "tokens_out": 115,
+      "tokens_total": 10670,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 8.5e-05,
+      "cost_by_node": {
+        "classify_topic": 2.2e-05,
+        "respond": 6.3e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 549.6,
+      "decline_ms": null,
+      "respond_ms": [
+        1585.1
+      ],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 2
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Where's the cheapest place to buy a Cutlass Black?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "item_price_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "item": "Cutlass Black"
+      },
+      "final_response": "No listed terminal is currently selling a Cutlass Black.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": false,
+      "args_correct": false,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 4841.8,
+      "tokens_in": 20962,
+      "tokens_out": 179,
+      "tokens_total": 21141,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000191,
+      "cost_by_node": {
+        "classify_topic": 1.9e-05,
+        "respond": 0.000173
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 472.7,
+      "decline_ms": null,
+      "respond_ms": [
+        2627.6,
+        1726.1
+      ],
+      "tool_ms": [
+        [
+          "item_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 3
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Where's the cheapest place to buy a Cutlass Black?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "item_price_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "item": "Cutlass Black"
+      },
+      "final_response": "No listed item was found matching \"Cutlass Black\".",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": false,
+      "args_correct": false,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 5896.1,
+      "tokens_in": 21018,
+      "tokens_out": 249,
+      "tokens_total": 21267,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000233,
+      "cost_by_node": {
+        "classify_topic": 2e-05,
+        "respond": 0.000213
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 509.3,
+      "decline_ms": null,
+      "respond_ms": [
+        3327.3,
+        2043.8
+      ],
+      "tool_ms": [
+        [
+          "item_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 4
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Where's the cheapest place to buy a Cutlass Black?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "item": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, in Pyro, is selling the Cutlass Black for 1,190,000.0 aUEC. Port Tressler on Crusader is the next cheapest alternative at 1,225,000.0 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": false,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [
+        "Baijini Point is selling the Cutlass Black for 1,190,000.0 aUEC (claim of availability contradicts tool result)",
+        "Port Tressler is selling the Cutlass Black for 1,225,000.0 aUEC (claim of availability contradicts tool result)"
+      ],
+      "latency_ms": 25249.7,
+      "tokens_in": 32161,
+      "tokens_out": 909,
+      "tokens_total": 33070,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.001001,
+      "cost_by_node": {
+        "classify_topic": 1.5e-05,
+        "respond": 0.000986
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 368.3,
+      "decline_ms": null,
+      "respond_ms": [
+        2625.5,
+        12251.6,
+        9978.4
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 5
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "I want to buy a Cutlass Black, what's the best price?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro, is selling Cutlass Black for 1,190,000 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [
+        "The terminal is described as 'selling' to the pilot when in fact it is a purchase (price_you_pay_to_acquire)."
+      ],
+      "latency_ms": 8417.4,
+      "tokens_in": 21197,
+      "tokens_out": 308,
+      "tokens_total": 21505,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000333,
+      "cost_by_node": {
+        "classify_topic": 2.5e-05,
+        "respond": 0.000309
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 621.2,
+      "decline_ms": null,
+      "respond_ms": [
+        2623.9,
+        5155.7
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 1
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "I want to buy a Cutlass Black, what's the best price?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling Cutlass Black for 1,190,000 aUEC. Port Tressler on Crusader offers it for 1,225,000 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 9348.3,
+      "tokens_in": 21240,
+      "tokens_out": 354,
+      "tokens_total": 21594,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.00037,
+      "cost_by_node": {
+        "classify_topic": 1.9e-05,
+        "respond": 0.000351
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 474.5,
+      "decline_ms": null,
+      "respond_ms": [
+        3364.2,
+        5494.4
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 2
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "I want to buy a Cutlass Black, what's the best price?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in Pyro I, is the cheapest, selling the Cutlass Black for 1,190,000.0 aUEC. Port Tressler, on Crusader, is the next best at 1,225,000.0 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [
+        "The reply states 'selling the Cutlass Black' but the tool result indicates a price to acquire (buy), not sell."
+      ],
+      "latency_ms": 9426.4,
+      "tokens_in": 21198,
+      "tokens_out": 371,
+      "tokens_total": 21569,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000373,
+      "cost_by_node": {
+        "classify_topic": 2.4e-05,
+        "respond": 0.000349
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 605.7,
+      "decline_ms": null,
+      "respond_ms": [
+        2580.4,
+        6223.0
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 3
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "I want to buy a Cutlass Black, what's the best price?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "The Baijini Point, in orbit around Pyro I, in the Pyro system, offers the best price for a Cutlass Black at 1,190,000.0 aUEC. An alternative price is available at Port Tressler, on Crusader, for 1,225,000.0 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 11290.0,
+      "tokens_in": 21220,
+      "tokens_out": 496,
+      "tokens_total": 21716,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000447,
+      "cost_by_node": {
+        "classify_topic": 2.1e-05,
+        "respond": 0.000426
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 525.0,
+      "decline_ms": null,
+      "respond_ms": [
+        2390.9,
+        8361.0
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 4
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "I want to buy a Cutlass Black, what's the best price?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "item_price_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "item": "Cutlass Black"
+      },
+      "final_response": "No item matching \"Cutlass Black\" was found.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": false,
+      "args_correct": false,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 4969.3,
+      "tokens_in": 20992,
+      "tokens_out": 199,
+      "tokens_total": 21191,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000196,
+      "cost_by_node": {
+        "classify_topic": 2.1e-05,
+        "respond": 0.000176
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 523.3,
+      "decline_ms": null,
+      "respond_ms": [
+        2853.1,
+        1576.5
+      ],
+      "tool_ms": [
+        [
+          "item_price_lookup",
+          0.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 5
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Find me a good deal on a Cutlass Black.",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling the Cutlass Black for 1,190,000 aUEC. Port Tressler on Crusader is also offering it for 1,225,000 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [
+        "The cutlass black is not available at Port Tressler despite being mentioned.",
+        "Port Tressler is wrongly presented as a viable option to buy when it should not be emphasized as the best terminal for purchase."
+      ],
+      "latency_ms": 21268.2,
+      "tokens_in": 21519,
+      "tokens_out": 822,
+      "tokens_total": 22341,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000843,
+      "cost_by_node": {
+        "classify_topic": 1.9e-05,
+        "respond": 0.000824
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 487.8,
+      "decline_ms": null,
+      "respond_ms": [
+        10564.5,
+        10200.0
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 1
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Find me a good deal on a Cutlass Black.",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "item_price_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "item": "Cutlass Black"
+      },
+      "final_response": "I couldn't find a match for a Cutlass Black in the current database.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": false,
+      "args_correct": false,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 5390.7,
+      "tokens_in": 20959,
+      "tokens_out": 198,
+      "tokens_total": 21157,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000213,
+      "cost_by_node": {
+        "classify_topic": 2.7e-05,
+        "respond": 0.000187
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 668.4,
+      "decline_ms": null,
+      "respond_ms": [
+        2474.4,
+        2232.1
+      ],
+      "tool_ms": [
+        [
+          "item_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 2
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Find me a good deal on a Cutlass Black.",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "item_price_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "item": "Cutlass Black"
+      },
+      "final_response": "No listed item matches Cutlass Black.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": false,
+      "args_correct": false,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 5892.3,
+      "tokens_in": 21006,
+      "tokens_out": 224,
+      "tokens_total": 21230,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000233,
+      "cost_by_node": {
+        "classify_topic": 2.4e-05,
+        "respond": 0.000209
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 602.9,
+      "decline_ms": null,
+      "respond_ms": [
+        3462.8,
+        1811.3
+      ],
+      "tool_ms": [
+        [
+          "item_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 3
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Find me a good deal on a Cutlass Black.",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling the Cutlass Black for 1,190,000 aUEC. Port Tressler on Crusader is also listed as a seller, priced at 1,225,000 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 25445.0,
+      "tokens_in": 21516,
+      "tokens_out": 1013,
+      "tokens_total": 22529,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.001009,
+      "cost_by_node": {
+        "classify_topic": 2.1e-05,
+        "respond": 0.000988
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 519.9,
+      "decline_ms": null,
+      "respond_ms": [
+        10064.4,
+        14844.9
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 4
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Find me a good deal on a Cutlass Black.",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "item_price_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "item": "Cutlass Black"
+      },
+      "final_response": "I cannot find any data for a Cutlass Black.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": false,
+      "args_correct": false,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 5486.4,
+      "tokens_in": 20977,
+      "tokens_out": 223,
+      "tokens_total": 21200,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000217,
+      "cost_by_node": {
+        "classify_topic": 1.8e-05,
+        "respond": 0.000199
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 463.1,
+      "decline_ms": null,
+      "respond_ms": [
+        2776.1,
+        2230.1
+      ],
+      "tool_ms": [
+        [
+          "item_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 5
+    }
+  ]
+}

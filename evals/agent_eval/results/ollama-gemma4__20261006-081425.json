@@ -1,0 +1,247 @@
+{
+  "summary": {
+    "model_provider": "ollama",
+    "model_name": "gemma4",
+    "timestamp": "2026-10-06T08:14:25.205075+00:00",
+    "total_cases": 6,
+    "passed": 2,
+    "pass_rate": 0.333,
+    "total_cost_usd": 0.00455,
+    "total_tokens": 116307,
+    "avg_latency_ms": 19116.2
+  },
+  "records": [
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "What's the cheapest place to buy Laranite?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is buying Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": "The copilot correctly identified Baijini Point as the location with the cheapest price for Laranite, specified the price as 3.15 aUEC per SCU, and accurately mentioned its location in orbit around Pyro I. All key facts were conveyed correctly.",
+      "latency_ms": 20996.5,
+      "tokens_in": 20753,
+      "tokens_out": 385,
+      "tokens_total": 21138,
+      "cost_usd": 0.0008328631318328166,
+      "classify_ms": 2127.4,
+      "decline_ms": null,
+      "respond_ms": [
+        5064.8,
+        13663.3
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": true,
+      "overall_pass": true
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "Where can I get Laranite for less?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, in Pyro, is buying Laranite for 3.15 aUEC per SCU.\n\nAlternatively, Port Tressler, in orbit around Crusader, on Stanton, is also selling Laranite for 3.42 aUEC per SCU.",
+      "judge_reasoning": "The copilot's response inaccurately states that Port Tressler is \"selling\" Laranite for 3.42 aUEC per SCU, while the correct information was regarding the purchasing price at that location. The pilot asked where to buy Laranite for less, and the relevant information about the cheapest terminal to buy it (Baijini Point at 3.15 aUEC) was given, but introducing the price at Port Tressler is misleading as it is above the price at Baijini Point and irrelevant to the pilot's question about the cheapest buying option.",
+      "latency_ms": 21197.2,
+      "tokens_in": 20750,
+      "tokens_out": 408,
+      "tokens_total": 21158,
+      "cost_usd": 0.0008408210981660038,
+      "classify_ms": 1869.8,
+      "decline_ms": null,
+      "respond_ms": [
+        5051.2,
+        14259.3
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": false,
+      "overall_pass": false
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "I need to buy some Laranite, where's it cheap?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling Laranite for 3.15 aUEC per SCU. If you're staying in the Stanton system, Port Tressler on Crusader is also selling it for 3.42 aUEC per SCU.",
+      "judge_reasoning": "The copilot accurately reported that Baijini Point is the cheapest terminal for Laranite at a price of 3.15 aUEC per SCU, providing the correct location and price as expected. Additionally, it mentioned Port Tressler as an alternative, which is factual as it is also conveying relevant information about another terminal. Therefore, the response provides the right substance and meets the requirements.",
+      "latency_ms": 28543.7,
+      "tokens_in": 20924,
+      "tokens_out": 593,
+      "tokens_total": 21517,
+      "cost_usd": 0.0011322339126257819,
+      "classify_ms": 2089.8,
+      "decline_ms": null,
+      "respond_ms": [
+        11492.5,
+        14946.5
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": true,
+      "overall_pass": true
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "What's the cheapest place to buy Agricium?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro, is buying Agricium for 25.4 aUEC per SCU.",
+      "judge_reasoning": "The copilot's response only mentions Baijini Point as having a price of 25.4 aUEC per SCU for Agricium but fails to inform the pilot that it is out of stock (status_buy 1). Additionally, it does not recommend Port Tressler as the best alternative location to buy Agricium at 26.10 aUEC per SCU, which actually has stock. This response is inadequate as it omits crucial information and could mislead the pilot.",
+      "latency_ms": 17541.1,
+      "tokens_in": 20777,
+      "tokens_out": 312,
+      "tokens_total": 21089,
+      "cost_usd": 0.0006957985087086175,
+      "classify_ms": 2004.7,
+      "decline_ms": null,
+      "respond_ms": [
+        5928.1,
+        9593.7
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": false,
+      "overall_pass": false
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "Where can I get Agricium for less?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": null,
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": null,
+      "final_response": "commodity_price_lookup(commodity=Agricium)",
+      "judge_reasoning": "The copilot's response simply indicates a lookup for the Agricium price without providing any concrete information about where to buy it or the stock situation. It fails to mention that Baijini Point has the lowest price but is out of stock, nor does it identify Port Tressler as the recommended place to buy Agricium at the next best price. The response is inadequate as it does not address the pilot's query on where to buy Agricium for less.",
+      "latency_ms": 7045.9,
+      "tokens_in": 10135,
+      "tokens_out": 76,
+      "tokens_total": 10211,
+      "cost_usd": 0.0002794879137492147,
+      "classify_ms": 2153.3,
+      "decline_ms": null,
+      "respond_ms": [
+        4882.8
+      ],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "tool_correct": false,
+      "args_correct": false,
+      "response_correct": false,
+      "overall_pass": false
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "I need to buy some Agricium, where's it cheap?",
+      "model_provider": "ollama",
+      "model_name": "gemma4",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I on Pyro, is selling Agricium for 25.4 aUEC per SCU.",
+      "judge_reasoning": "The copilot's response incorrectly recommends Baijini Point as a place to buy Agricium despite it being out of stock. The expected response should have indicated that Baijini Point, while having the lowest price, is out of stock, and instead recommended Port Tressler as the place to buy Agricium, which has stock at a higher price. Therefore, it does not correctly convey the necessary information.",
+      "latency_ms": 19372.8,
+      "tokens_in": 20840,
+      "tokens_out": 354,
+      "tokens_total": 21194,
+      "cost_usd": 0.0007684526629174166,
+      "classify_ms": 2120.0,
+      "decline_ms": null,
+      "respond_ms": [
+        8208.9,
+        9029.2
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "tool_correct": true,
+      "args_correct": true,
+      "response_correct": false,
+      "overall_pass": false
+    }
+  ]
+}
