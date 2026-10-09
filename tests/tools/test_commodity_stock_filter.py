@@ -35,7 +35,8 @@ async def test_the_out_of_stock_terminal_stays_in_all_results():
 
     by_name = {row["terminal_name"]: row for row in result["all_results"]}
     assert by_name[world.BAIJINI_POINT.name]["status_buy"] == 1
-    assert world.PORT_TRESSLER.name in by_name
+    assert by_name[world.BAIJINI_POINT.name]["in_stock"] is False
+    assert by_name[world.PORT_TRESSLER.name]["in_stock"] is True
 
 
 async def test_in_stock_commodity_is_unaffected():
@@ -65,3 +66,10 @@ async def test_vehicle_lookup_is_not_filtered_by_status():
         result = await VehiclePurchaseTool(client=_client())._arun(vehicle="Cutlass Black")
 
     assert result["cheapest_to_buy"]["terminal_name"] == world.BAIJINI_POINT.name
+
+
+async def test_vehicle_rows_get_no_in_stock_field():
+    with install_fakes():
+        result = await VehiclePurchaseTool(client=_client())._arun(vehicle="Cutlass Black")
+
+    assert all("in_stock" not in row for row in result["all_results"])

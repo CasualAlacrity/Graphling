@@ -48,8 +48,16 @@ class TradePriceTool(UEXBackedTool):
         cheapest_to_buy = min(buy_rows, key=attrgetter("price_you_pay_to_acquire"), default=None)
         best_to_sell = max(sell_rows, key=attrgetter("price_you_receive_when_selling"), default=None)
 
+        def row_dict(row: UEXTradeData) -> dict[str, Any]:
+            data = row.model_dump(exclude_none=True)
+            # An explicit boolean, not just a status code the model has to know how to read
+            # -- it was still picking the cheapest-priced row out of all_results now and then.
+            if skip_out_of_stock and row.price_you_pay_to_acquire is not None:
+                data["in_stock"] = row.status_buy != OUT_OF_STOCK_STATUS
+            return data
+
         return {
-            "cheapest_to_buy": cheapest_to_buy.model_dump(exclude_none=True) if cheapest_to_buy else None,
-            "best_to_sell": best_to_sell.model_dump(exclude_none=True) if best_to_sell else None,
-            "all_results": [r.model_dump(exclude_none=True) for r in rows],
+            "cheapest_to_buy": row_dict(cheapest_to_buy) if cheapest_to_buy else None,
+            "best_to_sell": row_dict(best_to_sell) if best_to_sell else None,
+            "all_results": [row_dict(r) for r in rows],
         }

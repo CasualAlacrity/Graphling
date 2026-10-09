@@ -90,9 +90,10 @@ class BestRouteArgs(BaseModel):
         default=False,
         description="Set true if the pilot wants to sell at a terminal that doesn't ask "
                     "where the cargo came from. They may say NQA, no questions asked, hot "
-                    "cargo, stolen, pirated, looted, boosted, dirty, black market, fence, "
-                    "shady, or hint at it ('goods of questionable provenance', 'somewhere "
-                    "that won't ask where I got it')."
+                    "cargo, stolen goods, boosted, dirty, black market, fence, or shady, "
+                    "or only hint at it ('somewhere that doesn't check paperwork'). Only "
+                    "for a pilot who has or wants such cargo: not when the pilot is the "
+                    "victim ('I got pirated', 'my cargo was stolen')."
     )
 
 

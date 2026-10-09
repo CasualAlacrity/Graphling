@@ -153,14 +153,24 @@ CASES: list[HarnessCase] = [
         expected_outcome="Not graded (args_only).",
         args_only=True,
     ),
+    # Held out on purpose: none of this wording (or its near-synonyms) appears in the
+    # Field description, so these test inference, not keyword matching.
     HarnessCase(
         id="best_route_nqa_oblique",
         phrasings=[
             "I've got goods of questionable provenance, find me a route from Seraphim",
             "Route from Seraphim to somewhere that won't ask where I got the cargo",
+            "I've got a hold full of stuff that fell off a truck, best route from Grim Hex",
+            "Cargo I'd rather not explain, find me a route out of Seraphim",
+            "Who buys without checking the manifest? Route from Seraphim",
         ],
         expected_tool="best_route",
         expected_args={"origin": "Seraphim", "sell_at_nqa_only": True},
+        args_by_phrasing={
+            "I've got a hold full of stuff that fell off a truck, best route from Grim Hex": {
+                "origin": "Grim Hex", "sell_at_nqa_only": True,
+            },
+        },
         exact_args=True,
         expected_outcome="Not graded (args_only).",
         args_only=True,
@@ -176,6 +186,8 @@ CASES: list[HarnessCase] = [
             "Best route from Seraphim, avoid any no-questions-asked terminals",
             "I got pirated at Seraphim, what's the best route out of here?",
             "Best legit route from Seraphim, somewhere reputable",
+            "My last haul got stolen, best route from Seraphim",
+            "I got looted out by Grim Hex, what's the best route from Seraphim?",
         ],
         expected_tool="best_route",
         expected_args={"origin": "Seraphim"},
