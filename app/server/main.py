@@ -1,14 +1,34 @@
+import asyncio
+import contextlib
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
+from server import llm_gateway_service
 from server.routes.auth import router as auth_router
 from server.routes.ledger import router as ledger_router
+from server.routes.llm import router as llm_router
 from server.routes.uex_cache import router as uex_cache_router
 from server.routes.wiki_cache import router as wiki_cache_router
 
-app = FastAPI(title="ALICE Ledger API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # One probe before serving, so the digest pin is enforced from the first request
+    # rather than up to PROBE_INTERVAL_S later, then keep probing in the background.
+    await llm_gateway_service.probe_once()
+    probe_task = asyncio.create_task(llm_gateway_service.probe_forever())
+    yield
+    probe_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await probe_task
+
+
+app = FastAPI(title="ALICE Ledger API", lifespan=lifespan)
 
 app.include_router(auth_router)
 app.include_router(ledger_router)
+app.include_router(llm_router)
 app.include_router(uex_cache_router)
 app.include_router(wiki_cache_router)
 

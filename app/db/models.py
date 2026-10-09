@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -170,3 +170,31 @@ class WikiCache(Base):
     key: Mapped[str] = mapped_column(String, nullable=False, index=True)
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class LlmUsage(Base):
+    """One row per model call relayed by the LLM gateway (server/llm_gateway_service.py).
+    Per-user cost and fallback frequency come from here -- the server-side counterpart to
+    the client's turn_metrics.jsonl (docs/llm-gateway.md). Usage metadata only, never
+    message content.
+
+    role/backend/status are plain strings rather than Postgres enums: new roles and
+    backends get added from config, and an enum would turn each one into a migration."""
+
+    __tablename__ = "llm_usage"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String, nullable=False)  # alice-chat / alice-classify
+    backend: Mapped[str] = mapped_column(String, nullable=False)  # frankencompute / openai
+    model: Mapped[str] = mapped_column(String, nullable=False)  # what actually answered
+    prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cache_read_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    latency_ms: Mapped[float] = mapped_column(Float, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)  # ok / error
+    # Why this call didn't go to frankencompute: down / timeout / 5xx / overflow /
+    # digest_mismatch. None = it did.
+    fallback_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Hosted calls only, from model_pricing. None for frankencompute (electricity isn't
+    # per-call knowable server-side) and for an unpriced hosted model.
+    cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)

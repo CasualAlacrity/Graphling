@@ -29,6 +29,24 @@ class Settings(BaseSettings):
     uexcorp_api_key: str = ""
     uexcorp_bearer_token: str = ""
 
+    # LLM gateway (server/llm_gateway_service.py, docs/llm-gateway.md). frankencompute is
+    # the self-hosted Ollama box, reached over Tailscale -- never exposed to pilots.
+    frankencompute_url: str = "http://localhost:11434"
+    frankencompute_chat_model: str = "gemma4"
+    frankencompute_classify_model: str = "gemma4"
+    # The digest the role table was evaluated at. Empty = don't check. When set, a box
+    # reporting a different digest for the model is treated as down (falls back) rather
+    # than silently serving an unevaluated build.
+    frankencompute_model_digest: str = ""
+    # Requests already running on frankencompute before new ones overflow to fallback.
+    # 0 disables overflow (everything queues on the box).
+    llm_max_inflight: int = 2
+
+    # Fallback when frankencompute can't answer. Empty key = no fallback (503 instead).
+    openai_api_key: str = ""
+    fallback_chat_model: str = "gpt-4o-mini"
+    fallback_classify_model: str = "gpt-4o-mini"
+
 
 @lru_cache
 def get_settings() -> Settings:
