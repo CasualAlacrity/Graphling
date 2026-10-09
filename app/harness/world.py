@@ -38,15 +38,15 @@ AGRICIUM = CachedCommodity(
 )
 
 BAIJINI_POINT = CachedTerminal(
-    id=201, name="Baijini Point", type=TerminalType.COMMODITY, star_system_name="Pyro",
-    orbit_name="Pyro I", moon_name=None, planet_name=None, displayname="Baijini Point",
+    id=201, name="Baijini Point", type=TerminalType.COMMODITY, star_system_name="Stanton",
+    orbit_name="ArcCorp", moon_name=None, planet_name=None, displayname="Baijini Point",
     nickname="Baijini", space_station_name="Baijini Point", outpost_name=None, city_name=None,
     is_auto_load=0, is_nqa=0,
 )
 
 PORT_TRESSLER = CachedTerminal(
     id=202, name="Port Tressler", type=TerminalType.COMMODITY, star_system_name="Stanton",
-    orbit_name="Crusader", moon_name=None, planet_name=None, displayname="Port Tressler",
+    orbit_name="microTech", moon_name=None, planet_name=None, displayname="Port Tressler",
     nickname="Tressler", space_station_name="Port Tressler", outpost_name=None, city_name=None,
     is_auto_load=0, is_nqa=0,
 )
@@ -77,12 +77,12 @@ COMMODITY_PRICE_ROWS: dict[int, list[dict]] = {
     LARANITE.id: [
         {
             "id_terminal": BAIJINI_POINT.id, "terminal_name": BAIJINI_POINT.name,
-            "star_system_name": "Pyro", "orbit_name": "Pyro I", "moon_name": None, "planet_name": None,
+            "star_system_name": "Stanton", "orbit_name": "ArcCorp", "moon_name": None, "planet_name": None,
             "price_buy": 3.15, "price_sell": 2.85, "status_buy": 4, "status_sell": 4,
         },
         {
             "id_terminal": PORT_TRESSLER.id, "terminal_name": PORT_TRESSLER.name,
-            "star_system_name": "Stanton", "orbit_name": "Crusader", "moon_name": None, "planet_name": None,
+            "star_system_name": "Stanton", "orbit_name": "microTech", "moon_name": None, "planet_name": None,
             "price_buy": 3.42, "price_sell": 3.10, "status_buy": 4, "status_sell": 4,
         },
     ],
@@ -91,12 +91,12 @@ COMMODITY_PRICE_ROWS: dict[int, list[dict]] = {
     AGRICIUM.id: [
         {
             "id_terminal": BAIJINI_POINT.id, "terminal_name": BAIJINI_POINT.name,
-            "star_system_name": "Pyro", "orbit_name": "Pyro I", "moon_name": None, "planet_name": None,
+            "star_system_name": "Stanton", "orbit_name": "ArcCorp", "moon_name": None, "planet_name": None,
             "price_buy": 25.40, "price_sell": 24.10, "status_buy": 1, "status_sell": 4,
         },
         {
             "id_terminal": PORT_TRESSLER.id, "terminal_name": PORT_TRESSLER.name,
-            "star_system_name": "Stanton", "orbit_name": "Crusader", "moon_name": None, "planet_name": None,
+            "star_system_name": "Stanton", "orbit_name": "microTech", "moon_name": None, "planet_name": None,
             "price_buy": 26.10, "price_sell": 24.80, "status_buy": 4, "status_sell": 4,
         },
     ],
@@ -108,12 +108,12 @@ VEHICLE_PURCHASE_ROWS: dict[int, list[dict]] = {
     CUTLASS_BLACK.id: [
         {
             "id_terminal": BAIJINI_POINT.id, "terminal_name": BAIJINI_POINT.name,
-            "star_system_name": "Pyro", "orbit_name": "Pyro I", "moon_name": None, "planet_name": None,
+            "star_system_name": "Stanton", "orbit_name": "ArcCorp", "moon_name": None, "planet_name": None,
             "price_buy": 1_190_000, "price_sell": 0, "status_buy": 1, "status_sell": 0,
         },
         {
             "id_terminal": PORT_TRESSLER.id, "terminal_name": PORT_TRESSLER.name,
-            "star_system_name": "Stanton", "orbit_name": "Crusader", "moon_name": None, "planet_name": None,
+            "star_system_name": "Stanton", "orbit_name": "microTech", "moon_name": None, "planet_name": None,
             "price_buy": 1_225_000, "price_sell": 0, "status_buy": 1, "status_sell": 0,
         },
     ],
@@ -129,7 +129,7 @@ LARANITE_ROUTE_ROWS: list[dict] = [
     {
         "id_commodity": LARANITE.id, "commodity_name": LARANITE.name,
         "id_terminal_origin": BAIJINI_POINT.id, "origin_terminal_name": BAIJINI_POINT.name,
-        "origin_star_system_name": "Pyro", "origin_planet_name": None,
+        "origin_star_system_name": "Stanton", "origin_planet_name": None,
         "id_terminal_destination": PORT_TRESSLER.id, "destination_terminal_name": PORT_TRESSLER.name,
         "destination_star_system_name": "Stanton", "destination_planet_name": None,
         "price_origin": 3.15, "price_destination": 3.10, "price_margin": -0.05,
@@ -144,7 +144,7 @@ FREELANCER_SHIP_SPEED = ShipSpeed.model_construct(
 )
 
 BAIJINI_POINT_LOCATION = LocationPosition(
-    name="Baijini Point", type="Anomaly", system="Pyro", x=1_000_000.0, y=2_000_000.0, z=3_000_000.0,
+    name="Baijini Point", type="Manmade", system="Stanton", x=1_000_000.0, y=2_000_000.0, z=3_000_000.0,
 )
 
 PORT_TRESSLER_LOCATION = LocationPosition(
