@@ -1,0 +1,2678 @@
+{
+  "summary": {
+    "dimensions": {
+      "on_topic_correct": {
+        "passed": 45,
+        "total": 45
+      },
+      "tool_correct": {
+        "passed": 45,
+        "total": 45
+      },
+      "args_correct": {
+        "passed": 45,
+        "total": 45
+      },
+      "location_correct": {
+        "passed": 45,
+        "total": 45
+      },
+      "price_correct": {
+        "passed": 45,
+        "total": 45
+      },
+      "unit_correct": {
+        "passed": 30,
+        "total": 30
+      },
+      "claims_supported": {
+        "passed": 19,
+        "total": 45
+      }
+    },
+    "model_provider": "alice",
+    "model_name": "gateway",
+    "timestamp": "2026-10-09T13:32:53.010782+00:00",
+    "total_cases": 45,
+    "passed": 19,
+    "pass_rate": 0.422,
+    "total_cost_usd": 0.008466,
+    "cost_per_turn_usd": 0.000188,
+    "total_tokens": 1447429,
+    "cache_hit_rate": 0.0,
+    "unpriced_calls": 0,
+    "config": {
+      "judge_provider": "openai",
+      "judge_model": "gpt-4o-mini",
+      "history_turns": 6,
+      "history_full_tool_result_turns": 2,
+      "classify_history_turns": 2,
+      "anthropic_cache_mode": "off",
+      "anthropic_cache_ttl": "5m"
+    },
+    "avg_latency_ms": 4756.0
+  },
+  "records": [
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "What's the cheapest place to buy Laranite?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, in the Pyro system, is selling Laranite for 3.15 aUEC per SCU. Port Tressler in orbit around Crusader, in Stanton, is next at 3.42 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 5014.6,
+      "tokens_in": 31891,
+      "tokens_out": 201,
+      "tokens_total": 32092,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000198,
+      "cost_by_node": {
+        "classify_topic": 0.000101,
+        "respond": 9.8e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 2543.5,
+      "decline_ms": null,
+      "respond_ms": [
+        1192.1,
+        1266.9
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.3
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "What's the cheapest place to buy Laranite?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling Laranite for 3.15 aUEC per SCU. The only other listed terminal is Port Tressler, in orbit around Crusader, at 3.42 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 4223.6,
+      "tokens_in": 31891,
+      "tokens_out": 195,
+      "tokens_total": 32086,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000167,
+      "cost_by_node": {
+        "classify_topic": 7.7e-05,
+        "respond": 9e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1935.1,
+      "decline_ms": null,
+      "respond_ms": [
+        1140.9,
+        1135.6
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.3
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 2
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "What's the cheapest place to buy Laranite?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point in the Pyro system, on Pyro I, is selling Laranite for 3.15 aUEC per SCU. Port Tressler in the Stanton system, on Crusader, is the other option at 3.42 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 4238.4,
+      "tokens_in": 31891,
+      "tokens_out": 196,
+      "tokens_total": 32087,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000168,
+      "cost_by_node": {
+        "classify_topic": 8e-05,
+        "respond": 8.8e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 2004.2,
+      "decline_ms": null,
+      "respond_ms": [
+        1157.2,
+        1063.4
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 3
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "What's the cheapest place to buy Laranite?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in Pyro on Pyro I, is selling Laranite for 3.15 aUEC per SCU. The other listed terminal is Port Tressler, on Crusader in Stanton, at 3.42 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 4288.0,
+      "tokens_in": 31891,
+      "tokens_out": 203,
+      "tokens_total": 32094,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.00017,
+      "cost_by_node": {
+        "classify_topic": 7.1e-05,
+        "respond": 9.8e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1798.8,
+      "decline_ms": null,
+      "respond_ms": [
+        1277.8,
+        1199.3
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 4
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "What's the cheapest place to buy Laranite?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, in the Pyro system, is selling Laranite for 3.15 aUEC per SCU. Port Tressler in orbit around Crusader, in Stanton, is the other listed option at 3.42 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 4369.9,
+      "tokens_in": 31891,
+      "tokens_out": 205,
+      "tokens_total": 32096,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000173,
+      "cost_by_node": {
+        "classify_topic": 7.8e-05,
+        "respond": 9.5e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1957.4,
+      "decline_ms": null,
+      "respond_ms": [
+        1196.0,
+        1204.7
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 5
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "Where can I get Laranite for less?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I in the Pyro system, is selling Laranite for 3.15 aUEC per SCU. That's the cheapest listed. Port Tressler, in orbit around Crusader in Stanton, is the only other listed terminal, at 3.42 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 5259.9,
+      "tokens_in": 31879,
+      "tokens_out": 440,
+      "tokens_total": 32319,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000208,
+      "cost_by_node": {
+        "classify_topic": 5.7e-05,
+        "respond": 0.000151
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1437.0,
+      "decline_ms": null,
+      "respond_ms": [
+        1765.7,
+        2044.2
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "Where can I get Laranite for less?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling Laranite for 3.15 aUEC per SCU. That is the lowest buy price listed. Port Tressler, on Crusader, is the other option at 3.42 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 6440.4,
+      "tokens_in": 31879,
+      "tokens_out": 422,
+      "tokens_total": 32301,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000255,
+      "cost_by_node": {
+        "classify_topic": 0.000114,
+        "respond": 0.000141
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 2874.4,
+      "decline_ms": null,
+      "respond_ms": [
+        1446.2,
+        2104.1
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 2
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "Where can I get Laranite for less?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, on Pyro I, is selling Laranite for 3.15 aUEC per SCU. That's the lowest of the two listed terminals. Port Tressler, on Crusader, is next at 3.42. Baijini Point is in the Pyro system, so it's a longer haul from Stanton.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [
+        "Baijini Point is in the Pyro system, so it's a longer haul from Stanton."
+      ],
+      "latency_ms": 4099.3,
+      "tokens_in": 31879,
+      "tokens_out": 411,
+      "tokens_total": 32290,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000162,
+      "cost_by_node": {
+        "classify_topic": 4.4e-05,
+        "respond": 0.000118
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1103.6,
+      "decline_ms": null,
+      "respond_ms": [
+        1132.2,
+        1850.6
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 3
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "Where can I get Laranite for less?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, on Pyro I, is selling Laranite for 3.15 aUEC per SCU, the lowest listed price. Port Tressler, in orbit around Crusader, is next at 3.42 aUEC per SCU, so Baijini Point is the cheaper option, but it is in the Pyro system.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [
+        "Baijini Point is selling Laranite for 3.15 aUEC per SCU, the lowest listed price."
+      ],
+      "latency_ms": 5058.4,
+      "tokens_in": 31879,
+      "tokens_out": 395,
+      "tokens_total": 32274,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.0002,
+      "cost_by_node": {
+        "classify_topic": 8.1e-05,
+        "respond": 0.000119
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 2042.6,
+      "decline_ms": null,
+      "respond_ms": [
+        1178.9,
+        1823.9
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 4
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "Where can I get Laranite for less?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling Laranite for 3.15 aUEC per SCU. That is the lowest of the two listed terminals. Port Tressler, in orbit around Crusader in Stanton, is next at 3.42 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 3814.8,
+      "tokens_in": 31879,
+      "tokens_out": 361,
+      "tokens_total": 32240,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000151,
+      "cost_by_node": {
+        "classify_topic": 4.1e-05,
+        "respond": 0.000109
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1043.1,
+      "decline_ms": null,
+      "respond_ms": [
+        982.6,
+        1775.2
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 5
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "I need to buy some Laranite, where's it cheap?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point at Pyro I, in the Pyro system, is selling Laranite for 3.15 aUEC per SCU. That is the cheapest listed terminal. Port Tressler on Crusader is the only other option, at 3.42 aUEC per SCU, and it is in Stanton.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 4700.4,
+      "tokens_in": 31897,
+      "tokens_out": 321,
+      "tokens_total": 32218,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000186,
+      "cost_by_node": {
+        "classify_topic": 7.2e-05,
+        "respond": 0.000114
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1803.4,
+      "decline_ms": null,
+      "respond_ms": [
+        1174.2,
+        1709.2
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "I need to buy some Laranite, where's it cheap?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling Laranite for 3.15 aUEC per SCU, the cheapest listed. Port Tressler, in orbit around Crusader in Stanton, is next at 3.42 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 4891.9,
+      "tokens_in": 31897,
+      "tokens_out": 352,
+      "tokens_total": 32249,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000194,
+      "cost_by_node": {
+        "classify_topic": 6.8e-05,
+        "respond": 0.000125
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1715.4,
+      "decline_ms": null,
+      "respond_ms": [
+        1238.3,
+        1924.5
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 2
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "I need to buy some Laranite, where's it cheap?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point on Pyro I is selling Laranite for 3.15 aUEC per SCU, the lowest listed price. Port Tressler, in orbit around Crusader in Stanton, is the alternative at 3.42 aUEC per SCU if you're staying in Stanton.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 5356.5,
+      "tokens_in": 31897,
+      "tokens_out": 346,
+      "tokens_total": 32243,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000212,
+      "cost_by_node": {
+        "classify_topic": 7.6e-05,
+        "respond": 0.000135
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1926.9,
+      "decline_ms": null,
+      "respond_ms": [
+        1529.6,
+        1885.9
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 3
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "I need to buy some Laranite, where's it cheap?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling Laranite for 3.15 aUEC per SCU. Port Tressler, in orbit around Crusader in Stanton, is the next option at 3.42 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 4971.1,
+      "tokens_in": 31897,
+      "tokens_out": 392,
+      "tokens_total": 32289,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000197,
+      "cost_by_node": {
+        "classify_topic": 7.5e-05,
+        "respond": 0.000122
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1893.5,
+      "decline_ms": null,
+      "respond_ms": [
+        1151.4,
+        1913.6
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.3
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 4
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "I need to buy some Laranite, where's it cheap?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling Laranite for 3.15 aUEC per SCU, the cheapest listed. The only other terminal with stock is Port Tressler, in orbit around Crusader, at 3.42 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [
+        "Port Tressler is described as having stock, which is true, but it is referred to as having the highest price without directly providing a comparative analysis against the recommended option in terms of availability or stock levels for buying."
+      ],
+      "latency_ms": 5172.0,
+      "tokens_in": 31897,
+      "tokens_out": 357,
+      "tokens_total": 32254,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000205,
+      "cost_by_node": {
+        "classify_topic": 7.5e-05,
+        "respond": 0.000129
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1898.2,
+      "decline_ms": null,
+      "respond_ms": [
+        1278.6,
+        1980.9
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.3
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 5
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "What's the cheapest place to buy Agricium?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on Crusader, is selling Agricium for 26.1 aUEC per SCU. Baijini Point, on Pyro I, lists a lower price of 25.4, but it is out of stock, so Port Tressler is the cheapest option you can actually buy from.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [
+        "Baijini Point is listed as a lower price option despite being out of stock."
+      ],
+      "latency_ms": 4126.0,
+      "tokens_in": 31890,
+      "tokens_out": 203,
+      "tokens_total": 32093,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000163,
+      "cost_by_node": {
+        "classify_topic": 6.7e-05,
+        "respond": 9.6e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1685.0,
+      "decline_ms": null,
+      "respond_ms": [
+        1175.6,
+        1251.9
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "What's the cheapest place to buy Agricium?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, in orbit around Crusader, is selling Agricium for 26.1 aUEC per SCU. Baijini Point in Pyro is cheaper at 25.4, but it is out of stock, so Port Tressler is the cheapest option you can actually buy from.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [
+        "Port Tressler is the cheapest option you can actually buy from, contradicting that Baijini Point is actually cheaper (25.4) but out of stock."
+      ],
+      "latency_ms": 4231.2,
+      "tokens_in": 31890,
+      "tokens_out": 205,
+      "tokens_total": 32095,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000167,
+      "cost_by_node": {
+        "classify_topic": 7e-05,
+        "respond": 9.7e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1767.7,
+      "decline_ms": null,
+      "respond_ms": [
+        1213.6,
+        1237.3
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 2
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "What's the cheapest place to buy Agricium?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on Crusader, is selling Agricium for 26.1 aUEC per SCU. It's the only in-stock terminal listed. Baijini Point, on Pyro I, is cheaper at 25.4 but is out of stock.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [
+        "Port Tressler is the only in-stock terminal listed."
+      ],
+      "latency_ms": 4108.5,
+      "tokens_in": 31890,
+      "tokens_out": 195,
+      "tokens_total": 32085,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000162,
+      "cost_by_node": {
+        "classify_topic": 7.3e-05,
+        "respond": 9e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1833.0,
+      "decline_ms": null,
+      "respond_ms": [
+        1180.0,
+        1081.5
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 3
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "What's the cheapest place to buy Agricium?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, in orbit around Crusader, is selling Agricium for 26.1 aUEC per SCU. Baijini Point in Pyro is cheaper at 25.4, but it is out of stock, so Port Tressler is the cheapest option you can actually buy from.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [
+        "Claims Baijini Point is cheaper but fails to mention it is out of stock; therefore, Port Tressler is indeed the cheapest buy, contradicting the availability of Baijini Point."
+      ],
+      "latency_ms": 4165.2,
+      "tokens_in": 31890,
+      "tokens_out": 205,
+      "tokens_total": 32095,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000165,
+      "cost_by_node": {
+        "classify_topic": 6.6e-05,
+        "respond": 9.9e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1661.7,
+      "decline_ms": null,
+      "respond_ms": [
+        1309.3,
+        1181.0
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.3
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 4
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "What's the cheapest place to buy Agricium?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on Crusader, is selling Agricium for 26.1 aUEC per SCU. It's the only in-stock terminal listed. Baijini Point, on Pyro I, is cheaper at 25.4 but is out of stock.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [
+        "Baijini Point is cheaper at 25.4 but is out of stock."
+      ],
+      "latency_ms": 4066.9,
+      "tokens_in": 31890,
+      "tokens_out": 195,
+      "tokens_total": 32085,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000161,
+      "cost_by_node": {
+        "classify_topic": 6.7e-05,
+        "respond": 9.4e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1678.8,
+      "decline_ms": null,
+      "respond_ms": [
+        1215.1,
+        1158.6
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 5
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "Where can I get Agricium for less?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler in orbit around Crusader is the cheapest available option. It is selling Agricium for 26.1 aUEC per SCU.\n\nBaijini Point in Pyro is listed at 25.4 aUEC per SCU, but it is out of stock, so I can't recommend it.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [
+        "Port Tressler is stated to be the cheapest available option, but it is not. Baijini Point is cheaper at 25.4 aUEC per SCU."
+      ],
+      "latency_ms": 5181.7,
+      "tokens_in": 31878,
+      "tokens_out": 514,
+      "tokens_total": 32392,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000205,
+      "cost_by_node": {
+        "classify_topic": 7.5e-05,
+        "respond": 0.00013
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1893.3,
+      "decline_ms": null,
+      "respond_ms": [
+        1163.1,
+        2109.4
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "Where can I get Agricium for less?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, in orbit around Crusader, is selling Agricium for 26.1 aUEC per SCU. That is the cheapest terminal with stock right now.\n\nBaijini Point in Pyro lists a lower price, 25.4 aUEC per SCU, but it is out of stock.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [
+        "Baijini Point is out of stock, but the reply states it's a lower price option."
+      ],
+      "latency_ms": 4680.9,
+      "tokens_in": 31878,
+      "tokens_out": 421,
+      "tokens_total": 32299,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000185,
+      "cost_by_node": {
+        "classify_topic": 7.4e-05,
+        "respond": 0.000111
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1875.3,
+      "decline_ms": null,
+      "respond_ms": [
+        1138.0,
+        1653.8
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 2
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "Where can I get Agricium for less?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on Crusader, is selling Agricium for 26.1 aUEC per SCU, and it's the cheapest terminal with stock.\n\nBaijini Point, on Pyro I, lists a lower price of 25.4 aUEC per SCU, but it's currently out of stock, so I've excluded it.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [
+        "Port Tressler is the cheapest terminal with stock."
+      ],
+      "latency_ms": 5159.2,
+      "tokens_in": 31878,
+      "tokens_out": 461,
+      "tokens_total": 32339,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000204,
+      "cost_by_node": {
+        "classify_topic": 7.7e-05,
+        "respond": 0.000127
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1953.5,
+      "decline_ms": null,
+      "respond_ms": [
+        1116.6,
+        2074.6
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 3
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "Where can I get Agricium for less?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, in orbit around Crusader, is selling Agricium for 26.1 aUEC per SCU, the lowest in-stock price. Baijini Point, in orbit around Pyro I, is listed at 25.4 aUEC per SCU, but it's out of stock.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [
+        "Baijini Point is not in stock but is described as having a price lower than Port Tressler despite being unavailable."
+      ],
+      "latency_ms": 5023.1,
+      "tokens_in": 31878,
+      "tokens_out": 493,
+      "tokens_total": 32371,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000199,
+      "cost_by_node": {
+        "classify_topic": 7.5e-05,
+        "respond": 0.000123
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1902.9,
+      "decline_ms": null,
+      "respond_ms": [
+        1070.2,
+        2036.0
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 4
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "Where can I get Agricium for less?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, in orbit around Crusader, is selling Agricium for 26.1 aUEC per SCU. That is the cheapest in-stock option.\n\nBaijini Point, in orbit around Pyro I, lists a lower price of 25.4 aUEC per SCU, but it is out of stock.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [
+        "Baijini Point lists a lower price of 25.4 aUEC per SCU, but it is out of stock."
+      ],
+      "latency_ms": 4600.5,
+      "tokens_in": 31878,
+      "tokens_out": 403,
+      "tokens_total": 32281,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000182,
+      "cost_by_node": {
+        "classify_topic": 7e-05,
+        "respond": 0.000112
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1771.9,
+      "decline_ms": null,
+      "respond_ms": [
+        1142.7,
+        1671.6
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 5
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "I need to buy some Agricium, where's it cheap?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, in orbit around Crusader, is selling Agricium for 26.1 aUEC per SCU. It's the only in-stock terminal listed. Baijini Point in Pyro is cheaper at 25.4 aUEC per SCU, but it's out of stock.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [
+        "Port Tressler is the only in-stock terminal listed."
+      ],
+      "latency_ms": 4333.9,
+      "tokens_in": 31896,
+      "tokens_out": 205,
+      "tokens_total": 32101,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000171,
+      "cost_by_node": {
+        "classify_topic": 7.5e-05,
+        "respond": 9.6e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1902.8,
+      "decline_ms": null,
+      "respond_ms": [
+        1256.2,
+        1162.0
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "I need to buy some Agricium, where's it cheap?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, in orbit around Crusader, is selling Agricium for 26.1 aUEC per SCU. Baijini Point in Pyro is cheaper at 25.4, but it's out of stock.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [
+        "Baijini Point is cheaper at 25.4 but it's out of stock."
+      ],
+      "latency_ms": 4132.3,
+      "tokens_in": 31896,
+      "tokens_out": 182,
+      "tokens_total": 32078,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000163,
+      "cost_by_node": {
+        "classify_topic": 7.1e-05,
+        "respond": 9.2e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1792.9,
+      "decline_ms": null,
+      "respond_ms": [
+        1236.0,
+        1090.1
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 2
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "I need to buy some Agricium, where's it cheap?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, in orbit around Crusader, is selling Agricium for 26.1 aUEC per SCU. It's the only terminal in stock right now. Baijini Point in Pyro is cheaper at 25.4, but it's out of stock.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [
+        "Port Tressler is the only terminal in stock right now."
+      ],
+      "latency_ms": 4302.4,
+      "tokens_in": 31896,
+      "tokens_out": 195,
+      "tokens_total": 32091,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.00017,
+      "cost_by_node": {
+        "classify_topic": 6.9e-05,
+        "respond": 0.000101
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1748.1,
+      "decline_ms": null,
+      "respond_ms": [
+        1349.5,
+        1190.3
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 3
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "I need to buy some Agricium, where's it cheap?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, in orbit around Crusader, is selling Agricium for 26.1 aUEC per SCU. It's the only in-stock terminal listed. Baijini Point in Pyro is cheaper at 25.4 aUEC per SCU, but it's out of stock.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [
+        "Baijini Point in Pyro is cheaper at 25.4 aUEC per SCU, but it's out of stock."
+      ],
+      "latency_ms": 4240.2,
+      "tokens_in": 31896,
+      "tokens_out": 205,
+      "tokens_total": 32101,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000168,
+      "cost_by_node": {
+        "classify_topic": 6.8e-05,
+        "respond": 0.0001
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1713.9,
+      "decline_ms": null,
+      "respond_ms": [
+        1284.1,
+        1227.8
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 4
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "I need to buy some Agricium, where's it cheap?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, in orbit around Crusader, is selling Agricium for 26.1 aUEC per SCU, and it's in stock. The only other listed terminal is Baijini Point in the Pyro system, at 25.4 aUEC per SCU, but it's out of stock.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [
+        "Baijini Point is selling Agricium for 25.4 aUEC per SCU despite being out of stock."
+      ],
+      "latency_ms": 4078.8,
+      "tokens_in": 31896,
+      "tokens_out": 203,
+      "tokens_total": 32099,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000161,
+      "cost_by_node": {
+        "classify_topic": 7e-05,
+        "respond": 9.2e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1753.2,
+      "decline_ms": null,
+      "respond_ms": [
+        1155.2,
+        1156.9
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 5
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Where's the cheapest place to buy a Cutlass Black?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling the Cutlass Black for 1,190,000 aUEC. Port Tressler, in orbit around Crusader in Stanton, is next at 1,225,000 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 5603.9,
+      "tokens_in": 31700,
+      "tokens_out": 553,
+      "tokens_total": 32253,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000222,
+      "cost_by_node": {
+        "classify_topic": 7.2e-05,
+        "respond": 0.00015
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1813.6,
+      "decline_ms": null,
+      "respond_ms": [
+        1270.8,
+        2505.6
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Where's the cheapest place to buy a Cutlass Black?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, on Pyro I, is selling the Cutlass Black for 1,190,000 aUEC. Port Tressler, on Crusader, is the alternative at 1,225,000 aUEC if you want to stay in Stanton.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [
+        "The mention of Port Tressler as an alternative includes it as a place to buy, but the copilot does not clarify that it is at a higher price. This implies it is positioned as a buying option rather than focusing solely on buying from Baijini Point."
+      ],
+      "latency_ms": 5287.5,
+      "tokens_in": 31700,
+      "tokens_out": 461,
+      "tokens_total": 32161,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000209,
+      "cost_by_node": {
+        "classify_topic": 7.2e-05,
+        "respond": 0.000137
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1809.9,
+      "decline_ms": null,
+      "respond_ms": [
+        1276.0,
+        2187.9
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 2
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Where's the cheapest place to buy a Cutlass Black?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, on Pyro I, is selling a Cutlass Black for 1,190,000 aUEC. Port Tressler, on Crusader, is next at 1,225,000 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [
+        "The price was stated as 1,190,000 aUEC, but it should be stated as 1,190,000 aUEC instead of 1,190,000.",
+        "No claims made about buying or selling contradictory to terminal availability."
+      ],
+      "latency_ms": 4732.4,
+      "tokens_in": 31700,
+      "tokens_out": 378,
+      "tokens_total": 32078,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000187,
+      "cost_by_node": {
+        "classify_topic": 7.1e-05,
+        "respond": 0.000116
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1788.2,
+      "decline_ms": null,
+      "respond_ms": [
+        1229.0,
+        1701.3
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 3
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Where's the cheapest place to buy a Cutlass Black?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, on Pyro I, is selling the Cutlass Black for 1,190,000 aUEC. Port Tressler, on Crusader, is next at 1,225,000 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 4645.2,
+      "tokens_in": 31700,
+      "tokens_out": 329,
+      "tokens_total": 32029,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000184,
+      "cost_by_node": {
+        "classify_topic": 7.5e-05,
+        "respond": 0.000109
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1879.1,
+      "decline_ms": null,
+      "respond_ms": [
+        1235.5,
+        1517.5
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 4
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Where's the cheapest place to buy a Cutlass Black?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling the Cutlass Black for 1,190,000 aUEC. Port Tressler, on Crusader, is next at 1,225,000 aUEC, which is 35,000 aUEC more.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 5050.6,
+      "tokens_in": 31700,
+      "tokens_out": 479,
+      "tokens_total": 32179,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.0002,
+      "cost_by_node": {
+        "classify_topic": 6.9e-05,
+        "respond": 0.000131
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1731.8,
+      "decline_ms": null,
+      "respond_ms": [
+        1192.3,
+        2112.9
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 5
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "I want to buy a Cutlass Black, what's the best price?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point in Pyro, on Pyro I, is selling the Cutlass Black for 1,190,000 aUEC. Port Tressler, on Crusader, is next at 1,225,000 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [
+        "The reply does not mention that Port Tressler is just next in price, which suggests a ranking in preference rather than just mentioning another terminal.",
+        "The copilot's phrasing implies that the pilot is buying rather than that the terminal is offering the Cutlass Black for sale."
+      ],
+      "latency_ms": 5058.6,
+      "tokens_in": 31697,
+      "tokens_out": 308,
+      "tokens_total": 32005,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.0002,
+      "cost_by_node": {
+        "classify_topic": 7.5e-05,
+        "respond": 0.000125
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1884.9,
+      "decline_ms": null,
+      "respond_ms": [
+        1527.8,
+        1632.1
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 1
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "I want to buy a Cutlass Black, what's the best price?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I in Pyro, is selling the Cutlass Black for 1,190,000 aUEC. Port Tressler, in orbit around Crusader in Stanton, is next at 1,225,000 aUEC, which is 35,000 aUEC more.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [
+        "None of the terminals are mentioned to be out of stock, yet Baijini Point is implied as the sole buying option."
+      ],
+      "latency_ms": 4705.4,
+      "tokens_in": 31697,
+      "tokens_out": 342,
+      "tokens_total": 32039,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000186,
+      "cost_by_node": {
+        "classify_topic": 6.6e-05,
+        "respond": 0.00012
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1660.1,
+      "decline_ms": null,
+      "respond_ms": [
+        1262.7,
+        1769.6
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 2
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "I want to buy a Cutlass Black, what's the best price?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling the Cutlass Black for 1,190,000 aUEC. Port Tressler, on Crusader, is the alternative at 1,225,000 aUEC, which is 35,000 aUEC more.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [
+        "The reply indicates the price at Baijini Point but does not specify the stock status (it is in stock as per the data, but not mentioned)",
+        "The reply does not clarify that the pilot is buying at Baijini Point instead of selling, despite being described as selling."
+      ],
+      "latency_ms": 4985.4,
+      "tokens_in": 31697,
+      "tokens_out": 451,
+      "tokens_total": 32148,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000197,
+      "cost_by_node": {
+        "classify_topic": 6.8e-05,
+        "respond": 0.00013
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1705.7,
+      "decline_ms": null,
+      "respond_ms": [
+        1144.9,
+        2122.0
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 3
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "I want to buy a Cutlass Black, what's the best price?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I in Pyro, is selling the Cutlass Black for 1,190,000 aUEC. Port Tressler, on Crusader in Stanton, is next at 1,225,000 aUEC, which is 35,000 aUEC more but in your home system if you're not in Pyro.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 5116.8,
+      "tokens_in": 31697,
+      "tokens_out": 389,
+      "tokens_total": 32086,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000202,
+      "cost_by_node": {
+        "classify_topic": 7.4e-05,
+        "respond": 0.000128
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1874.0,
+      "decline_ms": null,
+      "respond_ms": [
+        1262.8,
+        1966.6
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 4
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "I want to buy a Cutlass Black, what's the best price?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point on Pyro I is selling the Cutlass Black for 1,190,000 aUEC. Port Tressler on Crusader is next at 1,225,000 aUEC, 35,000 more, and it is in Stanton rather than Pyro.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [
+        "The price for the Cutlass Black is wrongly stated as 1,190,000 aUEC instead of 1,190,000 as the tool lists it as 1190000.0.",
+        "Port Tressler is mentioned as being 'next' despite the price difference being 35,000 aUEC, which is inaccurately described as '35,000 more', implying a second-best position without clear context."
+      ],
+      "latency_ms": 4957.9,
+      "tokens_in": 31697,
+      "tokens_out": 312,
+      "tokens_total": 32009,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000196,
+      "cost_by_node": {
+        "classify_topic": 7.8e-05,
+        "respond": 0.000118
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1965.0,
+      "decline_ms": null,
+      "respond_ms": [
+        1277.6,
+        1701.1
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 5
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Find me a good deal on a Cutlass Black.",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling the Cutlass Black for 1,190,000 aUEC. That is the lowest price listed.\n\nPort Tressler, in orbit around Crusader in Stanton, is the other option at 1,225,000 aUEC, which is 35,000 more. Baijini Point is in Pyro, so you would need to travel between systems to get there.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 5078.4,
+      "tokens_in": 31688,
+      "tokens_out": 451,
+      "tokens_total": 32139,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000201,
+      "cost_by_node": {
+        "classify_topic": 6.9e-05,
+        "respond": 0.000132
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1738.6,
+      "decline_ms": null,
+      "respond_ms": [
+        1383.5,
+        1941.9
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Find me a good deal on a Cutlass Black.",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point in the Pyro system, in orbit around Pyro I, is selling the Cutlass Black for 1,190,000 aUEC. That's the cheapest listed price.\n\nPort Tressler, in orbit around Crusader in Stanton, is the alternative at 1,225,000 aUEC, which is 35,000 more. Choose Port Tressler if you want to avoid traveling to Pyro.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 5261.8,
+      "tokens_in": 31688,
+      "tokens_out": 546,
+      "tokens_total": 32234,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000208,
+      "cost_by_node": {
+        "classify_topic": 6.7e-05,
+        "respond": 0.000141
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1701.1,
+      "decline_ms": null,
+      "respond_ms": [
+        1291.0,
+        2256.4
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 2
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Find me a good deal on a Cutlass Black.",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point on Pyro I is selling the Cutlass Black for 1,190,000 aUEC, the lowest listed price. Port Tressler, on Crusader, is next at 1,225,000 aUEC, 35,000 more.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 4892.6,
+      "tokens_in": 31688,
+      "tokens_out": 380,
+      "tokens_total": 32068,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000194,
+      "cost_by_node": {
+        "classify_topic": 7.1e-05,
+        "respond": 0.000122
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1793.3,
+      "decline_ms": null,
+      "respond_ms": [
+        1443.5,
+        1641.9
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 3
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Find me a good deal on a Cutlass Black.",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling the Cutlass Black for 1,190,000 aUEC. That is the lowest listed price.\n\nPort Tressler, on Crusader, is the alternative at 1,225,000 aUEC, which is 35,000 aUEC more. Baijini Point is in the Pyro system, so the Crusader terminal is the closer option if you're already in Stanton.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [
+        "Baijini Point is noted as selling the Cutlass Black for 1,190,000 aUEC, which is incorrect as it should be stated as the price you pay to acquire the Cutlass Black, rather than selling."
+      ],
+      "latency_ms": 5282.7,
+      "tokens_in": 31688,
+      "tokens_out": 442,
+      "tokens_total": 32130,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000209,
+      "cost_by_node": {
+        "classify_topic": 6.8e-05,
+        "respond": 0.000141
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1703.3,
+      "decline_ms": null,
+      "respond_ms": [
+        1499.7,
+        2065.2
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 4
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Find me a good deal on a Cutlass Black.",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around Pyro I, is selling the Cutlass Black for 1,190,000 aUEC. Port Tressler, on Crusader in Stanton, is next at 1,225,000 aUEC, 35,000 more. Port Tressler is the one to choose if you want to avoid the trip to Pyro.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [
+        "Port Tressler is the one to choose if you want to avoid the trip to Pyro."
+      ],
+      "latency_ms": 5030.8,
+      "tokens_in": 31688,
+      "tokens_out": 446,
+      "tokens_total": 32134,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000199,
+      "cost_by_node": {
+        "classify_topic": 7e-05,
+        "respond": 0.000129
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 1776.3,
+      "decline_ms": null,
+      "respond_ms": [
+        1411.8,
+        1829.2
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 5
+    }
+  ]
+}

@@ -219,6 +219,25 @@ free/lowest tier**: 10 pilots × 2–3 calls per turn blows through 5 requests/m
 Fix before launch: add credit to reach Tier 1 (much higher RPM), or make Anthropic the fallback.
 Then re-run this check to get the fallback model's actual scores.
 
+### Fallback model choice (2026-10-09)
+
+The OpenAI fallback is unusable on this account (429 at 5 requests/minute), so the default
+fallback is now **Anthropic** (`server/anthropic_fallback.py`, official SDK, prompt caching on
+the tools+persona prefix). Same 3 cases × 5 samples, frankencompute forced down:
+
+| Fallback | Tool / args | Claims supported | Median turn | Cost per call (`llm_usage`) |
+|---|---|---|---|---|
+| **`claude-haiku-5-5` (default)** | 45/45 | 19/45 | 4.9 s | $0.00019 |
+| `claude-haiku-4-5` | 33/45 | 16/33 | 4.2 s | $0.00161 |
+
+Haiku 4.5 asked a clarifying question instead of calling the tool in 12/45 turns. Haiku 5.5's
+low claims score is mostly the gpt-4o-mini judge flagging accurate comparisons ("Port
+Tressler is the alternative at 1,225,000") -- the judge is the weakest part of the eval now.
+
+**Bug found and fixed on the way:** the ollama client strips tool-call ids, so the gateway
+receives none. Both fallback translations now pair tool results to calls by position
+(`server/tool_call_ids.py`), the same pairing Ollama itself uses.
+
 ## Other blockers for 10 users (not the gateway, but they gate the same goal)
 
 The gateway removes the LLM key, but a fresh pilot's `.env` still needs these. Each one is
