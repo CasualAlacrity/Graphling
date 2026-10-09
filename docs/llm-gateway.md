@@ -1,6 +1,6 @@
 # LLM gateway — self-hosted models behind the ledger server
 
-**Status:** spec, not built (2026-10-09).
+**Status:** LLM gateway built 2026-10-09 (server + client + tests, verified end to end against frankencompute). TTS proxy, UEX move, limits, and deploy still to do.
 **Goal:** the client ships as a whole product. 10 new pilots using ALICE within 2 weeks (by
 ~2026-10-23), with nobody added by hand. Discord login is the only onboarding step.
 
@@ -34,7 +34,7 @@ dependency.
 
 ```
 ALICE client ── HTTPS + JWT ──▶ api.heyalice.help (Hetzner, nginx → server container)
-                                   │  /llm/v1/chat/completions
+                                   │  /llm/api/chat (Ollama native format)
                                    │  auth · rate limit · usage log · routing
                     ┌──────────────┴───────────────┐
                     ▼ primary                       ▼ fallback
@@ -49,11 +49,11 @@ CLAUDE.md says. The server only relays model calls; it doesn't run the graph.
 
 | # | Decision | Recommendation | Why |
 |---|---|---|---|
-| 1 | Wire format | **OpenAI-compatible** `/llm/v1/chat/completions` | Ollama serves this format natively, and OpenAI *is* this format, so both backends are a pass-through with no translation layer. The client uses stock `ChatOpenAI(base_url=...)`. |
+| 1 | Wire format | **Ollama-native** `/llm/api/chat` (changed 2026-10-09, was OpenAI-compatible) | Ollama's OpenAI-compatible endpoint silently drops gemma4's thinking: `reasoning_effort: high` produced 0 reasoning tokens in 0.08 s, while native `think: true` produced ~570 characters. The evals showed reasoning helps the default model. So the client keeps `ChatOllama` exactly as evaluated, pointed at `<ALICE_API_URL>/llm`, and the frankencompute path is a pure pass-through. Only the OpenAI fallback translates (Ollama ⇄ OpenAI chat-completions). |
 | 2 | Who picks the model | **The server.** The client sends a *role* (`alice-chat`, `alice-classify`), never a real model name | Lets you swap models, flip reasoning, or change fallback without shipping a client update to 10 people. Also stops a client from asking for an expensive model. |
 | 3 | Fallback provider for v1 | **OpenAI only.** Anthropic is v2 | OpenAI is the same format, so fallback is about 10 lines. Anthropic needs request/response translation, and the existing `cache_control` breakpoints (`anthropic_cache_mode`) wouldn't survive an OpenAI-format hop. |
 | 4 | Box ↔ Hetzner link | **Tailscale on exactly two machines** (Hetzner + frankencompute) | See below. Users never touch it; it's machine-to-machine infra you set up once. |
-| 5 | Streaming | **Not in v1** | ALICE doesn't stream LLM output today (no `astream` in `graph.py` / `voice/`), and non-streaming makes fallback clean: nothing has reached the client, so the gateway can retry elsewhere. |
+| 5 | Streaming | **Pass-through stream from frankencompute; fallback replies in one chunk** | `ChatOllama` always streams internally, so the gateway relays the box's NDJSON. Fallback decisions happen before any byte is sent (connect error / timeout / 5xx on the request), so retrying elsewhere stays clean. A mid-stream failure is recorded as an error, not retried. |
 | 6 | Reasoning flag | **Server-side, per role** (chat: on, classify: off) | Matches today's `OLLAMA_REASONING` / `OLLAMA_CLASSIFICATION_REASONING` defaults, moved to where the model choice now lives. |
 
 ### Why Tailscale here after all
@@ -69,16 +69,18 @@ added once. Tailscale ACLs can limit it further, to Hetzner → frankencompute:1
 
 ### Endpoint
 
-`POST /llm/v1/chat/completions`, behind `Depends(get_current_user)`. New router
-`server/routes/llm.py` and service `server/llm_gateway_service.py`, same split as ledger.
+`POST /llm/api/chat`, behind `Depends(get_current_user)`: `server/routes/llm.py` (HTTP) +
+`server/llm_gateway_service.py` (routing, translation, usage). Body cap 512 KB.
 
-Request: standard OpenAI chat-completions body (`model`, `messages`, `tools`, `tool_choice`,
-`temperature`…). `model` must be one of the role names, or the request gets a 400.
+Request: what `ChatOllama` sends. `model` must be a role name (400 otherwise). The server
+replaces `model` and `think` per role, drops `keep_alive`, and keeps only harmless `options`
+(temperature, top_p, top_k, seed, stop, num_predict, repeat_penalty), so one pilot can't send
+`num_ctx=131072` or `keep_alive=0` and evict the model for everyone.
 
-Response: the backend's response, passed through, except that **`model` is rewritten to the
-real model that answered** (e.g. `gemma4`, `gpt-4o-mini`). Also add a response header
-`X-Alice-Backend: frankencompute|openai`. This keeps the client's `turn_metrics` honest: it
-prices calls by model name (`MODEL_PRICING`), and a role name would show up as unpriced.
+Response: Ollama NDJSON. The final (`done: true`) chunk gets **`alice_backend:
+frankencompute|openai`** and the real `model`. `ChatOllama` copies that chunk into
+`generation_info`, and `turn_metrics._answered_by` uses it to price each call by what
+actually answered.
 
 ### Role table (server config, not client)
 
@@ -99,10 +101,9 @@ evaluated at (`gemma4@dc35e8d9c606` on frankencompute today), and the gateway's 
 check refuses to route to frankencompute if `/api/tags` reports a different digest. Never
 `ollama pull` on the box without re-running the eval first.
 
-Tried in order. Verify how Ollama's OpenAI-compatible endpoint exposes thinking
-(`reasoning_effort` / `think`) on 0.40.2 before relying on it. If it's awkward, call Ollama's
-native `/api/chat` for that backend instead. That's still server-side only, so the client never
-knows.
+Tried in order. Note: gemma4 decides per call whether to think even with `think: true`
+(the same request directly to the box produced no thinking 2 times out of 6), so "no
+thinking in this response" isn't a gateway bug.
 
 ### Fallback rules
 
@@ -184,22 +185,39 @@ instead of making a pilot wait in a queue. Revisit when `llm_usage` shows `overf
 
 ## Client
 
-1. **`app/llm.py`:** new provider `LLM_PROVIDER=alice` (becomes the default for shipped
-   builds). Both getters return
-   `ChatOpenAI(base_url=f"{api_url()}/llm/v1", api_key=<session JWT>, model="alice-chat" | "alice-classify")`.
-   The existing `ollama` / `openai` / `anthropic` providers stay for development and evals.
-2. **Token timing:** `graph.py` builds its LLM at import time (`llm = get_chat_llm().bind_tools(tools)`).
-   The JWT therefore has to exist before that import. Either make sure the entry point runs
-   `get_pilot_session()` first, or have the `alice` provider read the cached session
-   synchronously (`_load_cached_session()`). Check the entry-point order in `app/voice/__init__.py`
-   before picking one.
-3. **Expired token mid-session:** JWTs last 7 days. A 401 from the gateway should surface the
-   same re-login path the ledger client uses, not a raw stack trace.
-4. `PREWARM_OLLAMA` and `anthropic_cache_mode()` both become no-ops under `alice`. The box is
-   always warm (`KEEP_ALIVE=-1`), and caching is the gateway's problem now.
-5. **`turn_metrics`:** read the real `model` from the response (see the Endpoint section) and add
-   provider `alice` handling, so fallback calls get priced and frankencompute calls get the
-   electricity estimate.
+1. **`app/llm.py`:** `LLM_PROVIDER=alice` returns `ChatOllama(model="alice-chat" | "alice-classify",
+   base_url=f"{ALICE_API_URL}/llm", reasoning=<mirrors the role>)`. `reasoning` only makes
+   ChatOllama keep the thinking in history, the same message shape as the evals; the server
+   decides whether the model actually thinks.
+2. **Token timing:** `graph.py` builds its LLMs at import, and on a first install that happens
+   while the pilot is still mid-login. So the JWT isn't baked in: an `httpx.Auth`
+   (`_PilotSessionAuth`) reads it from the login cache on every request
+   (`auth.discord_identity.cached_session_token`).
+3. **Expired token mid-session:** still to do. A 401 from the gateway should go to the same
+   re-login path the ledger client uses, not a raw `ResponseError`.
+4. `PREWARM_OLLAMA` is already a no-op for any provider but `ollama`, and so is
+   `anthropic_cache_mode()`.
+5. **`turn_metrics`:** done. `_answered_by` reads `alice_backend` and the model name, so
+   fallback calls are priced at OpenAI rates and frankencompute calls on electricity.
+
+## Verification results (2026-10-09)
+
+Same 3 cases × 5 samples throughout, gemma4 `dc35e8d9c606` on frankencompute:
+
+| Path | Passed | Tool / args / location / price | Claims supported | Median turn |
+|---|---|---|---|---|
+| Direct to box (`ollama-gemma4__20261009-094148`) | 36/45 | 45/45 each | 36/45 | 2.73 s |
+| Through local gateway (`alice-gateway__20261009-121904`) | 39/45 | 45/45 each | 39/45 | 3.05 s |
+
+The gateway adds ~0.3 s and changes no behavior (the 36 vs 39 is noise). 137 `llm_usage` rows,
+all frankencompute, 0 errors.
+
+**Fallback (box pointed at a dead port):** routing works. Calls answer via gpt-4o-mini tagged
+`openai`, with `fallback_reason=down`. But the eval **died on call 4: OpenAI 429, "Limit 5
+RPM"** on this project. **The fallback is unusable until the OpenAI account leaves the
+free/lowest tier**: 10 pilots × 2–3 calls per turn blows through 5 requests/minute instantly.
+Fix before launch: add credit to reach Tier 1 (much higher RPM), or make Anthropic the fallback.
+Then re-run this check to get the fallback model's actual scores.
 
 ## Other blockers for 10 users (not the gateway, but they gate the same goal)
 
