@@ -57,7 +57,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "app"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from cases import CASES, HarnessCase  # noqa: E402
-from judge import extract_claims, judge_response  # noqa: E402
+from judge import extract_claims, judge_identity, judge_response  # noqa: E402
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage  # noqa: E402
 
 from graph import (  # noqa: E402
@@ -537,8 +537,8 @@ async def main() -> int:
         # Everything that changes what a turn costs, so two reports' costs can be told
         # apart by config rather than guessed at. Judge too: it grades, it isn't billed here.
         "config": {
-            "judge_provider": os.getenv("HARNESS_JUDGE_PROVIDER", "openai"),
-            "judge_model": os.getenv("HARNESS_JUDGE_MODEL", "gpt-4o-mini"),
+            "judge_provider": judge_identity()[0],
+            "judge_model": judge_identity()[1],
             "history_turns": HISTORY_TURNS,
             "history_full_tool_result_turns": HISTORY_FULL_TOOL_RESULT_TURNS,
             "classify_history_turns": CLASSIFY_HISTORY_TURNS,
