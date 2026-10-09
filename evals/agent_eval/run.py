@@ -22,8 +22,10 @@ import os
 # noise. Set before any langchain import, same reasoning as start_trade_run_flow.py.
 os.environ.setdefault("LANGSMITH_TRACING", "false")
 
+import argparse
 import asyncio
 import csv
+import itertools
 import json
 import re
 import sys
@@ -58,10 +60,17 @@ from cases import CASES, HarnessCase  # noqa: E402
 from judge import extract_claims, judge_response  # noqa: E402
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage  # noqa: E402
 
-from graph import graph, prewarm  # noqa: E402
+from graph import (  # noqa: E402
+    CACHE_MODE,
+    CLASSIFY_HISTORY_TURNS,
+    HISTORY_FULL_TOOL_RESULT_TURNS,
+    HISTORY_TURNS,
+    graph,
+    prewarm,
+)
 from graph import tools as graph_tools  # noqa: E402
 from harness.fakes import install_fakes  # noqa: E402
-from turn_metrics import TurnTimingsCallback, compute_turn_metrics  # noqa: E402
+from turn_metrics import TurnMetricsCallback  # noqa: E402
 
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
 
@@ -71,12 +80,13 @@ RESULTS_DIR = Path(__file__).resolve().parent / "results"
 # dragging into Excel/Sheets to eyeball trends across many runs over time, which a
 # pairwise JSON diff isn't really the tool for.
 CSV_FIELDS = [
-    "model_provider", "model_name", "case_id", "phrasing",
-    "expected_on_topic", "actual_on_topic", "on_topic_correct",
+    "model_provider", "model_name", "case_id", "phrasing", "sample",
+    "timed_out", "expected_on_topic", "actual_on_topic", "on_topic_correct",
     "expected_tool", "actual_tool", "tool_correct",
     "expected_args", "actual_args", "args_correct",
     "location_correct", "price_correct", "unit_correct", "claims_supported", "response_correct", "overall_pass",
     "latency_ms", "tokens_in", "tokens_out", "tokens_total", "cost_usd",
+    "tokens_cache_read", "tokens_cache_write", "cache_hit_rate", "unpriced_calls", "cost_by_node",
     "classify_ms", "decline_ms", "respond_ms", "tool_ms",
     "recommended_terminal", "stated_price", "unsupported_claims",
     "final_response", "judge_reasoning",
@@ -107,6 +117,7 @@ def _write_csv(records: list[dict], path: Path) -> None:
             row["actual_args"] = json.dumps(row["actual_args"])
             row["respond_ms"] = "+".join(f"{ms:.0f}" for ms in row["respond_ms"])
             row["tool_ms"] = ", ".join(f"{name}={ms:.0f}" for name, ms in row["tool_ms"])
+            row["cost_by_node"] = json.dumps(row["cost_by_node"])
             writer.writerow(row)
 
 MODEL_NAME_ENV_VAR = {
@@ -183,27 +194,40 @@ def _args_match(expected: dict | None, actual: dict | None, tool_name: str, exac
     return all(got.get(key) == value for key, value in wanted.items())
 
 
-async def _run_one(case: HarnessCase, phrasing: str, model_provider: str, model_name: str) -> dict:
+async def _run_one(
+    case: HarnessCase, phrasing: str, model_provider: str, model_name: str, run_timeout_s: float,
+) -> dict:
     thread_id = str(uuid.uuid4())
     config = {"configurable": {"thread_id": thread_id}}
 
-    timings_callback = TurnTimingsCallback()
+    metrics_callback = TurnMetricsCallback()
     with install_fakes():
         start = time.monotonic()
-        result = await graph.ainvoke(
-            # A plain dict, not State(...) -- see voice/__init__.py's note on why a
-            # full pydantic instance would clobber checkpointed fields with defaults.
-            # Harmless here (a fresh thread_id every call means nothing to clobber),
-            # but this is the pattern everything should follow regardless.
-            {"messages": [HumanMessage(content=phrasing)]},
-            config={**config, "callbacks": [timings_callback]},
-        )
+        timed_out = False
+        try:
+            # A model call that never returns would otherwise freeze the whole suite
+            # (one did: 6 runs in 34 minutes). Bounded, it becomes one recorded failure.
+            result = await asyncio.wait_for(
+                graph.ainvoke(
+                    # A plain dict, not State(...) -- see voice/__init__.py's note on why a
+                    # full pydantic instance would clobber checkpointed fields with defaults.
+                    # Harmless here (a fresh thread_id every call means nothing to clobber),
+                    # but this is the pattern everything should follow regardless.
+                    {"messages": [HumanMessage(content=phrasing)]},
+                    config={**config, "callbacks": [metrics_callback]},
+                ),
+                timeout=run_timeout_s,
+            )
+        except TimeoutError:
+            timed_out = True
+            result = {"messages": [HumanMessage(content=phrasing)], "on_topic": None}
         latency_ms = (time.monotonic() - start) * 1000
-    timings = timings_callback.timings
+    timings = metrics_callback.timings
+    usage = metrics_callback.usage
 
     messages = result["messages"]
     actual_on_topic = result["on_topic"]
-    final_response = messages[-1].content
+    final_response = "(timed out)" if timed_out else messages[-1].content
 
     calls = _tool_calls(messages)
     actual_tool = calls[0]["name"] if calls else None
@@ -223,21 +247,38 @@ async def _run_one(case: HarnessCase, phrasing: str, model_provider: str, model_
         "actual_args": actual_args,
         "final_response": final_response,
         "judge_reasoning": None,
+        "timed_out": timed_out,
         # Every scored dimension exists on every record (None = not applicable), so
         # readers never have to guess whether a missing key means "skipped" or "bug".
         "tool_correct": None, "args_correct": None, "location_correct": None, "price_correct": None,
         "unit_correct": None, "claims_supported": None, "response_correct": None,
         "recommended_terminal": None, "stated_price": None, "unsupported_claims": None,
         "latency_ms": round(latency_ms, 1),
-        "tokens_in": None,
-        "tokens_out": None,
-        "tokens_total": None,
-        "cost_usd": None,
+        # Every turn's usage, whatever the outcome -- a wrongly-declined or misrouted turn
+        # still billed. tokens_in is the whole prompt (cached parts included), matching
+        # what older reports meant by it; the cache columns say how much of it was cached.
+        # The judge's own calls aren't in here: it runs outside graph.ainvoke, so outside
+        # metrics_callback -- eval overhead, not what a pilot's turn costs.
+        "tokens_in": usage.prompt_tokens,
+        "tokens_out": usage.output_tokens,
+        "tokens_total": usage.prompt_tokens + usage.output_tokens,
+        "tokens_cache_read": usage.cache_read_tokens,
+        "tokens_cache_write": usage.cache_write_tokens,
+        "cache_hit_rate": round(usage.cache_hit_rate, 3) if usage.cache_hit_rate is not None else None,
+        "cost_usd": round(usage.cost_usd, 6),
+        "cost_by_node": {node: round(cost, 6) for node, cost in usage.cost_by_node.items()},
+        "unpriced_calls": usage.unpriced_calls,
         "classify_ms": round(timings.classify_ms, 1) if timings.classify_ms is not None else None,
         "decline_ms": round(timings.decline_ms, 1) if timings.decline_ms is not None else None,
         "respond_ms": [round(ms, 1) for ms in timings.respond_ms],
         "tool_ms": [(name, round(ms, 1)) for name, ms in timings.tool_ms],
     }
+
+    if timed_out:
+        # Nothing to score -- every dimension stays None, and the row shows PASS = fail.
+        record["on_topic_correct"] = None
+        record["overall_pass"] = False
+        return record
 
     on_topic_correct = actual_on_topic == case.expected_on_topic
     record["on_topic_correct"] = on_topic_correct
@@ -248,12 +289,6 @@ async def _run_one(case: HarnessCase, phrasing: str, model_provider: str, model_
         record["response_correct"] = None
         record["overall_pass"] = False
         return record
-
-    metrics = compute_turn_metrics(messages, latency_ms, model_provider, model_name)
-    record["tokens_in"] = metrics.tokens_in
-    record["tokens_out"] = metrics.tokens_out
-    record["tokens_total"] = metrics.tokens_total
-    record["cost_usd"] = metrics.cost_usd
 
     if not case.expected_on_topic:
         # Declined correctly -- decline_topic's reply is deterministic, canned text
@@ -349,20 +384,26 @@ PHRASING_WIDTH = 46
 CELL_WIDTH = 9
 
 
-def _cell(value) -> str:
-    if value is None:
+def _cell(values: list) -> str:
+    """One table cell from every sample of a phrasing: all passed, all failed, not
+    applicable, or (samples disagree) k/N in yellow -- the flaky ones."""
+    scored = [value for value in values if value is not None]
+    if not scored:
         return _c("-".center(CELL_WIDTH), "2")
-    if value:
+    if all(scored):
         return _c("\u2713".center(CELL_WIDTH), "32")
-    return _c("\u2717".center(CELL_WIDTH), "1;31")
+    if not any(scored):
+        return _c("\u2717".center(CELL_WIDTH), "1;31")
+    return _c(f"{sum(scored)}/{len(scored)}".center(CELL_WIDTH), "33")
 
 
 def render_table(records: list[dict]) -> str:
-    """One row per phrasing run, grouped under its case, a column per scored dimension:
-    \u2713 passed, \u2717 failed, - not applicable (or not evaluated after a tool miss). The
-    bottom row is passed/total per column. "grounded" is the unsupported-claims check
-    (\u2713 = nothing the reply said went beyond the tool result). Columns nothing scored
-    (the free-text judge, today) are dropped."""
+    """One row per phrasing, grouped under its case, a column per scored dimension:
+    \u2713 passed, \u2717 failed, - not applicable (or not evaluated after a tool miss),
+    k/N when a phrasing was sampled more than once and the samples disagree. The bottom
+    row is passed/total per column over every sample. "grounded" is the unsupported-claims
+    check (\u2713 = nothing the reply said went beyond the tool result). Columns nothing
+    scored (the free-text judge, today) are dropped."""
     columns = [
         (key, label) for key, label in TABLE_COLUMNS
         if any(record.get(key) is not None for record in records)
@@ -371,15 +412,14 @@ def render_table(records: list[dict]) -> str:
     lines = [_c(header, "1")]
 
     current_case = None
-    for record in records:
-        if record["case_id"] != current_case:
-            current_case = record["case_id"]
-            lines.append(_c(current_case, "1;36"))
-        phrasing = record["phrasing"]
-        if len(phrasing) > PHRASING_WIDTH:
-            phrasing = phrasing[: PHRASING_WIDTH - 1] + "\u2026"
-        row = "  " + phrasing.ljust(PHRASING_WIDTH)
-        lines.append(row + "".join(_cell(record.get(key)) for key, _ in columns))
+    for (case_id, phrasing), group in itertools.groupby(records, key=lambda r: (r["case_id"], r["phrasing"])):
+        group = list(group)
+        if case_id != current_case:
+            current_case = case_id
+            lines.append(_c(case_id, "1;36"))
+        shown = phrasing if len(phrasing) <= PHRASING_WIDTH else phrasing[: PHRASING_WIDTH - 1] + "\u2026"
+        row = "  " + shown.ljust(PHRASING_WIDTH)
+        lines.append(row + "".join(_cell([record.get(key) for record in group]) for key, _ in columns))
 
     totals = "  " + _c("passed / total".ljust(PHRASING_WIDTH), "1")
     for key, _ in columns:
@@ -399,9 +439,16 @@ async def main() -> int:
     print(_c(f"Running agent_eval against {model_provider}:{model_name}\n", "1;36"))
     await prewarm()
 
-    # Optional case-id filter -- `run.py some_case other_case` -- for iterating on one
-    # case without paying for the whole suite.
-    wanted_ids = set(sys.argv[1:])
+    # `run.py [--samples N] [case_id ...]` -- case ids to run just those cases; --samples
+    # to run every phrasing N times. One sample per phrasing can't tell a flaky model from
+    # a broken tool (the same phrasing passes one run and fails the next).
+    parser = argparse.ArgumentParser()
+    parser.add_argument("case_ids", nargs="*")
+    parser.add_argument("--samples", type=int, default=1)
+    parser.add_argument("--timeout", type=float, default=180.0, help="seconds before one run is abandoned")
+    args = parser.parse_args()
+    samples = max(1, args.samples)
+    wanted_ids = set(args.case_ids)
     cases = [case for case in CASES if not wanted_ids or case.id in wanted_ids]
     unknown_ids = wanted_ids - {case.id for case in CASES}
     if unknown_ids:
@@ -410,19 +457,23 @@ async def main() -> int:
 
     records = []
     for case in cases:
-        for phrasing in case.phrasings:
-            record = await _run_one(case, phrasing, model_provider, model_name)
+        for phrasing, sample in itertools.product(case.phrasings, range(1, samples + 1)):
+            record = await _run_one(case, phrasing, model_provider, model_name, args.timeout)
+            record["sample"] = sample
             records.append(record)
             if record["overall_pass"]:
                 status = _c("PASS", "32")
             else:
                 status = _c("FAIL", "1;31")
-            print(f"[{status}] {case.id!r} — {phrasing!r}")
+            sample_note = f" (sample {sample}/{samples})" if samples > 1 else ""
+            print(f"[{status}] {case.id!r} — {phrasing!r}{sample_note}")
             if not record["overall_pass"]:
                 # Only print the field(s) that actually caused the fail -- a mismatch
                 # is often just one of these, and printing all three every time buried
                 # the one that mattered under two that already matched.
-                if not record["on_topic_correct"]:
+                if record["timed_out"]:
+                    print(f"       {_c('timeout', '1;31')}: no result within {args.timeout:.0f}s")
+                elif not record["on_topic_correct"]:
                     label = _c("on_topic", "1;31")
                     print(f"       {label}: expected={record['expected_on_topic']} actual={record['actual_on_topic']}")
                 if record["tool_correct"] is False:
@@ -455,6 +506,9 @@ async def main() -> int:
     passed = sum(1 for r in records if r["overall_pass"])
     total_cost = sum(r["cost_usd"] or 0 for r in records)
     total_tokens = sum(r["tokens_total"] or 0 for r in records)
+    total_prompt = sum(r["tokens_in"] or 0 for r in records)
+    total_cache_read = sum(r["tokens_cache_read"] or 0 for r in records)
+    total_unpriced = sum(r["unpriced_calls"] or 0 for r in records)
     avg_latency = sum(r["latency_ms"] for r in records) / total if total else 0
 
     dimension_scores = {}
@@ -472,7 +526,21 @@ async def main() -> int:
         "passed": passed,
         "pass_rate": round(passed / total, 3) if total else 0,
         "total_cost_usd": round(total_cost, 6),
+        "cost_per_turn_usd": round(total_cost / total, 6) if total else 0,
         "total_tokens": total_tokens,
+        "cache_hit_rate": round(total_cache_read / total_prompt, 3) if total_prompt else None,
+        "unpriced_calls": total_unpriced,
+        # Everything that changes what a turn costs, so two reports' costs can be told
+        # apart by config rather than guessed at. Judge too: it grades, it isn't billed here.
+        "config": {
+            "judge_provider": os.getenv("HARNESS_JUDGE_PROVIDER", "openai"),
+            "judge_model": os.getenv("HARNESS_JUDGE_MODEL", "gpt-4o-mini"),
+            "history_turns": HISTORY_TURNS,
+            "history_full_tool_result_turns": HISTORY_FULL_TOOL_RESULT_TURNS,
+            "classify_history_turns": CLASSIFY_HISTORY_TURNS,
+            "anthropic_cache_mode": CACHE_MODE,
+            "anthropic_cache_ttl": os.getenv("ANTHROPIC_CACHE_TTL", "5m"),
+        },
         "avg_latency_ms": round(avg_latency, 1),
     }
 
@@ -483,7 +551,11 @@ async def main() -> int:
     pass_rate_color = "32" if passed == total else ("1;31" if passed == 0 else "33")
     pass_line = f"{passed}/{total} passed ({summary['pass_rate']:.0%})"
     print(f"  {_c(pass_line, pass_rate_color)}")
-    print(f"  total cost: ${summary['total_cost_usd']}")
+    print(f"  total cost: ${summary['total_cost_usd']}  (${summary['cost_per_turn_usd']}/turn)")
+    if summary["cache_hit_rate"] is not None:
+        print(f"  cache hit rate: {summary['cache_hit_rate']:.0%}")
+    if total_unpriced:
+        print(_c(f"  {total_unpriced} LLM call(s) had no MODEL_PRICING entry -- total cost is an undercount", "1;31"))
     print(f"  total tokens: {summary['total_tokens']}")
     print(f"  avg latency: {summary['avg_latency_ms']} ms")
 

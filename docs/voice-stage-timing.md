@@ -1,6 +1,6 @@
 # Voice stage timing — measuring where a turn's time goes
 
-**Status:** built (2026-10-01) — `app/turn_metrics.py`'s `TurnTimingsCallback`, wired into
+**Status:** built (2026-10-01) — `app/turn_metrics.py`'s `TurnTimingsCallback` (renamed `TurnMetricsCallback` 2026-10-06, when it also took over per-call token/cost capture -- see `tests/test_turn_usage.py`; log is now `turn_metrics.jsonl`, path override `ALICE_METRICS_LOG_PATH`), wired into
 both `voice/__init__.py` and `evals/agent_eval/run.py`, 11 new tests, full suite passing.
 Confirmed live against the real graph (not just mocked): `metadata["langgraph_node"]` is
 genuinely how LangGraph tags each node's LLM calls (verified directly before writing the

@@ -1,12 +1,12 @@
 """Covers the new per-stage timing pieces in turn_metrics.py (docs/voice-stage-timing.md):
-TurnTimingsCallback bucketing LangChain start/end events into classify_ms/respond_ms/
+TurnMetricsCallback bucketing LangChain start/end events into classify_ms/respond_ms/
 decline_ms/tool_ms by metadata["langgraph_node"] (the mechanism LangGraph itself attaches,
 confirmed empirically against the real graph before writing this), and TurnTimings'
-JSON round-trip. TurnMetrics/compute_turn_metrics are covered separately in
-tests/test_ledger_client.py's neighbours -- not duplicated here."""
+JSON round-trip. Usage/cost capture (the same callback's other half) is covered in
+tests/test_turn_usage.py."""
 import uuid
 
-from turn_metrics import TurnTimings, TurnTimingsCallback
+from turn_metrics import TurnMetricsCallback, TurnTimings
 
 
 def _run_id() -> uuid.UUID:
@@ -14,7 +14,7 @@ def _run_id() -> uuid.UUID:
 
 
 async def test_classify_node_llm_call_recorded_as_classify_ms():
-    callback = TurnTimingsCallback()
+    callback = TurnMetricsCallback()
     run_id = _run_id()
 
     await callback.on_chat_model_start({}, [], run_id=run_id, metadata={"langgraph_node": "classify_topic"})
@@ -27,7 +27,7 @@ async def test_classify_node_llm_call_recorded_as_classify_ms():
 
 
 async def test_decline_node_llm_call_recorded_as_decline_ms():
-    callback = TurnTimingsCallback()
+    callback = TurnMetricsCallback()
     run_id = _run_id()
 
     await callback.on_chat_model_start({}, [], run_id=run_id, metadata={"langgraph_node": "decline"})
@@ -40,7 +40,7 @@ async def test_decline_node_llm_call_recorded_as_decline_ms():
 async def test_respond_node_calls_accumulate_in_order():
     # A turn can round-trip respond <-> tools more than once -- each gets its own run_id
     # and must land as its own entry, not overwrite the previous one.
-    callback = TurnTimingsCallback()
+    callback = TurnMetricsCallback()
     first_id, second_id = _run_id(), _run_id()
 
     await callback.on_chat_model_start({}, [], run_id=first_id, metadata={"langgraph_node": "respond"})
@@ -54,7 +54,7 @@ async def test_respond_node_calls_accumulate_in_order():
 async def test_llm_call_with_no_langgraph_node_is_ignored():
     # No metadata at all (e.g. a non-LangGraph call using the same callback by mistake)
     # must not crash and must not land in any bucket.
-    callback = TurnTimingsCallback()
+    callback = TurnMetricsCallback()
     run_id = _run_id()
 
     await callback.on_chat_model_start({}, [], run_id=run_id)
@@ -66,7 +66,7 @@ async def test_llm_call_with_no_langgraph_node_is_ignored():
 
 
 async def test_llm_error_clears_pending_state_without_recording():
-    callback = TurnTimingsCallback()
+    callback = TurnMetricsCallback()
     run_id = _run_id()
 
     await callback.on_chat_model_start({}, [], run_id=run_id, metadata={"langgraph_node": "respond"})
@@ -81,7 +81,7 @@ async def test_llm_end_for_unknown_run_id_is_a_noop():
     # on_llm_end firing for a run_id this handler never saw on_chat_model_start for
     # (shouldn't happen, but must not crash) -- defensive, matches the None-check in
     # the implementation.
-    callback = TurnTimingsCallback()
+    callback = TurnMetricsCallback()
 
     await callback.on_llm_end(None, run_id=_run_id())
 
@@ -89,7 +89,7 @@ async def test_llm_end_for_unknown_run_id_is_a_noop():
 
 
 async def test_tool_call_recorded_with_its_name():
-    callback = TurnTimingsCallback()
+    callback = TurnMetricsCallback()
     run_id = _run_id()
 
     await callback.on_tool_start({"name": "commodity_price_lookup"}, "{}", run_id=run_id)
@@ -102,7 +102,7 @@ async def test_tool_call_recorded_with_its_name():
 
 
 async def test_multiple_tool_calls_each_recorded_separately():
-    callback = TurnTimingsCallback()
+    callback = TurnMetricsCallback()
     first_id, second_id = _run_id(), _run_id()
 
     await callback.on_tool_start({"name": "commodity_price_lookup"}, "{}", run_id=first_id)
@@ -115,7 +115,7 @@ async def test_multiple_tool_calls_each_recorded_separately():
 
 
 async def test_tool_error_clears_pending_state_without_recording():
-    callback = TurnTimingsCallback()
+    callback = TurnMetricsCallback()
     run_id = _run_id()
 
     await callback.on_tool_start({"name": "best_route"}, "{}", run_id=run_id)

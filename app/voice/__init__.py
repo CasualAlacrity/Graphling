@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 
 from auth.discord_identity import get_pilot_session
-from turn_metrics import TurnTimingsCallback, log_turn_timings
+from turn_metrics import TurnMetricsCallback, log_turn_metrics
 from voice.audio_output import play_audio
 from voice.tts import synthesize
 from voice.voice_input import listen_once, load_whisper
@@ -79,7 +79,7 @@ async def run() -> None:
 
         print(f"[ALICE] You: {text!r}")
 
-        timings_callback = TurnTimingsCallback()
+        metrics_callback = TurnMetricsCallback()
         # A plain dict, not a full State(...) object -- a pydantic instance's
         # model_dump() materializes every field's default (on_topic, reason,
         # pending_confirmation), which would overwrite the checkpointed values from
@@ -87,8 +87,8 @@ async def run() -> None:
         # updates the key actually given, leaving everything else to the checkpoint.
         state_input = {"messages": [HumanMessage(content=text)]}
         graph_start = time.monotonic()
-        result = await graph.ainvoke(state_input, config={**config, "callbacks": [timings_callback]})
-        timings = timings_callback.timings
+        result = await graph.ainvoke(state_input, config={**config, "callbacks": [metrics_callback]})
+        timings = metrics_callback.timings
         timings.whisper_ms = whisper_ms
         timings.graph_ms = (time.monotonic() - graph_start) * 1000
         response_text = result["messages"][-1].content
@@ -103,7 +103,7 @@ async def run() -> None:
         # round_trip_ms stops here, at play_audio starting -- it blocks until playback
         # finishes (voice/audio_output.py), which is not part of this metric.
         timings.round_trip_ms = (time.monotonic() - round_trip_start) * 1000
-        log_turn_timings(timings)
+        log_turn_metrics(timings, metrics_callback.usage, thread_id)
 
         play_audio(audio)
 
