@@ -1,0 +1,362 @@
+# LLM gateway — self-hosted models behind the ledger server
+
+**Status:** spec, not built (2026-10-09).
+**Goal:** the client ships as a whole product. 10 new pilots using ALICE within 2 weeks (by
+~2026-10-23), with nobody added by hand. Discord login is the only onboarding step.
+
+**Later, not v1: beta access gating.** Discord can also decide *who* may use ALICE, e.g. require
+membership of a specific Discord server or a "beta" role. It's checked once in the OAuth callback
+(`server/routes/auth.py`), which would need the `guilds.members.read` scope. No JWT or client
+change is needed: an unauthorized user just doesn't get a token.
+
+**Growth model:** grow users slowly and watch cost per active user across every paid or
+self-hosted service: frankencompute (electricity, already estimated in `turn_metrics`), hosted LLM
+fallback, ElevenLabs, and Jev if `classify_topic` moves to it. **ElevenLabs is the expected
+bottleneck.** The point of metering is to find *how many active users* it takes before it hurts,
+not to cap it early. So every server-side metered row records `user_id` + units + cost, and a
+single query answers "cost per active user per day, by service".
+
+## Why
+
+Today every pilot's ALICE calls an LLM directly from their own machine (`get_chat_llm()` in
+`app/llm.py`). That means each pilot either runs Ollama locally or holds a hosted API key. Neither
+works for paying users. **frankencompute** (Threadripper 1900X, 64 GB, RTX 4080 16 GB, Ubuntu
+Server, built 2026-10-08) can serve gemma4 at about **2.7–3.4 s median per turn**, versus 15.3 s on the
+Mac (eval runs `evals/agent_eval/results/ollama-gemma4__20261009-09*.json` vs `…20261006-092416.json`).
+Caveat: those aren't the same weights. The box pulled a fresh `gemma4:latest` (dc35e8d9c606,
+6.6 GB), while the Mac's is a 3-month-old build (c6eb396dbd59, 9.6 GB). So part of the speedup may
+be the model, not the hardware. Either way it must not be reachable by users directly.
+
+Same move as Phase 2 made for Postgres: **users talk only to the server, and the server talks to
+everything else.** The ledger server already authenticates every request with Discord OAuth + JWT
+(`server/dependencies.get_current_user`). The gateway is one more router behind that same
+dependency.
+
+```
+ALICE client ── HTTPS + JWT ──▶ api.heyalice.help (Hetzner, nginx → server container)
+                                   │  /llm/v1/chat/completions
+                                   │  auth · rate limit · usage log · routing
+                    ┌──────────────┴───────────────┐
+                    ▼ primary                       ▼ fallback
+          frankencompute Ollama               OpenAI (gpt-4o-mini)
+          (private link, never public)        (key lives only on the server)
+```
+
+The agent itself does not move. LangGraph, tools, voice and overlay all stay client-side, as
+CLAUDE.md says. The server only relays model calls; it doesn't run the graph.
+
+## Decisions
+
+| # | Decision | Recommendation | Why |
+|---|---|---|---|
+| 1 | Wire format | **OpenAI-compatible** `/llm/v1/chat/completions` | Ollama serves this format natively, and OpenAI *is* this format, so both backends are a pass-through with no translation layer. The client uses stock `ChatOpenAI(base_url=...)`. |
+| 2 | Who picks the model | **The server.** The client sends a *role* (`alice-chat`, `alice-classify`), never a real model name | Lets you swap models, flip reasoning, or change fallback without shipping a client update to 10 people. Also stops a client from asking for an expensive model. |
+| 3 | Fallback provider for v1 | **OpenAI only.** Anthropic is v2 | OpenAI is the same format, so fallback is about 10 lines. Anthropic needs request/response translation, and the existing `cache_control` breakpoints (`anthropic_cache_mode`) wouldn't survive an OpenAI-format hop. |
+| 4 | Box ↔ Hetzner link | **Tailscale on exactly two machines** (Hetzner + frankencompute) | See below. Users never touch it; it's machine-to-machine infra you set up once. |
+| 5 | Streaming | **Not in v1** | ALICE doesn't stream LLM output today (no `astream` in `graph.py` / `voice/`), and non-streaming makes fallback clean: nothing has reached the client, so the gateway can retry elsewhere. |
+| 6 | Reasoning flag | **Server-side, per role** (chat: on, classify: off) | Matches today's `OLLAMA_REASONING` / `OLLAMA_CLASSIFICATION_REASONING` defaults, moved to where the model choice now lives. |
+
+### Why Tailscale here after all
+
+The earlier idea was a reverse SSH tunnel from frankencompute to Hetzner. The catch is that the
+server runs in Docker. A reverse tunnel binds to the Hetzner host's loopback, which the container
+can't reach without `GatewayPorts` plus `host-gateway` plumbing. With Tailscale on both hosts, the
+container reaches frankencompute's Tailscale IP through the host's normal routing. The objection to
+Tailscale was having to add each *user* to it, and that doesn't apply: it's two machines you own,
+added once. Tailscale ACLs can limit it further, to Hetzner → frankencompute:11434 only.
+
+## Server
+
+### Endpoint
+
+`POST /llm/v1/chat/completions`, behind `Depends(get_current_user)`. New router
+`server/routes/llm.py` and service `server/llm_gateway_service.py`, same split as ledger.
+
+Request: standard OpenAI chat-completions body (`model`, `messages`, `tools`, `tool_choice`,
+`temperature`…). `model` must be one of the role names, or the request gets a 400.
+
+Response: the backend's response, passed through, except that **`model` is rewritten to the
+real model that answered** (e.g. `gemma4`, `gpt-4o-mini`). Also add a response header
+`X-Alice-Backend: frankencompute|openai`. This keeps the client's `turn_metrics` honest: it
+prices calls by model name (`MODEL_PRICING`), and a role name would show up as unpriced.
+
+### Role table (server config, not client)
+
+```python
+ROLES = {
+    "alice-chat":     [Backend("frankencompute", "gemma4", reasoning=True),
+                       Backend("openai", settings.fallback_chat_model)],
+    "alice-classify": [Backend("frankencompute", "gemma4", reasoning=False),
+                       Backend("openai", settings.fallback_classify_model)],
+}
+```
+
+**Pin the exact model build, not just the tag.** On 2026-10-09 `gemma4:latest` meant three
+different builds across three eval runs (Mac old 9.6 GB, Mac new nvfp4 safetensors, box GGUF
+Q4_K_M), and they scored 39/45, 29/45 and 36/45 on the same cases. The new Mac build printed raw
+tool-call text instead of making calls. So the role table names a model *and* the digest it was
+evaluated at (`gemma4@dc35e8d9c606` on frankencompute today), and the gateway's startup health
+check refuses to route to frankencompute if `/api/tags` reports a different digest. Never
+`ollama pull` on the box without re-running the eval first.
+
+Tried in order. Verify how Ollama's OpenAI-compatible endpoint exposes thinking
+(`reasoning_effort` / `think`) on 0.40.2 before relying on it. If it's awkward, call Ollama's
+native `/api/chat` for that backend instead. That's still server-side only, so the client never
+knows.
+
+### Fallback rules
+
+Fall back to the next backend **only when frankencompute can't answer**, never because the answer
+looks bad:
+
+- connect error / connection refused / DNS failure;
+- connect timeout (**2 s**) or total timeout (**30 s**, since eval p90 is 5.1 s and max 15.4 s);
+- HTTP 5xx from Ollama;
+- **overflow**: frankencompute already has `MAX_INFLIGHT` requests running (see Capacity).
+
+A 4xx from a backend (bad request) is returned to the client as-is, not retried. Retrying would
+just double the cost of a bug.
+
+**Circuit breaker:** after a connect failure, mark frankencompute *down* for 30 s and send
+everything straight to fallback. That way every turn doesn't pay the 2 s timeout while the box is
+off. A background task probes `GET /api/version` every 15 s and marks it *up* again. In-memory
+state is fine: one server process, the same assumption `_PENDING_LOGINS` already makes.
+
+### Usage log
+
+New table `llm_usage` (Alembic migration):
+
+| column | notes |
+|---|---|
+| `id`, `created_at` | |
+| `user_id` | FK users |
+| `role`, `backend`, `model` | what was asked for vs. what answered |
+| `prompt_tokens`, `completion_tokens` | from the backend's `usage` |
+| `latency_ms` | gateway-measured |
+| `status` | `ok` / `error` |
+| `fallback_reason` | null, or `down` / `timeout` / `5xx` / `overflow` |
+
+This table is the seed of the subscription story: cost per user, who's active, and how often
+fallback (real money) fires. It's the server-side counterpart to the turn-metrics → Grafana idea.
+
+### Limits (cheap insurance for 10 users)
+
+- **Per-user rate limit:** 30 requests/min, in-memory. A normal turn is 2–3 calls.
+- **Global daily fallback-spend cap:** `FALLBACK_DAILY_USD_CAP`, default $5. Computed from
+  `llm_usage` × the same `MODEL_PRICING` rates. Past the cap, fallback returns 503 with a clear
+  message instead of silently billing. At about 21.6k tokens/turn, a gpt-4o-mini turn is roughly
+  $0.003, so $5 is about 1,500 fallback turns. The cap is a runaway guard, not a budget.
+- **Body size cap:** 512 KB. History is already windowed client-side (`HISTORY_TURNS`).
+
+### Config (new `Settings` fields + `docker-compose.prod.yml` env)
+
+`frankencompute_url` (e.g. `http://100.x.y.z:11434`), `openai_api_key`,
+`fallback_chat_model` (`gpt-4o-mini`), `fallback_classify_model` (`gpt-4o-mini`),
+`llm_max_inflight` (2), `fallback_daily_usd_cap` (5.0).
+
+## frankencompute
+
+Already done 2026-10-09: `OLLAMA_KEEP_ALIVE=-1`, `OLLAMA_CONTEXT_LENGTH=32768` (systemd override),
+GPU moved to the x16 slot (PCI_E1).
+
+Still to do:
+
+1. Install Tailscale on frankencompute and the Hetzner host. Add an ACL so only Hetzner can reach
+   frankencompute:11434.
+2. Make Ollama listen beyond loopback: `OLLAMA_HOST=0.0.0.0:11434` in the override. Firewall it
+   to the tailnet only: `ufw allow in on tailscale0 to any port 11434`, with the default deny
+   for everything else. (Binding straight to the Tailscale IP breaks if Ollama starts before
+   tailscaled does.)
+3. From **inside the server container** on Hetzner, `curl http://<franken-tailscale-ip>:11434/api/version`.
+   This proves the Docker → host → tailnet path before any gateway code depends on it.
+4. Capacity: set `OLLAMA_NUM_PARALLEL=2`. Each parallel slot gets its own 32k KV cache, so confirm
+   `ollama ps` still shows 100% GPU. If it doesn't, drop the context length before dropping
+   parallelism.
+5. Power settings: the box must not suspend. Enable BIOS "restore on AC power loss" so a power
+   blip brings it back without you.
+
+### Capacity sanity check
+
+10 pilots won't all be online together. Say 5 at peak, each taking a turn every ~1 min, at
+~3.5 s of GPU time per turn: the GPU is busy about 30% of the time at peak. Two parallel slots
+absorb most collisions. `MAX_INFLIGHT=2` sends the rare third concurrent request to fallback
+instead of making a pilot wait in a queue. Revisit when `llm_usage` shows `overflow` regularly.
+
+## Client
+
+1. **`app/llm.py`:** new provider `LLM_PROVIDER=alice` (becomes the default for shipped
+   builds). Both getters return
+   `ChatOpenAI(base_url=f"{api_url()}/llm/v1", api_key=<session JWT>, model="alice-chat" | "alice-classify")`.
+   The existing `ollama` / `openai` / `anthropic` providers stay for development and evals.
+2. **Token timing:** `graph.py` builds its LLM at import time (`llm = get_chat_llm().bind_tools(tools)`).
+   The JWT therefore has to exist before that import. Either make sure the entry point runs
+   `get_pilot_session()` first, or have the `alice` provider read the cached session
+   synchronously (`_load_cached_session()`). Check the entry-point order in `app/voice/__init__.py`
+   before picking one.
+3. **Expired token mid-session:** JWTs last 7 days. A 401 from the gateway should surface the
+   same re-login path the ledger client uses, not a raw stack trace.
+4. `PREWARM_OLLAMA` and `anthropic_cache_mode()` both become no-ops under `alice`. The box is
+   always warm (`KEEP_ALIVE=-1`), and caching is the gateway's problem now.
+5. **`turn_metrics`:** read the real `model` from the response (see the Endpoint section) and add
+   provider `alice` handling, so fallback calls get priced and frankencompute calls get the
+   electricity estimate.
+
+## Other blockers for 10 users (not the gateway, but they gate the same goal)
+
+The gateway removes the LLM key, but a fresh pilot's `.env` still needs these. Each one is
+something a new user can't supply:
+
+**Decided 2026-10-09: every third-party key moves to Hetzner.** After this, a shipped client
+holds only `ALICE_API_URL` and the pilot's JWT.
+
+### TTS proxy (ElevenLabs)
+
+- `POST /tts` with `{"text": ...}`, behind `get_current_user`. The server holds
+  `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID`, calls `text_to_speech.convert(...)`
+  (same `eleven_turbo_v2_5` / `mp3_44100_128` as `voice/tts.py` today), and **relays the chunks
+  as they arrive** via a FastAPI `StreamingResponse`. Nothing is buffered server-side, so the
+  first audio byte reaches the client one hop after ElevenLabs sends it.
+- nginx must not buffer the stream. Add `proxy_buffering off;` to the `api.heyalice.help`
+  location (docs/deploy.md step 2), or the first-chunk win disappears.
+- Client: `voice/tts.synthesize()` becomes an `httpx` stream against `/tts` with the JWT. Keep
+  measuring `tts_first_chunk_ms` on the client, since it now includes the Hetzner hop, which is
+  exactly what's worth watching (docs/voice-stage-timing.md).
+- Meter characters per user into a `tts_usage` row (or reuse `llm_usage` with `role="tts"`).
+  ElevenLabs bills per character and is likely the biggest per-turn cost once the LLM is on
+  frankencompute. Only add a **runaway guard** (a per-user daily cap well above any real
+  session, same 429 shape as the LLM limits), not a usage limit. The goal is to *observe* where
+  ElevenLabs starts to hurt.
+- STT stays local (Whisper `base` on the pilot's machine, `voice/voice_input.py`). It needs no
+  key, adds no server load, and keeps raw audio off the server.
+
+### UEX: all calls server-side
+
+Reference data and the overlay's price lookups already go through the server
+(`uex_cache_client`). But the agent's own tool calls still hit UEX **directly from the client**
+through `UEXCorpClient` (`tools/uexcorp/client.py`), with the client's own token:
+
+| Client method | Server route today? |
+|---|---|
+| `get_commodity_routes` | yes, overlay uses `uex_cache_client.get_commodity_route_rows` |
+| `get_commodity_prices` / `get_terminal_prices` | yes, `/uex-cache/commodity-prices`, `/terminal-prices` |
+| `get_item_prices` | **no, new route** |
+| `get_vehicle_purchase_prices` / `get_vehicle_rental_prices` | **no, new routes** |
+| `get_orbit_distances` | **no, new route** (static data, long TTL like reference) |
+
+Work: add the four missing routes to `server/routes/uex_cache.py` + `uex_cache_service.py`, then
+point every `UEXCorpClient` method at the server, so the methods keep their signatures and the
+tools don't change. Remove `UEXCORP_*` from the client `.env-template`.
+
+**Shared UEX rate limit: accepted (2026-10-09).** Caching keeps volume low, and Jeff has a
+direct line to UEX if limits become a problem.
+
+### Cache lifetimes by how often the data actually changes
+
+UEX's own cache times come from each endpoint's `Cache-Control: max-age` header, read live on
+2026-10-09. The docs site doesn't list them.
+
+| Data | Cached where today | Our TTL today | UEX max-age | Changes when | **Target** |
+|---|---|---|---|---|---|
+| Reference bundle: star systems, orbits, moons, POI, item categories, items, commodity statuses | server Postgres + client memory | 24 h | 24 h | patches | **7 d + version refresh** |
+| Refinery yields (bonus %) | (in the bundle today) | 24 h | 24 h | patches, then community re-reports for ~2 weeks after | **split out: 24 h (= UEX)** |
+| ↳ terminals, vehicles | (same bundle) | 24 h | 12 h | patches; occasional UEX community fixes | (same bundle) |
+| ↳ commodities (ids, flags) | (same bundle) | 24 h | 1 h | patches (our cached fields are definitions only, no prices) | (same bundle) |
+| Wiki: ship speeds, locations | server Postgres | 24 h | — | patches, wiki edits | **7 d + version refresh** |
+| Orbit distances | **client memory, no TTL** | until restart | 24 h | never within a patch | **server, patch lifetime** |
+| Item prices | none (live per call) | — | 24 h | game versions only (Jeff, 2026-10-09) | **7 d + version refresh** |
+| Vehicle purchase / rental prices | none (live per call) | — | 12 h | game versions only (Jeff, 2026-10-09) | **7 d + version refresh** |
+| Commodity prices (by commodity / by terminal) | server Postgres | 30 min | 30 min | player reports, any second | **30 min (= UEX)** |
+| Commodity routes (by commodity / by origin) | server Postgres | 30 min | 30 min | player reports | **30 min (= UEX)** |
+
+**Rule of thumb (2026-10-09):** only commodity prices and routes shift regularly (player-driven
+economy). Everything else changes with game versions, so it gets 7 days plus the version refresh.
+The one exception is refinery yields at 24 h, because of the post-patch reporting wave (below).
+
+Why the targets differ from "same as UEX":
+
+- **Static data: longer than UEX, plus a version trigger.** UEX's 12–24 h are generic hints,
+  not how often terminals actually change. Going longer saves the shared rate limit (the
+  reference bundle alone is ~10 calls plus one per item category). 7 days, not months, because
+  UEX's data is community-corrected: a wrongly flagged terminal (`is_nqa`, `is_auto_load`) fixed
+  upstream should reach pilots within a week. `refresh_static_caches.py` stays for patch day.
+- **Prices: UEX's 30 min is effectively a floor.** UEX itself asks clients to cache 30 min, so
+  polling faster mostly gets the same answer back while spending the shared rate limit. Fresher
+  than that can only come from the crowd-sourced OCR pool, where local reports override cached
+  UEX rows by recency.
+- **Commodity price lookups move from live to the 30-min cache.** Today `commodity_price_lookup`
+  calls UEX live from the client. Behind the server it reads the shared cache, which is in
+  practice as fresh as UEX's own 30-min caching allows.
+
+**Refinery yields are split out of the bundle.** UEX's 215 yield rows (checked 2026-10-09) were
+all last modified between 2026-08-29 and 2026-09-12, in a ~2-week wave after the patch, with
+nothing since. So they don't change continuously, but after a patch they keep trickling in for
+weeks as pilots report them, and a 7-day TTL would lag that wave. It's one endpoint, so a 24 h
+TTL costs one UEX call a day. If yields turn out to change mid-patch in game (Jeff's read), 24 h
+still catches it within a day.
+
+**Game-version refresh (new).** `GET /2.0/game_versions` returns `{"live": "4.10.1", "ptu": "4.10.2"}`.
+A server background job polls it hourly. When `live` changes, it runs the same refresh as
+`refresh_static_caches.py` and clears the item and vehicle purchase/rental price rows. Caveat: that endpoint also sends
+`max-age=86400`. If UEX caches it server-side for that long, detection can lag a patch by up to a
+day, so keep the manual script for patch day.
+
+**Client copy of the reference bundle.** The client holds the bundle in memory with its own
+24 h check (`UEXCorpClient._is_fresh`). Once the server's TTL is a week, the client's copy should
+follow the server's version, not the clock: the server returns the bundle's `fetched_at` with a
+cheap `/uex-cache/reference/version` call, and the client re-downloads only when it changed.
+Otherwise a patch refresh on the server takes up to 24 h to reach a running client.
+
+**Stale comment to fix:** `tools/uexcorp/price_cache.py` says the price cache "only ever answers
+'does this terminal/commodity pairing exist at all'". That's no longer true: `best_route` ranks
+on cached route rows and the overlay's volatility icon reads cached prices. The 30-min TTL is
+still right; the comment isn't.
+
+### Remaining client keys
+
+| Key | Plan |
+|---|---|
+| `LANGSMITH_*` | Off for users (`LANGSMITH_TRACING=false`). `llm_usage` covers what you need. |
+
+Packaging the client so a non-developer can install it is out of scope here, but it's the other
+big gate on "10 users" and needs its own plan.
+
+Privacy: pilots' conversations will now pass through your server and frankencompute. Say so in
+plain words at onboarding. Log usage metadata, never message content, unless a pilot opts in to
+debug logging.
+
+## Verification (definition of done)
+
+1. **Same behavior through the gateway:** `evals/agent_eval/run.py` with `LLM_PROVIDER=alice`
+   against a local server pointed at frankencompute. Pass rate within noise of the direct-Ollama
+   run, and median latency ≤ direct + ~300 ms.
+2. **Fallback model is acceptable:** the same eval with frankencompute forced down
+   (`frankencompute_url` pointed at a dead port). This is the first eval of gpt-4o-mini on the
+   current case set. If it's clearly worse, choose a better fallback model before launch, not
+   after.
+3. **Pull the plug live:** stop Ollama mid-session, take a turn (should succeed via fallback
+   within ~2 s of extra latency), restart it, and see traffic return within ~15 s.
+4. **Auth:** no token → 401, expired token → 401, unknown role → 400.
+5. **Limits:** rate-limit and spend-cap paths return their 429/503 with readable messages.
+6. Unit tests for the routing and fallback decision (pure function: backend state + error → next
+   action) and for the usage-row writer. No live models in pytest, same rule as the evals.
+
+## Two-week plan
+
+| Days | Work |
+|---|---|
+| 1–2 | Tailscale + Ollama binding + container curl (frankencompute steps 1–3). Gateway endpoint with frankencompute only, auth, usage table. |
+| 3–4 | Fallback + circuit breaker + limits. Client `alice` provider + token timing + metrics. |
+| 5 | Verification 1–5. Deploy to Hetzner. |
+| 6–7 | TTS streaming proxy + nginx `proxy_buffering off`. Four missing UEX routes, `UEXCorpClient` repointed, `UEXCORP_*` gone from the client. |
+| 8–10 | First 3 pilots from the org. Watch `llm_usage`, fix what breaks. |
+| 11–14 | Remaining 7 pilots. |
+
+## Open questions
+
+1. Fallback model: gpt-4o-mini (cheap, unevaluated on this case set) or something stronger?
+   Decide after verification step 2.
+2. Should a pilot ever see that they're on fallback? (Information-not-decisions suggests a small
+   overlay indicator, not a spoken line.)
+3. UEX: one server token now makes calls for every pilot. Worth a heads-up to your UEX contact
+   about expected volume and rate limits.
+4. Anthropic as a second fallback (v2): worth the translation layer, or is OpenAI enough?
