@@ -1,11 +1,49 @@
 import os
 
+import httpx
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 
 load_dotenv()
+
+# LLM_PROVIDER=alice: model calls go through ALICE's own server (server/routes/llm.py,
+# docs/llm-gateway.md), which picks the real model and holds every provider key. The
+# client asks for a ROLE, never a model -- the server can swap models, thinking, and
+# fallback without a client release.
+ALICE_CHAT_ROLE = "alice-chat"
+ALICE_CLASSIFY_ROLE = "alice-classify"
+
+
+class _PilotSessionAuth(httpx.Auth):
+    """Attaches the pilot's JWT per request, read from the login cache at send time.
+    It can't be baked in when the LLM is built: graph.py builds its LLMs at import,
+    and on a first install that happens while the pilot is still mid-login
+    (voice.run gathers get_pilot_session alongside everything else)."""
+
+    def auth_flow(self, request):
+        # Imported here, not at module level -- auth.discord_identity has no reason to
+        # load for the ollama/openai/anthropic providers.
+        from auth.discord_identity import cached_session_token
+
+        token = cached_session_token()
+        if token is not None:
+            request.headers["Authorization"] = f"Bearer {token}"
+        yield request
+
+
+def _alice_llm(role: str, reasoning: bool) -> ChatOllama:
+    """ChatOllama pointed at the gateway, which speaks Ollama's native /api/chat -- the
+    same protocol the evals ran against, so the frankencompute path is unchanged.
+
+    The gateway decides whether the model actually thinks (per role). `reasoning` here
+    only mirrors that so ChatOllama keeps the thinking in each AIMessage and sends it
+    back in later history -- the same message shape the evals ran with."""
+    api_url = os.getenv("ALICE_API_URL", "http://localhost:8000").rstrip("/")
+    return ChatOllama(
+        model=role, reasoning=reasoning, base_url=f"{api_url}/llm", client_kwargs={"auth": _PilotSessionAuth()},
+    )
 
 
 def get_chat_llm():
@@ -15,7 +53,9 @@ def get_chat_llm():
     back off."""
     provider = os.getenv("LLM_PROVIDER", "ollama")
 
-    if provider == "ollama":
+    if provider == "alice":
+        return _alice_llm(ALICE_CHAT_ROLE, reasoning=True)
+    elif provider == "ollama":
         reasoning = os.getenv("OLLAMA_REASONING", "true").strip().lower() != "false"
         return ChatOllama(model=os.getenv("OLLAMA_CHAT_MODEL"), reasoning=reasoning)
     elif provider == "openai":
@@ -36,7 +76,9 @@ def get_classification_llm():
     future classification model actually needs it turned on."""
     provider = os.getenv("LLM_PROVIDER", "ollama")
 
-    if provider == "ollama":
+    if provider == "alice":
+        return _alice_llm(ALICE_CLASSIFY_ROLE, reasoning=False)
+    elif provider == "ollama":
         model = os.getenv("OLLAMA_CLASSIFICATION_MODEL") or os.getenv("OLLAMA_CHAT_MODEL")
         reasoning = os.getenv("OLLAMA_CLASSIFICATION_REASONING", "false").strip().lower() == "true"
         return ChatOllama(model=model, reasoning=reasoning)

@@ -25,38 +25,7 @@ from pathlib import Path
 from langchain_core.callbacks import AsyncCallbackHandler
 from pydantic import BaseModel, Field, computed_field
 
-
-class ModelRates(BaseModel):
-    """$ per 1M tokens. Cached-input rates are separate because both hosted providers
-    bill them differently from plain input: Anthropic reads at 0.1x and writes at 1.25x
-    (5-minute TTL) or 2x (1-hour); OpenAI reads at 0.5x with no write premium, so its
-    write rates just equal `input`."""
-    input: float
-    output: float
-    cache_read: float
-    cache_write_5m: float
-    cache_write_1h: float
-
-
-_HAIKU_4_5 = ModelRates(input=1.00, output=5.00, cache_read=0.10, cache_write_5m=1.25, cache_write_1h=2.00)
-
-# (provider, model) -> rates. Keyed by the model name as CONFIGURED (.env's *_MODEL vars,
-# which is what LangChain reports as ls_model_name), not whatever dated snapshot the API
-# echoes back. Hosted APIs only -- Ollama is priced by electricity, see below. Manually
-# maintained: verify against each provider's current pricing page whenever an entry is
-# added or a bill doesn't match. Checked 2026-10-06 (Anthropic from the claude-api
-# reference; gpt-4o-mini from the rates in use since this table was first written --
-# re-verify against OpenAI's page before trusting a production cost).
-MODEL_PRICING: dict[tuple[str, str], ModelRates] = {
-    ("openai", "gpt-4o-mini"): ModelRates(
-        input=0.15, output=0.60, cache_read=0.075, cache_write_5m=0.15, cache_write_1h=0.15,
-    ),
-    ("anthropic", "claude-haiku-4-5-20251001"): _HAIKU_4_5,
-    ("anthropic", "claude-haiku-4-5"): _HAIKU_4_5,
-    ("anthropic", "claude-sonnet-5-5"): ModelRates(
-        input=2.00, output=10.00, cache_read=0.20, cache_write_5m=2.50, cache_write_1h=4.00,
-    ),
-}
+from model_pricing import MODEL_PRICING
 
 # A local model isn't free -- electricity is the real cost, and it doesn't scale
 # with tokens the way a hosted API's bill does. It scales with wall-clock time the
@@ -303,6 +272,23 @@ def _usage_metadata(response) -> dict | None:
     return getattr(message, "usage_metadata", None)
 
 
+def _answered_by(response) -> tuple[str, str] | None:
+    """(provider, model) of what actually answered a gateway call (LLM_PROVIDER=alice),
+    or None for any other provider. The gateway tags its final chunk with alice_backend
+    and the real model name (server/llm_gateway_service.py); ChatOllama copies the final
+    chunk into generation_info. Without this, every gateway call would be priced as the
+    role name ("alice-chat") on electricity, a fallback call to OpenAI included."""
+    generations = getattr(response, "generations", None)
+    if not generations or not generations[0]:
+        return None
+    info = getattr(generations[0][0], "generation_info", None) or {}
+    backend = info.get("alice_backend")
+    if backend is None:
+        return None
+    provider = "ollama" if backend == "frankencompute" else backend
+    return provider, info.get("model_name") or info.get("model") or "unknown"
+
+
 class TurnMetricsCallback(AsyncCallbackHandler):
     """Fresh one per turn, passed via graph.ainvoke's config={"callbacks": [...]}. Fills
     .timings (per-stage durations) and .usage (one LLMCallUsage per LLM call).
@@ -341,6 +327,7 @@ class TurnMetricsCallback(AsyncCallbackHandler):
         provider, model = self._llm_model.pop(run_id, ("unknown", "unknown"))
         if start is None:
             return
+        provider, model = _answered_by(response) or (provider, model)
         duration_ms = (time.monotonic() - start) * 1000
         if node == "classify_topic":
             self.timings.classify_ms = duration_ms

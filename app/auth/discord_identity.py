@@ -62,6 +62,14 @@ def _load_cached_session() -> PilotSession | None:
         return None
 
 
+def cached_session_token() -> str | None:
+    """The cached JWT without validating it or prompting a login -- for code that runs
+    per request and can't block on a browser round trip (llm.py's gateway auth). An
+    expired token just gets a 401 from the server, same as any other request."""
+    session = _load_cached_session()
+    return session.token if session is not None else None
+
+
 def _save_cached_session(session: PilotSession) -> None:
     IDENTITY_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
     IDENTITY_CACHE_PATH.write_text(json.dumps({"token": session.token, "username": session.username}))

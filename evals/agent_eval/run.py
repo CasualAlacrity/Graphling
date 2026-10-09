@@ -134,6 +134,10 @@ def _resolve_model_name(model_provider: str) -> str:
     rather than silently naming the run after only one of the two models that
     actually ran. turn_metrics.DEFAULT_LOCAL_POWER_WATTS covers the cost lookup for
     a label like this with no matching table entry."""
+    if model_provider == "alice":
+        # The gateway picks the real model server-side; per-call models (and fallbacks)
+        # are in each record's cost_by_node / turn usage, not knowable up front.
+        return "gateway"
     if model_provider != "ollama":
         return os.getenv(MODEL_NAME_ENV_VAR.get(model_provider, ""), "unknown")
 
