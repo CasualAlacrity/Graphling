@@ -1,0 +1,2611 @@
+{
+  "summary": {
+    "dimensions": {
+      "on_topic_correct": {
+        "passed": 45,
+        "total": 45
+      },
+      "tool_correct": {
+        "passed": 43,
+        "total": 45
+      },
+      "args_correct": {
+        "passed": 43,
+        "total": 45
+      },
+      "location_correct": {
+        "passed": 41,
+        "total": 43
+      },
+      "price_correct": {
+        "passed": 41,
+        "total": 43
+      },
+      "unit_correct": {
+        "passed": 28,
+        "total": 28
+      },
+      "claims_supported": {
+        "passed": 41,
+        "total": 43
+      }
+    },
+    "model_provider": "alice",
+    "model_name": "gateway",
+    "timestamp": "2026-10-09T15:09:23.978202+00:00",
+    "total_cases": 45,
+    "passed": 41,
+    "pass_rate": 0.911,
+    "total_cost_usd": 0.006102,
+    "cost_per_turn_usd": 0.000136,
+    "total_tokens": 957477,
+    "cache_hit_rate": 0.0,
+    "unpriced_calls": 0,
+    "config": {
+      "judge_provider": "anthropic",
+      "judge_model": "claude-haiku-5-5",
+      "history_turns": 6,
+      "history_full_tool_result_turns": 2,
+      "classify_history_turns": 2,
+      "anthropic_cache_mode": "off",
+      "anthropic_cache_ttl": "5m"
+    },
+    "avg_latency_ms": 3434.2
+  },
+  "records": [
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "What's the cheapest place to buy Laranite?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in Stanton, on ArcCorp, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 3470.1,
+      "tokens_in": 21404,
+      "tokens_out": 387,
+      "tokens_total": 21791,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000137,
+      "cost_by_node": {
+        "classify_topic": 2.9e-05,
+        "respond": 0.000108
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 738.3,
+      "decline_ms": null,
+      "respond_ms": [
+        1410.3,
+        1306.5
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "What's the cheapest place to buy Laranite?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp, in Stanton, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 3003.2,
+      "tokens_in": 21334,
+      "tokens_out": 352,
+      "tokens_total": 21686,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000119,
+      "cost_by_node": {
+        "classify_topic": 2.1e-05,
+        "respond": 9.7e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 537.7,
+      "decline_ms": null,
+      "respond_ms": [
+        866.3,
+        1584.7
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 2
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "What's the cheapest place to buy Laranite?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": null,
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": null,
+      "final_response": "commodity_price_lookup(commodity=\"Laranite\")",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": false,
+      "args_correct": false,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 1093.2,
+      "tokens_in": 10553,
+      "tokens_out": 41,
+      "tokens_total": 10594,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 4.3e-05,
+      "cost_by_node": {
+        "classify_topic": 2.2e-05,
+        "respond": 2.1e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 542.7,
+      "decline_ms": null,
+      "respond_ms": [
+        539.2
+      ],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 3
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "What's the cheapest place to buy Laranite?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp, in Stanton, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 2879.3,
+      "tokens_in": 21363,
+      "tokens_out": 325,
+      "tokens_total": 21688,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000114,
+      "cost_by_node": {
+        "classify_topic": 2.1e-05,
+        "respond": 9.3e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 524.0,
+      "decline_ms": null,
+      "respond_ms": [
+        1146.1,
+        1193.9
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 4
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "What's the cheapest place to buy Laranite?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp, in Stanton, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 3896.0,
+      "tokens_in": 21466,
+      "tokens_out": 538,
+      "tokens_total": 22004,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000154,
+      "cost_by_node": {
+        "classify_topic": 2.4e-05,
+        "respond": 0.00013
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 613.9,
+      "decline_ms": null,
+      "respond_ms": [
+        1463.8,
+        1803.3
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 5
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "Where can I get Laranite for less?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp, in Stanton, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 2985.8,
+      "tokens_in": 21343,
+      "tokens_out": 310,
+      "tokens_total": 21653,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000118,
+      "cost_by_node": {
+        "classify_topic": 2.2e-05,
+        "respond": 9.6e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 549.1,
+      "decline_ms": null,
+      "respond_ms": [
+        1146.0,
+        1280.2
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "Where can I get Laranite for less?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp, in Stanton, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 3649.7,
+      "tokens_in": 21446,
+      "tokens_out": 522,
+      "tokens_total": 21968,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000144,
+      "cost_by_node": {
+        "classify_topic": 2.2e-05,
+        "respond": 0.000122
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 560.0,
+      "decline_ms": null,
+      "respond_ms": [
+        1310.7,
+        1764.5
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 2
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "Where can I get Laranite for less?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point at ArcCorp, in Stanton, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 3106.1,
+      "tokens_in": 21396,
+      "tokens_out": 387,
+      "tokens_total": 21783,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000123,
+      "cost_by_node": {
+        "classify_topic": 2.3e-05,
+        "respond": 0.0001
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 572.0,
+      "decline_ms": null,
+      "respond_ms": [
+        1074.3,
+        1444.4
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 3
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "Where can I get Laranite for less?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp, in Stanton, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 4374.8,
+      "tokens_in": 21485,
+      "tokens_out": 637,
+      "tokens_total": 22122,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000173,
+      "cost_by_node": {
+        "classify_topic": 2.5e-05,
+        "respond": 0.000148
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 632.7,
+      "decline_ms": null,
+      "respond_ms": [
+        1575.5,
+        2150.5
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 4
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "Where can I get Laranite for less?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp in Stanton, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 3941.9,
+      "tokens_in": 21390,
+      "tokens_out": 524,
+      "tokens_total": 21914,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000156,
+      "cost_by_node": {
+        "classify_topic": 2.5e-05,
+        "respond": 0.000131
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 619.9,
+      "decline_ms": null,
+      "respond_ms": [
+        1081.4,
+        2224.1
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 5
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "I need to buy some Laranite, where's it cheap?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp, in Stanton, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 3591.2,
+      "tokens_in": 21349,
+      "tokens_out": 414,
+      "tokens_total": 21763,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000142,
+      "cost_by_node": {
+        "classify_topic": 2.1e-05,
+        "respond": 0.000121
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 526.3,
+      "decline_ms": null,
+      "respond_ms": [
+        1033.2,
+        2015.5
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "I need to buy some Laranite, where's it cheap?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp in Stanton, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 2881.9,
+      "tokens_in": 21394,
+      "tokens_out": 341,
+      "tokens_total": 21735,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000114,
+      "cost_by_node": {
+        "classify_topic": 2.3e-05,
+        "respond": 9.1e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 576.5,
+      "decline_ms": null,
+      "respond_ms": [
+        1059.9,
+        1231.5
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 2
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "I need to buy some Laranite, where's it cheap?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp, in Stanton, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 3250.5,
+      "tokens_in": 21359,
+      "tokens_out": 366,
+      "tokens_total": 21725,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000128,
+      "cost_by_node": {
+        "classify_topic": 2.2e-05,
+        "respond": 0.000107
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 547.8,
+      "decline_ms": null,
+      "respond_ms": [
+        986.2,
+        1701.2
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 3
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "I need to buy some Laranite, where's it cheap?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, on ArcCorp, in Stanton, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 2851.8,
+      "tokens_in": 21337,
+      "tokens_out": 278,
+      "tokens_total": 21615,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000113,
+      "cost_by_node": {
+        "classify_topic": 2.5e-05,
+        "respond": 8.7e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 634.6,
+      "decline_ms": null,
+      "respond_ms": [
+        919.9,
+        1285.5
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.3
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 4
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "I need to buy some Laranite, where's it cheap?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point at ArcCorp, in Stanton, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 2691.2,
+      "tokens_in": 21353,
+      "tokens_out": 276,
+      "tokens_total": 21629,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000106,
+      "cost_by_node": {
+        "classify_topic": 2.2e-05,
+        "respond": 8.5e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 543.1,
+      "decline_ms": null,
+      "respond_ms": [
+        992.2,
+        1140.0
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 5
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "What's the cheapest place to buy Agricium?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on microTech, in Stanton, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 4153.7,
+      "tokens_in": 21359,
+      "tokens_out": 600,
+      "tokens_total": 21959,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000164,
+      "cost_by_node": {
+        "classify_topic": 2.4e-05,
+        "respond": 0.00014
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 616.6,
+      "decline_ms": null,
+      "respond_ms": [
+        1108.9,
+        2412.6
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "What's the cheapest place to buy Agricium?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on microTech in Stanton, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 2803.2,
+      "tokens_in": 21360,
+      "tokens_out": 289,
+      "tokens_total": 21649,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000111,
+      "cost_by_node": {
+        "classify_topic": 2.6e-05,
+        "respond": 8.5e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 649.9,
+      "decline_ms": null,
+      "respond_ms": [
+        974.2,
+        1162.4
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 2
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "What's the cheapest place to buy Agricium?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Baijini Point, on ArcCorp in Stanton, is selling Agricium for 25.4 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": false,
+      "price_correct": false,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 25.4,
+      "unsupported_claims": [
+        "Recommends Baijini Point as the place to buy Agricium, though its in_stock is false",
+        "States the price is per SCU, which the tool result does not specify"
+      ],
+      "latency_ms": 3352.5,
+      "tokens_in": 21450,
+      "tokens_out": 434,
+      "tokens_total": 21884,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000132,
+      "cost_by_node": {
+        "classify_topic": 2.2e-05,
+        "respond": 0.000111
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 542.1,
+      "decline_ms": null,
+      "respond_ms": [
+        1337.1,
+        1458.6
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 3
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "What's the cheapest place to buy Agricium?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, in orbit around microTech, in Stanton, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 4255.1,
+      "tokens_in": 21325,
+      "tokens_out": 617,
+      "tokens_total": 21942,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000168,
+      "cost_by_node": {
+        "classify_topic": 2.6e-05,
+        "respond": 0.000142
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 655.3,
+      "decline_ms": null,
+      "respond_ms": [
+        821.0,
+        2764.3
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 4
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "What's the cheapest place to buy Agricium?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on microTech, in the Stanton system, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 3314.5,
+      "tokens_in": 21327,
+      "tokens_out": 320,
+      "tokens_total": 21647,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000131,
+      "cost_by_node": {
+        "classify_topic": 2.8e-05,
+        "respond": 0.000102
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 718.0,
+      "decline_ms": null,
+      "respond_ms": [
+        923.9,
+        1657.2
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 5
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "Where can I get Agricium for less?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on microTech, in Stanton, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 6039.9,
+      "tokens_in": 21361,
+      "tokens_out": 918,
+      "tokens_total": 22279,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000239,
+      "cost_by_node": {
+        "classify_topic": 2.7e-05,
+        "respond": 0.000212
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 677.4,
+      "decline_ms": null,
+      "respond_ms": [
+        1185.1,
+        4161.8
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "Where can I get Agricium for less?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, in orbit around microTech, in Stanton, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 4155.7,
+      "tokens_in": 21353,
+      "tokens_out": 558,
+      "tokens_total": 21911,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000164,
+      "cost_by_node": {
+        "classify_topic": 2.5e-05,
+        "respond": 0.000139
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 633.0,
+      "decline_ms": null,
+      "respond_ms": [
+        1036.6,
+        2472.3
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 2
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "Where can I get Agricium for less?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on microTech, in Stanton, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 4557.6,
+      "tokens_in": 21414,
+      "tokens_out": 666,
+      "tokens_total": 22080,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.00018,
+      "cost_by_node": {
+        "classify_topic": 2.9e-05,
+        "respond": 0.000152
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 719.2,
+      "decline_ms": null,
+      "respond_ms": [
+        1178.9,
+        2644.9
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 3
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "Where can I get Agricium for less?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on microTech in Stanton, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 3402.0,
+      "tokens_in": 21405,
+      "tokens_out": 387,
+      "tokens_total": 21792,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000134,
+      "cost_by_node": {
+        "classify_topic": 2.4e-05,
+        "respond": 0.00011
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 605.7,
+      "decline_ms": null,
+      "respond_ms": [
+        1309.2,
+        1471.9
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 4
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "Where can I get Agricium for less?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Baijini Point, on ArcCorp, in Stanton, is selling Agricium for 25.4 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": false,
+      "price_correct": false,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 25.4,
+      "unsupported_claims": [
+        "Baijini Point, on ArcCorp, in Stanton, is selling Agricium for 25.4 aUEC per SCU"
+      ],
+      "latency_ms": 3805.3,
+      "tokens_in": 21336,
+      "tokens_out": 524,
+      "tokens_total": 21860,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.00015,
+      "cost_by_node": {
+        "classify_topic": 2.3e-05,
+        "respond": 0.000128
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 573.3,
+      "decline_ms": null,
+      "respond_ms": [
+        963.3,
+        2253.7
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 5
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "I need to buy some Agricium, where's it cheap?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, in orbit around microTech, in Stanton, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 3181.8,
+      "tokens_in": 21399,
+      "tokens_out": 350,
+      "tokens_total": 21749,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000126,
+      "cost_by_node": {
+        "classify_topic": 2.6e-05,
+        "respond": 9.9e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 665.1,
+      "decline_ms": null,
+      "respond_ms": [
+        1272.4,
+        1228.4
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "I need to buy some Agricium, where's it cheap?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on microTech, in the Stanton system, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 4032.9,
+      "tokens_in": 21396,
+      "tokens_out": 564,
+      "tokens_total": 21960,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000159,
+      "cost_by_node": {
+        "classify_topic": 2.2e-05,
+        "respond": 0.000137
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 561.9,
+      "decline_ms": null,
+      "respond_ms": [
+        1107.7,
+        2347.2
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 2
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "I need to buy some Agricium, where's it cheap?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": null,
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": null,
+      "final_response": "commodity_price_lookup(commodity='Agricium')",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": false,
+      "args_correct": false,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 1223.4,
+      "tokens_in": 10557,
+      "tokens_out": 47,
+      "tokens_total": 10604,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 4.8e-05,
+      "cost_by_node": {
+        "classify_topic": 2.8e-05,
+        "respond": 2e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 713.5,
+      "decline_ms": null,
+      "respond_ms": [
+        498.9
+      ],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 3
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "I need to buy some Agricium, where's it cheap?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler on microTech, in Stanton, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 4128.7,
+      "tokens_in": 21516,
+      "tokens_out": 587,
+      "tokens_total": 22103,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000163,
+      "cost_by_node": {
+        "classify_topic": 2.2e-05,
+        "respond": 0.000141
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 564.2,
+      "decline_ms": null,
+      "respond_ms": [
+        1758.3,
+        1791.5
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 4
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "I need to buy some Agricium, where's it cheap?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on microTech, in Stanton, is selling Agricium for 26.1 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 4106.5,
+      "tokens_in": 21466,
+      "tokens_out": 523,
+      "tokens_total": 21989,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000162,
+      "cost_by_node": {
+        "classify_topic": 3.2e-05,
+        "respond": 0.00013
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 818.2,
+      "decline_ms": null,
+      "respond_ms": [
+        1477.0,
+        1794.4
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 5
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Where's the cheapest place to buy a Cutlass Black?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp, in Stanton, is selling the Cutlass Black for 1,190,000.0 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 3101.5,
+      "tokens_in": 21156,
+      "tokens_out": 307,
+      "tokens_total": 21463,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000122,
+      "cost_by_node": {
+        "classify_topic": 2.5e-05,
+        "respond": 9.7e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 631.4,
+      "decline_ms": null,
+      "respond_ms": [
+        1021.2,
+        1432.9
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Where's the cheapest place to buy a Cutlass Black?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in Stanton, on ArcCorp, is selling the Cutlass Black for 1,190,000.0 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 3009.4,
+      "tokens_in": 21159,
+      "tokens_out": 334,
+      "tokens_total": 21493,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000119,
+      "cost_by_node": {
+        "classify_topic": 2.4e-05,
+        "respond": 9.4e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 613.3,
+      "decline_ms": null,
+      "respond_ms": [
+        833.7,
+        1547.0
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 2
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Where's the cheapest place to buy a Cutlass Black?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp in Stanton, is selling the Cutlass Black for 1,190,000 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 2687.8,
+      "tokens_in": 21213,
+      "tokens_out": 306,
+      "tokens_total": 21519,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000106,
+      "cost_by_node": {
+        "classify_topic": 2.2e-05,
+        "respond": 8.5e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 542.5,
+      "decline_ms": null,
+      "respond_ms": [
+        1009.2,
+        1122.2
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 3
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Where's the cheapest place to buy a Cutlass Black?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in Stanton, on ArcCorp, is selling the Cutlass Black for 1,190,000 aUEC. Port Tressler on microTech is the next cheapest option at 1,225,000 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 4252.5,
+      "tokens_in": 21246,
+      "tokens_out": 616,
+      "tokens_total": 21862,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000168,
+      "cost_by_node": {
+        "classify_topic": 2.5e-05,
+        "respond": 0.000143
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 625.2,
+      "decline_ms": null,
+      "respond_ms": [
+        1142.9,
+        2468.1
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 4
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Where's the cheapest place to buy a Cutlass Black?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point at ArcCorp, in Stanton, is the cheapest place to buy a Cutlass Black for 1,190,000 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 2589.6,
+      "tokens_in": 21179,
+      "tokens_out": 255,
+      "tokens_total": 21434,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000102,
+      "cost_by_node": {
+        "classify_topic": 2.1e-05,
+        "respond": 8.1e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 534.8,
+      "decline_ms": null,
+      "respond_ms": [
+        1007.1,
+        1031.9
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 5
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "I want to buy a Cutlass Black, what's the best price?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp, in Stanton, is selling the Cutlass Black for 1,190,000.0 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 3272.5,
+      "tokens_in": 21165,
+      "tokens_out": 401,
+      "tokens_total": 21566,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000129,
+      "cost_by_node": {
+        "classify_topic": 2.3e-05,
+        "respond": 0.000106
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 588.4,
+      "decline_ms": null,
+      "respond_ms": [
+        924.6,
+        1743.5
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "I want to buy a Cutlass Black, what's the best price?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp in Stanton, has the cheapest price at 1,190,000.0 aUEC. Port Tressler, on microTech in Stanton, is the next best option at 1,225,000.0 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 4731.5,
+      "tokens_in": 21314,
+      "tokens_out": 713,
+      "tokens_total": 22027,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000187,
+      "cost_by_node": {
+        "classify_topic": 2.5e-05,
+        "respond": 0.000162
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 622.9,
+      "decline_ms": null,
+      "respond_ms": [
+        1458.5,
+        2634.7
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 2
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "I want to buy a Cutlass Black, what's the best price?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "The cheapest place to buy a Cutlass Black is at Baijini Point, in orbit around ArcCorp, in Stanton, for 1,190,000.0 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 2639.1,
+      "tokens_in": 21187,
+      "tokens_out": 265,
+      "tokens_total": 21452,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000104,
+      "cost_by_node": {
+        "classify_topic": 2.5e-05,
+        "respond": 7.9e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 634.9,
+      "decline_ms": null,
+      "respond_ms": [
+        944.6,
+        1044.0
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 3
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "I want to buy a Cutlass Black, what's the best price?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "The cheapest price is at Baijini Point, in orbit around ArcCorp in Stanton, for 1,190,000.0 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 2537.7,
+      "tokens_in": 21176,
+      "tokens_out": 263,
+      "tokens_total": 21439,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.0001,
+      "cost_by_node": {
+        "classify_topic": 2.1e-05,
+        "respond": 7.9e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 531.6,
+      "decline_ms": null,
+      "respond_ms": [
+        833.7,
+        1158.6
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.3
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 4
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "I want to buy a Cutlass Black, what's the best price?",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp, in Stanton, is selling a Cutlass Black for 1,190,000 aUEC. Another option at Port Tressler, on microTech, is 1,225,000 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 2544.8,
+      "tokens_in": 21169,
+      "tokens_out": 277,
+      "tokens_total": 21446,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.0001,
+      "cost_by_node": {
+        "classify_topic": 2.1e-05,
+        "respond": 7.9e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 526.3,
+      "decline_ms": null,
+      "respond_ms": [
+        819.8,
+        1184.0
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.4
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 5
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Find me a good deal on a Cutlass Black.",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point on ArcCorp, in Stanton, is selling the Cutlass Black for 1,190,000 aUEC. An alternative is Port Tressler on microTech, also in Stanton, at 1,225,000 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 3080.6,
+      "tokens_in": 21180,
+      "tokens_out": 302,
+      "tokens_total": 21482,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000122,
+      "cost_by_node": {
+        "classify_topic": 2.1e-05,
+        "respond": 0.000101
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 528.1,
+      "decline_ms": null,
+      "respond_ms": [
+        1215.3,
+        1321.1
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Find me a good deal on a Cutlass Black.",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp, is selling the Cutlass Black for 1,190,000 aUEC. Port Tressler on microTech is another option at 1,225,000 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 5056.5,
+      "tokens_in": 21428,
+      "tokens_out": 775,
+      "tokens_total": 22203,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.0002,
+      "cost_by_node": {
+        "classify_topic": 2.4e-05,
+        "respond": 0.000176
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 613.4,
+      "decline_ms": null,
+      "respond_ms": [
+        2174.5,
+        2251.5
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 2
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Find me a good deal on a Cutlass Black.",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "The cheapest deal on a Cutlass Black is at Baijini Point in orbit around ArcCorp in Stanton for 1,190,000.0 aUEC. An alternative is Port Tressler in orbit around microTech in Stanton, priced at 1,225,000.0 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 3119.3,
+      "tokens_in": 21160,
+      "tokens_out": 374,
+      "tokens_total": 21534,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000123,
+      "cost_by_node": {
+        "classify_topic": 2.5e-05,
+        "respond": 9.8e-05
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 639.7,
+      "decline_ms": null,
+      "respond_ms": [
+        886.5,
+        1577.9
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 3
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Find me a good deal on a Cutlass Black.",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp, in Stanton, is selling the Cutlass Black for 1,190,000.0 aUEC. Port Tressler, in orbit around microTech, in Stanton, is selling it for 1,225,000.0 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 3525.9,
+      "tokens_in": 21179,
+      "tokens_out": 479,
+      "tokens_total": 21658,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000139,
+      "cost_by_node": {
+        "classify_topic": 2.2e-05,
+        "respond": 0.000117
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 563.7,
+      "decline_ms": null,
+      "respond_ms": [
+        941.2,
+        2005.2
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.5
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 4
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Find me a good deal on a Cutlass Black.",
+      "model_provider": "alice",
+      "model_name": "gateway",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "The Cutlass Black is cheapest at Baijini Point, in orbit around ArcCorp in Stanton, for 1,190,000.0 aUEC. Port Tressler, in orbit around microTech in Stanton, is available for 1,225,000.0 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 4209.5,
+      "tokens_in": 21255,
+      "tokens_out": 566,
+      "tokens_total": 21821,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000166,
+      "cost_by_node": {
+        "classify_topic": 2.3e-05,
+        "respond": 0.000143
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 585.4,
+      "decline_ms": null,
+      "respond_ms": [
+        1402.2,
+        2207.5
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 5
+    }
+  ]
+}
