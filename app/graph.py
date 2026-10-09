@@ -3,7 +3,7 @@ import os
 from typing import Annotated
 
 from dotenv import load_dotenv
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import START, StateGraph
 from langgraph.graph.message import add_messages
@@ -11,7 +11,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from pydantic import BaseModel
 
 from db.models import LegType
-from llm import get_chat_llm, get_classification_llm
+from llm import anthropic_cache_control, anthropic_cache_mode, get_chat_llm, get_classification_llm
 from prompt_loader import load_prompt
 from tools.best_route_tool import BestRouteTool
 from tools.starcitizenwiki.client import StarCitizenWikiClient
@@ -122,7 +122,14 @@ tools = uex_backed_tools + trade_run_tools + general_tools
 # failures showed up and where reasoning has measurably helped (evals/agent_eval/
 # results/); classify_topic and the reject line are a fast binary decision and a
 # short in-character line, neither needing reasoning or necessarily respond's model.
+# Anthropic prompt caching (llm.anthropic_cache_mode) -- "off" for every other provider.
+# "full"'s rolling breakpoint rides on langchain-anthropic's cache_control kwarg, which
+# marks the last eligible block of each request; the fixed one is _persona_messages().
+CACHE_MODE = anthropic_cache_mode()
+
 llm = get_chat_llm().bind_tools(tools)
+if CACHE_MODE == "full":
+    llm = llm.bind(cache_control=anthropic_cache_control())
 classifier_llm = get_classification_llm().with_structured_output(TopicClassification)
 reject_llm = get_classification_llm().with_structured_output(RejectLine)
 
@@ -257,8 +264,68 @@ async def _resolve_last_touched_leg_id(messages: list[BaseMessage]) -> int | Non
     return leg.id
 
 
-async def respond(state: State) -> dict:
+# History windowing -- what each LLM call is SENT, not what's stored. state.messages keeps
+# the whole thread (MemorySaver, one thread per app launch), so without this every turn
+# resends the entire play session, every old all_results list included, on top of the
+# ~11.5k-token tools+persona prefix. Trade-run state lives in the ledger, not the chat, so
+# forgetting old turns loses nothing ALICE can't re-fetch (trade_run_status).
+#
+# HISTORY_TURNS counts pilot turns (HumanMessages); 0 disables windowing entirely.
+# HISTORY_FULL_TOOL_RESULT_TURNS is how many of those keep tool results verbatim -- older
+# ones get STALE_TOOL_RESULT instead. Never below 1: the current turn's own results must
+# survive its respond<->tools loop, and 2 keeps "what about in Pyro?" follow-ups working
+# off the previous turn's all_results (commodity_price_lookup's description relies on it).
+# CLASSIFY_HISTORY_TURNS is classify_topic's own, smaller window -- it judges the latest
+# utterance, needing only enough before it for "Let's do it." to read as on-topic.
+HISTORY_TURNS = int(os.getenv("HISTORY_TURNS", "6"))
+HISTORY_FULL_TOOL_RESULT_TURNS = max(1, int(os.getenv("HISTORY_FULL_TOOL_RESULT_TURNS", "2")))
+CLASSIFY_HISTORY_TURNS = int(os.getenv("CLASSIFY_HISTORY_TURNS", "2"))
+STALE_TOOL_RESULT = "[older result omitted; call the tool again if you need it]"
+
+
+def _windowed_history(messages: list[BaseMessage], turns: int, full_result_turns: int) -> list[BaseMessage]:
+    """The last `turns` pilot turns of `messages`, with tool results older than the last
+    `full_result_turns` turns replaced by STALE_TOOL_RESULT. Always cuts at a HumanMessage,
+    never mid-turn, so a ToolMessage is never separated from the AIMessage whose tool_call
+    it answers -- both hosted APIs reject that with a 400, and Anthropic also requires the
+    first message to come from the user. Stubbed ToolMessages keep their tool_call_id for
+    the same reason: the pairing has to stay intact even when the content doesn't."""
+    if turns <= 0:
+        return messages
+
+    human_positions = []
+    for index, message in enumerate(messages):
+        if isinstance(message, HumanMessage):
+            human_positions.append(index)
+
+    start = human_positions[-turns] if len(human_positions) > turns else 0
+    keep_results_from = human_positions[-full_result_turns] if len(human_positions) >= full_result_turns else 0
+
+    window = []
+    for index in range(start, len(messages)):
+        message = messages[index]
+        if isinstance(message, ToolMessage) and index < keep_results_from:
+            message = message.model_copy(update={"content": STALE_TOOL_RESULT})
+        window.append(message)
+    return window
+
+
+def _persona_messages() -> list[BaseMessage]:
+    """The persona's system message(s), with a cache breakpoint on the last one when
+    Anthropic caching is on. Tools render before system in Anthropic's request, so this
+    one breakpoint caches every tool schema plus the persona -- the stable prefix,
+    unlike the windowed history after it."""
     messages = PERSONA_TEMPLATE.invoke({}).to_messages()
+    if CACHE_MODE == "off" or not isinstance(messages[-1], SystemMessage):
+        return messages
+    block = {"type": "text", "text": messages[-1].content, "cache_control": anthropic_cache_control()}
+    return messages[:-1] + [SystemMessage(content=[block])]
+
+
+async def respond(state: State) -> dict:
+    messages = _persona_messages() + _windowed_history(
+        state.messages, HISTORY_TURNS, HISTORY_FULL_TOOL_RESULT_TURNS,
+    )
     pending_confirmation = _just_ran_confirmation_prone_tool(state.messages)
 
     # Run the leg re-resolution alongside the LLM call rather than before it. It's a real
@@ -269,11 +336,11 @@ async def respond(state: State) -> dict:
     # running them concurrently adds ~0 wall-clock time instead of adding it serially.
     if pending_confirmation:
         response, resolved_leg_id = await asyncio.gather(
-            llm.ainvoke(messages + state.messages),
+            llm.ainvoke(messages),
             _resolve_last_touched_leg_id(state.messages),
         )
     else:
-        response = await llm.ainvoke(messages + state.messages)
+        response = await llm.ainvoke(messages)
         resolved_leg_id = None
 
     last_touched_leg_id = resolved_leg_id if resolved_leg_id is not None else state.last_touched_leg_id
@@ -286,7 +353,10 @@ async def respond(state: State) -> dict:
 
 async def classify_topic(state: State) -> dict:
     messages = CLASSIFY_TEMPLATE.invoke({}).to_messages()
-    response = await classifier_llm.ainvoke(messages + state.messages)
+    # full_result_turns=1: classify runs before this turn's tools, so every tool result
+    # it sees is a previous turn's -- all stubbed, none needed to judge topic.
+    history = _windowed_history(state.messages, CLASSIFY_HISTORY_TURNS, 1)
+    response = await classifier_llm.ainvoke(messages + history)
     return {"on_topic": response.on_topic, "reason": response.reason}
 
 
