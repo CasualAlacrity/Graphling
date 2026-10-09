@@ -6,7 +6,7 @@ OpenAI-compatible endpoint silently drops gemma4's thinking (verified 2026-10-09
 reasoning_effort=high still produced zero reasoning tokens), and the evals showed
 reasoning helps the default model. So the client keeps using ChatOllama exactly as
 evaluated, just pointed at this server, and the frankencompute path is a pass-through.
-Only the OpenAI fallback translates.
+Only the fallback translates (OpenAI here, Anthropic in server/anthropic_fallback.py).
 
 Routing, per request:
 1. The client names a ROLE (alice-chat / alice-classify), never a real model -- the
@@ -14,9 +14,10 @@ Routing, per request:
    without a client release.
 2. frankencompute first, unless it's known to be down or already has llm_max_inflight
    requests running ("overflow").
-3. Fall back to OpenAI only when frankencompute can't answer: connect error, timeout,
-   or 5xx. Never because an answer looks bad, and never after any bytes have reached
-   the client (non-streamed fallback is what makes this clean).
+3. Fall back (settings.fallback_provider: Anthropic or OpenAI) only when frankencompute
+   can't answer: connect error, timeout, or 5xx. Never because an answer looks bad,
+   and never after any bytes have reached the client (non-streamed fallback is what
+   makes this clean).
 4. Every call writes one llm_usage row.
 
 In-memory state (the down flag, the in-flight count) assumes one server process, the
@@ -32,17 +33,28 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+import anthropic
 import httpx
 
 from db.models import LlmUsage
 from db.session import SessionLocal
 from model_pricing import MODEL_PRICING
+from server import anthropic_fallback
 from server.config import settings
+from server.tool_call_ids import with_tool_call_ids
 
 log = logging.getLogger(__name__)
 
 FRANKENCOMPUTE = "frankencompute"
 OPENAI = "openai"
+ANTHROPIC = anthropic_fallback.ANTHROPIC
+
+# Used when fallback_chat_model / fallback_classify_model are left empty. Haiku 5.5 over
+# 4.5, measured 2026-10-09 (3 cases x 5 samples through the gateway): 45/45 correct tool
+# and args vs 33/45 (4.5 asked a clarifying question instead of looking prices up in
+# 12 turns), at ~$0.0002 vs ~$0.0016 per call. Costs ~1.9 s more per turn than
+# frankencompute (it thinks by default) -- fine for a fallback.
+DEFAULT_FALLBACK_MODELS = {ANTHROPIC: "claude-haiku-5-5", OPENAI: "gpt-4o-mini"}
 OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 
 # Ollama options a client may set. Everything else (num_ctx, num_gpu, keep_alive, ...)
@@ -91,10 +103,23 @@ class Role:
 def roles() -> dict[str, Role]:
     # Thinking on for chat, off for classify -- the same split as the client's own
     # OLLAMA_REASONING / OLLAMA_CLASSIFICATION_REASONING defaults (app/llm.py).
+    default_fallback = DEFAULT_FALLBACK_MODELS.get(settings.fallback_provider, "")
     return {
-        "alice-chat": Role(settings.frankencompute_chat_model, True, settings.fallback_chat_model),
-        "alice-classify": Role(settings.frankencompute_classify_model, False, settings.fallback_classify_model),
+        "alice-chat": Role(
+            settings.frankencompute_chat_model, True, settings.fallback_chat_model or default_fallback,
+        ),
+        "alice-classify": Role(
+            settings.frankencompute_classify_model, False, settings.fallback_classify_model or default_fallback,
+        ),
     }
+
+
+def fallback_configured() -> bool:
+    if settings.fallback_provider == ANTHROPIC:
+        return bool(settings.anthropic_api_key)
+    if settings.fallback_provider == OPENAI:
+        return bool(settings.openai_api_key)
+    return False
 
 
 class FrankencomputeState:
@@ -147,8 +172,10 @@ async def open_chat(payload: dict, user_id: uuid.UUID) -> Relay:
             state.mark_down(failure.reason, time.monotonic() + DOWN_FOR_S)
             log.warning("frankencompute failed (%s); falling back", failure.reason)
 
-    if not settings.openai_api_key:
+    if not fallback_configured():
         raise NoBackendAvailable(f"frankencompute unavailable ({fallback_reason}) and no fallback is configured")
+    if settings.fallback_provider == ANTHROPIC:
+        return await _relay_anthropic(payload, role_name, role, user_id, started, fallback_reason)
     return await _relay_openai(payload, role_name, role, user_id, started, fallback_reason)
 
 
@@ -233,10 +260,10 @@ async def _open_frankencompute(
 
 def openai_request(payload: dict, model: str) -> dict:
     """Ollama /api/chat request -> OpenAI chat-completions request. ChatOllama already
-    sends tools in OpenAI's shape and gives every tool call an id (echoed back as the
-    tool message's tool_call_id), so the pairing OpenAI insists on survives as-is."""
+    sends tools in OpenAI's shape; tool calls and results are paired by position
+    (server/tool_call_ids.py -- the ollama client strips ids, so none arrive)."""
     messages = []
-    for message in payload.get("messages", []):
+    for message in with_tool_call_ids(payload.get("messages", [])):
         role = message.get("role")
         content = message.get("content") or ""
         if role == "tool":
@@ -329,11 +356,11 @@ async def _relay_openai(
                 headers={"Authorization": f"Bearer {settings.openai_api_key}"},
             )
     except httpx.HTTPError as exc:
-        await _record_fallback_error(user_id, role_name, model, started, fallback_reason)
+        await _record_fallback_error(user_id, role_name, OPENAI, model, started, fallback_reason)
         raise NoBackendAvailable(f"fallback request failed: {exc!r}") from exc
 
     if response.status_code != 200:
-        await _record_fallback_error(user_id, role_name, model, started, fallback_reason)
+        await _record_fallback_error(user_id, role_name, OPENAI, model, started, fallback_reason)
         error_line = json.dumps({"error": f"fallback model returned {response.status_code}: {response.text[:500]}"})
         return Relay(status_code=502, media_type="application/json", body=_one_line(error_line))
 
@@ -355,15 +382,40 @@ async def _relay_openai(
     )
 
 
+async def _relay_anthropic(
+    payload: dict, role_name: str, role: Role, user_id: uuid.UUID, started: float, fallback_reason: str,
+) -> Relay:
+    model = role.fallback_model
+    try:
+        message = await anthropic_fallback.create(payload, model)
+    except anthropic.APIStatusError as exc:
+        await _record_fallback_error(user_id, role_name, ANTHROPIC, model, started, fallback_reason)
+        error_line = json.dumps({"error": f"fallback model returned {exc.status_code}: {exc.message[:500]}"})
+        return Relay(status_code=502, media_type="application/json", body=_one_line(error_line))
+    except anthropic.APIConnectionError as exc:
+        await _record_fallback_error(user_id, role_name, ANTHROPIC, model, started, fallback_reason)
+        raise NoBackendAvailable(f"fallback request failed: {exc!r}") from exc
+
+    usage = message.usage
+    chunk = anthropic_fallback.ollama_final_chunk(message, model)
+    await record_usage(
+        user_id=user_id, role=role_name, backend=ANTHROPIC, model=model,
+        prompt_tokens=chunk["prompt_eval_count"], cache_read_tokens=usage.cache_read_input_tokens or 0,
+        completion_tokens=usage.output_tokens, latency_ms=(time.monotonic() - started) * 1000, status="ok",
+        fallback_reason=fallback_reason, cost_usd=anthropic_fallback.cost_usd(model, usage),
+    )
+    return Relay(status_code=200, media_type="application/x-ndjson", body=_one_line(json.dumps(chunk)))
+
+
 async def _one_line(line: str) -> AsyncIterator[bytes]:
     yield (line + "\n").encode()
 
 
 async def _record_fallback_error(
-    user_id: uuid.UUID, role_name: str, model: str, started: float, fallback_reason: str,
+    user_id: uuid.UUID, role_name: str, backend: str, model: str, started: float, fallback_reason: str,
 ) -> None:
     await record_usage(
-        user_id=user_id, role=role_name, backend=OPENAI, model=model, prompt_tokens=0, cache_read_tokens=0,
+        user_id=user_id, role=role_name, backend=backend, model=model, prompt_tokens=0, cache_read_tokens=0,
         completion_tokens=0, latency_ms=(time.monotonic() - started) * 1000, status="error",
         fallback_reason=fallback_reason, cost_usd=None,
     )

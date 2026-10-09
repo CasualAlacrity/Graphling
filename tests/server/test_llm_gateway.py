@@ -6,12 +6,14 @@ is swapped for a list, so nothing touches Postgres.
 """
 import json
 import uuid
+from types import SimpleNamespace
 
 import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 from db.models import User
+from server import anthropic_fallback, tool_call_ids
 from server import llm_gateway_service as gateway
 from server.config import settings
 from server.dependencies import get_current_user
@@ -32,7 +34,13 @@ CHAT_PAYLOAD = {
 @pytest.fixture(autouse=True)
 def fresh_state(monkeypatch):
     monkeypatch.setattr(gateway, "state", gateway.FrankencomputeState())
+    # The OpenAI-path tests below mock httpx; the Anthropic path has its own tests at the
+    # bottom with a fake SDK client. No test may pick up a real key from .env.
+    monkeypatch.setattr(settings, "fallback_provider", "openai")
     monkeypatch.setattr(settings, "openai_api_key", "sk-test")
+    monkeypatch.setattr(settings, "anthropic_api_key", "")
+    monkeypatch.setattr(settings, "fallback_chat_model", "")
+    monkeypatch.setattr(settings, "fallback_classify_model", "")
     monkeypatch.setattr(settings, "llm_max_inflight", 2)
     monkeypatch.setattr(settings, "frankencompute_model_digest", "")
 
@@ -308,3 +316,144 @@ def test_route_rejects_an_unknown_role_and_an_oversized_body():
 
     assert unknown.status_code == 400
     assert oversized.status_code == 413
+
+
+# ---- Anthropic fallback ----
+
+def test_anthropic_request_moves_system_to_the_top_and_pairs_tool_results():
+    payload = {
+        "messages": [
+            {"role": "system", "content": "You are ALICE."},
+            {"role": "user", "content": "Price of Laranite and Agricium?"},
+            {"role": "assistant", "content": "", "thinking": "two lookups", "tool_calls": [
+                {"id": "a", "function": {"name": "commodity_price_lookup", "arguments": {"commodity": "Laranite"}}},
+                {"id": "b", "function": {"name": "commodity_price_lookup",
+                                         "arguments": "{\"commodity\": \"Agricium\"}"}},
+            ]},
+            {"role": "tool", "tool_call_id": "a", "content": "laranite rows"},
+            {"role": "tool", "tool_call_id": "b", "content": "agricium rows"},
+        ],
+        "tools": [{"type": "function", "function": {
+            "name": "commodity_price_lookup", "description": "Look up prices",
+            "parameters": {"type": "object", "properties": {"commodity": {"type": "string"}}},
+        }}],
+        "options": {"temperature": 0.3},
+    }
+
+    request = anthropic_fallback.anthropic_request(payload, "claude-haiku-4-5")
+
+    assert request["system"] == [{"type": "text", "text": "You are ALICE.", "cache_control": {"type": "ephemeral"}}]
+    assert [message["role"] for message in request["messages"]] == ["user", "assistant", "user"]
+    tool_uses = request["messages"][1]["content"]
+    assert [block["input"] for block in tool_uses] == [{"commodity": "Laranite"}, {"commodity": "Agricium"}]
+    # Both results in ONE user message, each paired to its tool_use id.
+    results = request["messages"][2]["content"]
+    pairs = [(block["tool_use_id"], block["content"]) for block in results]
+    assert pairs == [("a", "laranite rows"), ("b", "agricium rows")]
+    assert request["tools"][0]["input_schema"]["properties"] == {"commodity": {"type": "string"}}
+    assert "temperature" not in request
+
+
+def test_anthropic_request_maps_format_to_a_closed_json_schema():
+    schema = {"type": "object", "properties": {"on_topic": {"type": "boolean"}}, "required": ["on_topic"]}
+
+    request = anthropic_fallback.anthropic_request(
+        {"messages": [{"role": "user", "content": "hi"}], "format": schema}, "claude-haiku-4-5",
+    )
+
+    sent = request["output_config"]["format"]["schema"]
+    assert sent["additionalProperties"] is False
+    assert "additionalProperties" not in schema  # the caller's schema isn't mutated
+
+
+def _fake_message(content, input_tokens=100, cache_read=11000, cache_write=0, output_tokens=20):
+    usage = SimpleNamespace(
+        input_tokens=input_tokens, cache_read_input_tokens=cache_read,
+        cache_creation_input_tokens=cache_write, output_tokens=output_tokens,
+    )
+    return SimpleNamespace(content=content, usage=usage, stop_reason="end_turn")
+
+
+def test_anthropic_reply_becomes_an_ollama_chunk():
+    message = _fake_message([
+        SimpleNamespace(type="text", text="Checking."),
+        SimpleNamespace(type="tool_use", name="best_route", input={"origin": "Seraphim"}),
+    ])
+
+    chunk = anthropic_fallback.ollama_final_chunk(message, "claude-haiku-4-5")
+
+    assert chunk["message"]["content"] == "Checking."
+    assert chunk["message"]["tool_calls"] == [{"function": {"name": "best_route", "arguments": {"origin": "Seraphim"}}}]
+    assert chunk["prompt_eval_count"] == 100 + 11000
+    assert chunk["alice_backend"] == "anthropic"
+
+
+def test_anthropic_cost_prices_cache_reads_and_writes_separately():
+    rates = anthropic_fallback.MODEL_PRICING[("anthropic", "claude-haiku-4-5")]
+    usage = _fake_message([], input_tokens=100, cache_read=11000, cache_write=500, output_tokens=20).usage
+
+    cost = anthropic_fallback.cost_usd("claude-haiku-4-5", usage)
+
+    expected = 100 * rates.input + 11000 * rates.cache_read + 500 * rates.cache_write_5m + 20 * rates.output
+    assert cost == pytest.approx(expected / 1_000_000)
+
+
+async def test_anthropic_is_the_fallback_when_configured(monkeypatch, usage_rows):
+    monkeypatch.setattr(settings, "fallback_provider", "anthropic")
+    monkeypatch.setattr(settings, "anthropic_api_key", "sk-ant-test")
+    gateway.state.mark_down("down", until=float("inf"))
+    sent = {}
+
+    async def fake_create(payload, model):
+        sent["model"] = model
+        return _fake_message([SimpleNamespace(type="text", text="Area18 is cheapest.")])
+
+    monkeypatch.setattr(anthropic_fallback, "create", fake_create)
+
+    chunks = await collect(await gateway.open_chat(CHAT_PAYLOAD, USER_ID))
+
+    assert sent["model"] == "claude-haiku-5-5"
+    assert chunks[0]["message"]["content"] == "Area18 is cheapest."
+    assert usage_rows[0]["backend"] == "anthropic"
+    assert usage_rows[0]["cache_read_tokens"] == 11000
+    assert usage_rows[0]["cost_usd"] > 0
+
+
+# ---- tool-call pairing (the real wire shape: the ollama client strips every id) ----
+
+WIRE_HISTORY = [
+    {"role": "user", "content": "Laranite and Agricium prices?"},
+    {"role": "assistant", "content": "", "tool_calls": [
+        {"function": {"name": "commodity_price_lookup", "arguments": {"commodity": "Laranite"}}},
+        {"function": {"name": "commodity_price_lookup", "arguments": {"commodity": "Agricium"}}},
+    ]},
+    {"role": "tool", "content": "laranite rows", "tool_name": "commodity_price_lookup"},
+    {"role": "tool", "content": "agricium rows", "tool_name": "commodity_price_lookup"},
+    {"role": "assistant", "content": "Laranite is cheapest at Area18."},
+    {"role": "user", "content": "And a route from there?"},
+    {"role": "assistant", "content": "", "tool_calls": [{"function": {"name": "best_route", "arguments": {}}}]},
+    {"role": "tool", "content": "route rows"},
+]
+
+
+def test_tool_results_are_paired_to_calls_by_position():
+    paired = tool_call_ids.with_tool_call_ids(WIRE_HISTORY)
+
+    first_calls = [call["id"] for call in paired[1]["tool_calls"]]
+    assert [paired[2]["tool_call_id"], paired[3]["tool_call_id"]] == first_calls
+    assert paired[7]["tool_call_id"] == paired[6]["tool_calls"][0]["id"]
+    assert len(set(first_calls + [paired[7]["tool_call_id"]])) == 3
+    assert "id" not in WIRE_HISTORY[1]["tool_calls"][0]  # input untouched
+
+
+def test_both_fallback_translations_pair_id_less_wire_history():
+    anthropic_request = anthropic_fallback.anthropic_request({"messages": WIRE_HISTORY}, "claude-haiku-4-5")
+    anthropic_messages = anthropic_request["messages"]
+    tool_use_ids = [block["id"] for block in anthropic_messages[1]["content"]]
+    tool_result_ids = [block["tool_use_id"] for block in anthropic_messages[2]["content"]]
+    assert tool_result_ids == tool_use_ids
+    assert all(tool_use_ids)
+
+    openai_messages = gateway.openai_request({"messages": WIRE_HISTORY}, "gpt-4o-mini")["messages"]
+    call_ids = [call["id"] for call in openai_messages[1]["tool_calls"]]
+    assert [openai_messages[2]["tool_call_id"], openai_messages[3]["tool_call_id"]] == call_ids

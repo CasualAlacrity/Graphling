@@ -34,6 +34,11 @@ MODEL_PRICING: dict[tuple[str, str], ModelRates] = {
     ),
     ("anthropic", "claude-haiku-4-5-20251001"): _HAIKU_4_5,
     ("anthropic", "claude-haiku-4-5"): _HAIKU_4_5,
+    # Prompts of 100K tokens or fewer -- ALICE's are ~20K. Above 100K the rate is $0.50 / $2.50
+    # (5x); not modeled here. From the claude-api reference, 2026-10-09.
+    ("anthropic", "claude-haiku-5-5"): ModelRates(
+        input=0.10, output=0.50, cache_read=0.01, cache_write_5m=0.125, cache_write_1h=0.20,
+    ),
     ("anthropic", "claude-sonnet-5-5"): ModelRates(
         input=2.00, output=10.00, cache_read=0.20, cache_write_5m=2.50, cache_write_1h=4.00,
     ),

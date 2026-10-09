@@ -19,7 +19,7 @@ services:
       retries: 20
 
   server:
-    image: feenstra32/graphling-server:c1d18b8
+    image: feenstra32/graphling-server:5fb2462
     restart: unless-stopped
     depends_on:
       postgres:
@@ -36,6 +36,9 @@ services:
       # http://100.x.y.z:11434; the digest pins the evaluated model build.
       FRANKENCOMPUTE_URL: ${FRANKENCOMPUTE_URL}
       FRANKENCOMPUTE_MODEL_DIGEST: ${FRANKENCOMPUTE_MODEL_DIGEST}
+      # Fallback when frankencompute can't answer (server/config.py fallback_provider,
+      # default anthropic). Only the chosen provider's key is needed.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
     # Bound to loopback only, not 0.0.0.0 — nginx (already on this box, see
     # docs/deploy.md) is the only path in, proxying api.heyalice.help to here, same

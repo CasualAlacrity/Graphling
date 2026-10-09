@@ -25,3 +25,8 @@ alembic>=1.13
 # LANGSMITH_TRACING/LANGSMITH_API_KEY set, but the import itself is unconditional.
 requests
 langsmith
+
+# The LLM gateway's Anthropic fallback (server/anthropic_fallback.py). Pinned below 1.0
+# to match the desktop client's version (pulled in by langchain-anthropic) -- 1.x moves
+# to httpx2, a separate upgrade (see the claude-api skill's sdk-upgrade guide).
+anthropic>=0.115,<1

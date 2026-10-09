@@ -42,10 +42,14 @@ class Settings(BaseSettings):
     # 0 disables overflow (everything queues on the box).
     llm_max_inflight: int = 2
 
-    # Fallback when frankencompute can't answer. Empty key = no fallback (503 instead).
+    # Fallback when frankencompute can't answer: "anthropic" or "openai". No key for the
+    # chosen provider = no fallback (503 instead). Empty model = that provider's default
+    # (server/llm_gateway_service.DEFAULT_FALLBACK_MODELS).
+    fallback_provider: str = "anthropic"
+    anthropic_api_key: str = ""
     openai_api_key: str = ""
-    fallback_chat_model: str = "gpt-4o-mini"
-    fallback_classify_model: str = "gpt-4o-mini"
+    fallback_chat_model: str = ""
+    fallback_classify_model: str = ""
 
 
 @lru_cache
