@@ -20,6 +20,9 @@ SSH_KEY="$HOME/.ssh/flockt"
 PROD_DIR="/opt/graphling"
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Build context is the repo root (Dockerfile, alembic.ini, app/), wherever this was run from.
+cd "$(dirname "$0")/.."
+
 IMAGE="$DOCKER_USERNAME/$IMAGE_NAME"
 TAG=$(git rev-parse --short HEAD)
 SSH="ssh -i $SSH_KEY $PROD_USER@$PROD_HOST"
