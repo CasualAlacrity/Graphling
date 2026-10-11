@@ -81,7 +81,7 @@ RESULTS_DIR = Path(__file__).resolve().parent / "results"
 # pairwise JSON diff isn't really the tool for.
 CSV_FIELDS = [
     "model_provider", "model_name", "case_id", "phrasing", "sample",
-    "timed_out", "expected_on_topic", "actual_on_topic", "on_topic_correct",
+    "timed_out", "error", "expected_on_topic", "actual_on_topic", "on_topic_correct",
     "expected_tool", "actual_tool", "tool_correct",
     "expected_args", "actual_args", "args_correct",
     "location_correct", "price_correct", "unit_correct", "claims_supported", "response_correct", "overall_pass",
@@ -208,6 +208,7 @@ async def _run_one(
     with install_fakes():
         start = time.monotonic()
         timed_out = False
+        error = None
         try:
             # A model call that never returns would otherwise freeze the whole suite
             # (one did: 6 runs in 34 minutes). Bounded, it becomes one recorded failure.
@@ -225,13 +226,24 @@ async def _run_one(
         except TimeoutError:
             timed_out = True
             result = {"messages": [HumanMessage(content=phrasing)], "on_topic": None}
+        except Exception as raised:
+            # Same idea for a turn that raises: a model answering in the wrong shape
+            # (gpt-oss ignoring Ollama's `format`, 2026-10-11) used to end the whole suite
+            # and lose every finished result. Now it's one recorded failure.
+            error = f"{type(raised).__name__}: {raised}"
+            result = {"messages": [HumanMessage(content=phrasing)], "on_topic": None}
         latency_ms = (time.monotonic() - start) * 1000
     timings = metrics_callback.timings
     usage = metrics_callback.usage
 
     messages = result["messages"]
     actual_on_topic = result["on_topic"]
-    final_response = "(timed out)" if timed_out else messages[-1].content
+    if timed_out:
+        final_response = "(timed out)"
+    elif error:
+        final_response = f"(error) {error}"
+    else:
+        final_response = messages[-1].content
 
     calls = _tool_calls(messages)
     actual_tool = calls[0]["name"] if calls else None
@@ -252,6 +264,7 @@ async def _run_one(
         "final_response": final_response,
         "judge_reasoning": None,
         "timed_out": timed_out,
+        "error": error,
         # Every scored dimension exists on every record (None = not applicable), so
         # readers never have to guess whether a missing key means "skipped" or "bug".
         "tool_correct": None, "args_correct": None, "location_correct": None, "price_correct": None,
@@ -278,7 +291,7 @@ async def _run_one(
         "tool_ms": [(name, round(ms, 1)) for name, ms in timings.tool_ms],
     }
 
-    if timed_out:
+    if timed_out or error:
         # Nothing to score -- every dimension stays None, and the row shows PASS = fail.
         record["on_topic_correct"] = None
         record["overall_pass"] = False
@@ -477,6 +490,8 @@ async def main() -> int:
                 # the one that mattered under two that already matched.
                 if record["timed_out"]:
                     print(f"       {_c('timeout', '1;31')}: no result within {args.timeout:.0f}s")
+                elif record["error"]:
+                    print(f"       {_c('error', '1;31')}: {record['error'][:200]}")
                 elif not record["on_topic_correct"]:
                     label = _c("on_topic", "1;31")
                     print(f"       {label}: expected={record['expected_on_topic']} actual={record['actual_on_topic']}")
