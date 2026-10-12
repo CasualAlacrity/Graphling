@@ -22,14 +22,25 @@ from tools.cargo_packing import format_container_sizes, usable_container_sizes
 from tools.uexcorp.trade_data import UEXTradeRoute
 
 # Multi-tenancy scoping boundary (docs/todo.md Phase 2): create_run_from_route stamps
-# user_id, and get_in_progress_runs/get_finalized_runs filter by it — those are the only
-# two ways a pilot's client ever learns a run/leg id in the first place (resolver.py
-# resolves against get_in_progress_runs; the overlay lists via the same two functions).
-# advance_leg/record_purchase/record_sale/finalize_run/delete_run take an id directly and
-# don't re-check ownership themselves — a UUID from a run/leg you were never handed isn't
-# guessable, so this is scoped transitively rather than duplicating the check at every
-# id-based call. Revisit if that stops being true (e.g. ids start getting shared/logged
-# somewhere cross-tenant).
+# user_id, get_in_progress_runs/get_finalized_runs filter by it, and every id-based
+# function (advance_leg/record_purchase/record_sale/update_transaction/finalize_run/
+# delete_run) re-checks it against the caller's user_id. That last part used to be left
+# "transitive" (a run/leg id was only learned via the filtered lists, so unguessable),
+# but an authenticated pilot holding any other pilot's id could then mutate that run —
+# ids are not a secret worth betting the ledger on.
+
+
+class NotFoundError(Exception):
+    """A run/leg id that doesn't exist OR belongs to another pilot — deliberately one
+    error, so a caller can't tell "someone else's run" from "no such run". The routes
+    map it to 404."""
+
+
+async def _get_owned_leg(session, leg_id: UUID, user_id: UUID) -> TradeLeg:
+    leg = await session.get(TradeLeg, leg_id)
+    if leg is None or leg.user_id != user_id:
+        raise NotFoundError(f"No trade leg with id {leg_id}")
+    return leg
 
 
 async def create_run_from_route(
@@ -98,11 +109,9 @@ async def get_finalized_runs(user_id: UUID, limit: int = 50) -> list[TradeRun]:
         return list(result.scalars().all())
 
 
-async def advance_leg(leg_id: UUID) -> TradeLeg:
+async def advance_leg(leg_id: UUID, *, user_id: UUID) -> TradeLeg:
     async with SessionLocal() as session:
-        leg = await session.get(TradeLeg, leg_id)
-        if leg is None:
-            raise ValueError(f"No trade leg with id {leg_id}")
+        leg = await _get_owned_leg(session, leg_id, user_id)
 
         field = next_unset_field(leg)
         if field is None:
@@ -150,12 +159,10 @@ def _apply_transaction(
 
 async def record_purchase(
         leg_id: UUID, quantity_scu: int, price_per_unit: int,
-        cargo_transfer_type: CargoTransferType, cargo_transfer_fee: int,
+        cargo_transfer_type: CargoTransferType, cargo_transfer_fee: int, *, user_id: UUID,
 ) -> TradeLeg:
     async with SessionLocal() as session:
-        leg = await session.get(TradeLeg, leg_id)
-        if leg is None:
-            raise ValueError(f"No trade leg with id {leg_id}")
+        leg = await _get_owned_leg(session, leg_id, user_id)
         if leg.leg_type != LegType.ACQUISITION:
             raise ValueError(f"Trade leg {leg_id} is not an acquisition leg")
         if leg.transaction_completed_at is not None:
@@ -187,12 +194,10 @@ async def record_purchase(
 
 async def record_sale(
         leg_id: UUID, quantity_scu: int, price_per_unit: int,
-        cargo_transfer_type: CargoTransferType, cargo_transfer_fee: int,
+        cargo_transfer_type: CargoTransferType, cargo_transfer_fee: int, *, user_id: UUID,
 ) -> TradeLeg:
     async with SessionLocal() as session:
-        leg = await session.get(TradeLeg, leg_id)
-        if leg is None:
-            raise ValueError(f"No trade leg with id {leg_id}")
+        leg = await _get_owned_leg(session, leg_id, user_id)
         if leg.leg_type != LegType.SALE:
             raise ValueError(f"Trade leg {leg_id} is not a sale leg")
         if leg.transaction_completed_at is not None:
@@ -213,6 +218,7 @@ async def record_sale(
 async def update_transaction(
         leg_id: UUID, quantity_scu: int | None = None, price_per_unit: int | None = None,
         cargo_transfer_fee: int | None = None, cargo_transfer_type: CargoTransferType | None = None,
+        *, user_id: UUID,
 ) -> TradeLeg:
     """Corrects a leg's already-recorded quantity/price/fee/transfer-type, up until its
     run is finalized -- for a Whisper mishearing or any other after-the-fact fix. Doesn't
@@ -221,9 +227,7 @@ async def update_transaction(
     a sale exceeding its own run's acquisition is a real case (cargo sold from inventory
     carried over from earlier play), not something to reject."""
     async with SessionLocal() as session:
-        leg = await session.get(TradeLeg, leg_id)
-        if leg is None:
-            raise ValueError(f"No trade leg with id {leg_id}")
+        leg = await _get_owned_leg(session, leg_id, user_id)
         if leg.transaction_completed_at is None:
             raise ValueError(
                 f"Trade leg {leg_id} has no recorded transaction yet -- "
@@ -254,14 +258,16 @@ async def update_transaction(
         return leg
 
 
-async def finalize_run(run_id: UUID) -> TradeRun:
+async def finalize_run(run_id: UUID, *, user_id: UUID) -> TradeRun:
     async with SessionLocal() as session:
         result = await session.execute(
-            select(TradeRun).where(TradeRun.id == run_id).options(selectinload(TradeRun.legs))
+            select(TradeRun)
+            .where(TradeRun.id == run_id, TradeRun.user_id == user_id)
+            .options(selectinload(TradeRun.legs))
         )
         run = result.scalar_one_or_none()
-        if run is None:
-            raise ValueError(f"No trade run with id {run_id}")
+        if run is None or run.user_id != user_id:
+            raise NotFoundError(f"No trade run with id {run_id}")
 
         if any(next_unset_field(leg) is not None for leg in run.legs):
             raise ValueError(f"Trade run {run_id} still has unfinished legs")
@@ -271,9 +277,10 @@ async def finalize_run(run_id: UUID) -> TradeRun:
         return run
 
 
-async def delete_run(run_id: UUID) -> None:
+async def delete_run(run_id: UUID, *, user_id: UUID) -> None:
     async with SessionLocal() as session:
         run = await session.get(TradeRun, run_id)
-        if run is not None:
-            await session.delete(run)
-            await session.commit()
+        if run is None or run.user_id != user_id:
+            raise NotFoundError(f"No trade run with id {run_id}")
+        await session.delete(run)
+        await session.commit()

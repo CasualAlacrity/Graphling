@@ -24,6 +24,7 @@ restart or run behind multiple server processes.
 import secrets
 import time
 from datetime import UTC, datetime, timedelta
+from urllib.parse import urlsplit
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -41,6 +42,8 @@ DISCORD_AUTHORIZE_URL = "https://discord.com/oauth2/authorize"
 DISCORD_TOKEN_URL = "https://discord.com/api/oauth2/token"
 DISCORD_USER_URL = "https://discord.com/api/users/@me"
 
+_LOOPBACK_HOSTS = {"localhost", "127.0.0.1"}
+
 _PENDING_LOGIN_TTL_SECONDS = 600
 _PENDING_LOGINS: dict[str, dict] = {}
 
@@ -56,6 +59,30 @@ def _stash_pending_login(redirect_uri: str, client_state: str) -> str:
     return nonce
 
 
+def _is_allowed_redirect_uri(redirect_uri: str) -> bool:
+    """The callback redirect carries the pilot's JWT in its query string, so an
+    unchecked redirect_uri would let anyone mint a /discord/login link that hands a
+    victim's token to their own host. Only the desktop client's loopback listener and
+    explicitly configured origins (settings.auth_allowed_redirect_origins) qualify."""
+    # Backslashes/whitespace/control chars parse differently in urllib than in browsers
+    # (http://evil.com\@localhost/ is host "localhost" to urlparse, "evil.com" to Chrome).
+    if any(ch == "\\" or ch.isspace() or ord(ch) < 0x20 for ch in redirect_uri):
+        return False
+    try:
+        parsed = urlsplit(redirect_uri)
+        port = parsed.port
+    except ValueError:
+        return False
+    if parsed.username is not None or parsed.password is not None or parsed.fragment:
+        return False
+
+    if parsed.scheme == "http" and parsed.hostname in _LOOPBACK_HOSTS:
+        return True
+
+    origin = f"{parsed.scheme}://{parsed.hostname}" + (f":{port}" if port is not None else "")
+    return origin in {o.rstrip("/").lower() for o in settings.auth_allowed_redirect_origins}
+
+
 def _issue_jwt(user_id) -> str:
     expire = datetime.now(UTC) + timedelta(minutes=settings.jwt_expire_minutes)
     return jwt.encode({"sub": str(user_id), "exp": expire}, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
@@ -63,6 +90,8 @@ def _issue_jwt(user_id) -> str:
 
 @router.get("/discord/login")
 async def discord_login(redirect_uri: str, client_state: str) -> RedirectResponse:
+    if not _is_allowed_redirect_uri(redirect_uri):
+        raise HTTPException(status_code=400, detail="redirect_uri is not an allowed ALICE client address.")
     nonce = _stash_pending_login(redirect_uri, client_state)
     params = {
         "client_id": settings.discord_client_id,

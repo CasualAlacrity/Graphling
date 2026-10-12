@@ -14,10 +14,13 @@ import pytest
 from db.models import CargoTransferType, LegType, TradeLeg, TradeRun
 from server import ledger_service
 
+OWNER = uuid.uuid4()
+
 
 def _make_leg(leg_type, cargo_transfer_type=CargoTransferType.MANUAL, **overrides):
     fields = {
         "id": uuid.uuid4(),
+        "user_id": OWNER,
         "leg_type": leg_type,
         "terminal_id": 1,
         "terminal_name": "Test Terminal",
@@ -38,7 +41,10 @@ def _make_leg(leg_type, cargo_transfer_type=CargoTransferType.MANUAL, **override
 
 
 def _make_run(legs, **overrides):
-    fields = {"id": uuid.uuid4(), "ship": None, "created_at": datetime.now(UTC), "finalized_at": None, "legs": legs}
+    fields = {
+        "id": uuid.uuid4(), "user_id": OWNER, "ship": None,
+        "created_at": datetime.now(UTC), "finalized_at": None, "legs": legs,
+    }
     fields.update(overrides)
     return TradeRun(**fields)
 
@@ -81,7 +87,7 @@ async def test_advance_leg_sets_the_next_field(monkeypatch):
     session = _FakeSession(get_value=leg)
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
 
-    result = await ledger_service.advance_leg(leg.id)
+    result = await ledger_service.advance_leg(leg.id, user_id=OWNER)
 
     assert result.reached_at is not None
     assert session.committed
@@ -102,7 +108,7 @@ async def test_advance_leg_finalizing_starts_the_sibling_leg(monkeypatch):
     session = _FakeSession(get_value=acquisition, execute_value=sale)
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
 
-    await ledger_service.advance_leg(acquisition.id)
+    await ledger_service.advance_leg(acquisition.id, user_id=OWNER)
 
     assert sale.started_at is not None
 
@@ -121,7 +127,7 @@ async def test_advance_leg_finalizing_does_not_clobber_an_already_started_siblin
     session = _FakeSession(get_value=acquisition, execute_value=sale)
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
 
-    await ledger_service.advance_leg(acquisition.id)
+    await ledger_service.advance_leg(acquisition.id, user_id=OWNER)
 
     assert sale.started_at == original_start
 
@@ -134,14 +140,14 @@ async def test_advance_leg_raises_when_already_finalized(monkeypatch):
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: _FakeSession(get_value=leg))
 
     with pytest.raises(ValueError, match="already finalized"):
-        await ledger_service.advance_leg(leg.id)
+        await ledger_service.advance_leg(leg.id, user_id=OWNER)
 
 
 async def test_advance_leg_raises_when_leg_not_found(monkeypatch):
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: _FakeSession(get_value=None))
 
-    with pytest.raises(ValueError, match="No trade leg"):
-        await ledger_service.advance_leg(uuid.uuid4())
+    with pytest.raises(ledger_service.NotFoundError, match="No trade leg"):
+        await ledger_service.advance_leg(uuid.uuid4(), user_id=OWNER)
 
 
 async def test_advance_leg_raises_when_next_step_needs_transaction_data(monkeypatch):
@@ -152,7 +158,7 @@ async def test_advance_leg_raises_when_next_step_needs_transaction_data(monkeypa
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: _FakeSession(get_value=leg))
 
     with pytest.raises(ValueError, match="record_purchase/record_sale"):
-        await ledger_service.advance_leg(leg.id)
+        await ledger_service.advance_leg(leg.id, user_id=OWNER)
 
 
 async def test_record_purchase_writes_fields_and_stamps_transaction_only(monkeypatch):
@@ -160,7 +166,7 @@ async def test_record_purchase_writes_fields_and_stamps_transaction_only(monkeyp
     session = _FakeSession(get_value=leg)
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
 
-    result = await ledger_service.record_purchase(leg.id, 40, 12, CargoTransferType.AUTOLOAD, 5000)
+    result = await ledger_service.record_purchase(leg.id, 40, 12, CargoTransferType.AUTOLOAD, 5000, user_id=OWNER)
 
     assert result.quantity_scu == 40
     assert result.price_per_unit == 12
@@ -176,7 +182,7 @@ async def test_record_purchase_raises_on_sale_leg(monkeypatch):
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: _FakeSession(get_value=leg))
 
     with pytest.raises(ValueError, match="not an acquisition leg"):
-        await ledger_service.record_purchase(leg.id, 1, 1, CargoTransferType.MANUAL, 0)
+        await ledger_service.record_purchase(leg.id, 1, 1, CargoTransferType.MANUAL, 0, user_id=OWNER)
 
 
 async def test_record_purchase_raises_if_already_recorded(monkeypatch):
@@ -184,7 +190,7 @@ async def test_record_purchase_raises_if_already_recorded(monkeypatch):
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: _FakeSession(get_value=leg))
 
     with pytest.raises(ValueError, match="already recorded"):
-        await ledger_service.record_purchase(leg.id, 1, 1, CargoTransferType.MANUAL, 0)
+        await ledger_service.record_purchase(leg.id, 1, 1, CargoTransferType.MANUAL, 0, user_id=OWNER)
 
 
 async def test_record_sale_writes_fields_and_stamps_both_timestamps(monkeypatch):
@@ -195,7 +201,7 @@ async def test_record_sale_writes_fields_and_stamps_both_timestamps(monkeypatch)
     session = _FakeSession(get_value=leg)
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
 
-    result = await ledger_service.record_sale(leg.id, 30, 20, CargoTransferType.MANUAL, 0)
+    result = await ledger_service.record_sale(leg.id, 30, 20, CargoTransferType.MANUAL, 0, user_id=OWNER)
 
     assert result.quantity_scu == 30
     assert result.price_per_unit == 20
@@ -212,7 +218,7 @@ async def test_record_sale_preserves_existing_transferred_at(monkeypatch):
     session = _FakeSession(get_value=leg)
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
 
-    result = await ledger_service.record_sale(leg.id, 30, 20, CargoTransferType.MANUAL, 0)
+    result = await ledger_service.record_sale(leg.id, 30, 20, CargoTransferType.MANUAL, 0, user_id=OWNER)
 
     assert result.transaction_completed_at is not None
     assert result.transferred_at == unloaded_at
@@ -223,7 +229,7 @@ async def test_record_sale_raises_on_acquisition_leg(monkeypatch):
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: _FakeSession(get_value=leg))
 
     with pytest.raises(ValueError, match="not a sale leg"):
-        await ledger_service.record_sale(leg.id, 1, 1, CargoTransferType.MANUAL, 0)
+        await ledger_service.record_sale(leg.id, 1, 1, CargoTransferType.MANUAL, 0, user_id=OWNER)
 
 
 async def test_record_sale_raises_if_already_recorded(monkeypatch):
@@ -231,7 +237,7 @@ async def test_record_sale_raises_if_already_recorded(monkeypatch):
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: _FakeSession(get_value=leg))
 
     with pytest.raises(ValueError, match="already recorded"):
-        await ledger_service.record_sale(leg.id, 1, 1, CargoTransferType.MANUAL, 0)
+        await ledger_service.record_sale(leg.id, 1, 1, CargoTransferType.MANUAL, 0, user_id=OWNER)
 
 
 async def test_record_purchase_carries_quantity_forward_to_unrecorded_sale(monkeypatch):
@@ -245,7 +251,7 @@ async def test_record_purchase_carries_quantity_forward_to_unrecorded_sale(monke
     session = _FakeSession(get_value=acquisition, execute_value=sale)
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
 
-    await ledger_service.record_purchase(acquisition.id, 614, 10, CargoTransferType.MANUAL, 0)
+    await ledger_service.record_purchase(acquisition.id, 614, 10, CargoTransferType.MANUAL, 0, user_id=OWNER)
 
     assert sale.quantity_scu == 614
 
@@ -262,7 +268,7 @@ async def test_record_purchase_does_not_touch_an_already_recorded_sale(monkeypat
     session = _FakeSession(get_value=acquisition, execute_value=sale)
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
 
-    await ledger_service.record_purchase(acquisition.id, 614, 10, CargoTransferType.MANUAL, 0)
+    await ledger_service.record_purchase(acquisition.id, 614, 10, CargoTransferType.MANUAL, 0, user_id=OWNER)
 
     assert sale.quantity_scu == 700
 
@@ -273,7 +279,7 @@ async def test_update_transaction_edits_a_recorded_leg(monkeypatch):
     session = _FakeSession(get_value=leg, execute_value=None)  # run not finalized
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
 
-    result = await ledger_service.update_transaction(leg.id, price_per_unit=99)
+    result = await ledger_service.update_transaction(leg.id, price_per_unit=99, user_id=OWNER)
 
     assert result.price_per_unit == 99
     assert result.transaction_completed_at == now
@@ -286,7 +292,7 @@ async def test_update_transaction_on_a_done_leg_keeps_it_done(monkeypatch):
     session = _FakeSession(get_value=leg, execute_value=None)
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
 
-    result = await ledger_service.update_transaction(leg.id, quantity_scu=99)
+    result = await ledger_service.update_transaction(leg.id, quantity_scu=99, user_id=OWNER)
 
     assert result.quantity_scu == 99
     assert result.finalized_at == now
@@ -298,7 +304,7 @@ async def test_update_transaction_rejects_on_a_finalized_run(monkeypatch):
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
 
     with pytest.raises(ValueError, match="already finalized"):
-        await ledger_service.update_transaction(leg.id, quantity_scu=1)
+        await ledger_service.update_transaction(leg.id, quantity_scu=1, user_id=OWNER)
 
 
 async def test_update_transaction_rejects_before_anything_recorded(monkeypatch):
@@ -306,14 +312,14 @@ async def test_update_transaction_rejects_before_anything_recorded(monkeypatch):
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: _FakeSession(get_value=leg))
 
     with pytest.raises(ValueError, match="record_purchase/record_sale"):
-        await ledger_service.update_transaction(leg.id, quantity_scu=1)
+        await ledger_service.update_transaction(leg.id, quantity_scu=1, user_id=OWNER)
 
 
 async def test_update_transaction_raises_when_leg_not_found(monkeypatch):
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: _FakeSession(get_value=None))
 
-    with pytest.raises(ValueError, match="No trade leg"):
-        await ledger_service.update_transaction(uuid.uuid4(), quantity_scu=1)
+    with pytest.raises(ledger_service.NotFoundError, match="No trade leg"):
+        await ledger_service.update_transaction(uuid.uuid4(), quantity_scu=1, user_id=OWNER)
 
 
 async def test_update_transaction_rejects_negative_values(monkeypatch):
@@ -322,7 +328,7 @@ async def test_update_transaction_rejects_negative_values(monkeypatch):
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
 
     with pytest.raises(ValueError, match="can't be negative"):
-        await ledger_service.update_transaction(leg.id, price_per_unit=-5)
+        await ledger_service.update_transaction(leg.id, price_per_unit=-5, user_id=OWNER)
 
 
 async def test_update_transaction_edits_transfer_type_without_touching_transferred_at(monkeypatch):
@@ -334,7 +340,9 @@ async def test_update_transaction_edits_transfer_type_without_touching_transferr
     session = _FakeSession(get_value=leg, execute_value=None)
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
 
-    result = await ledger_service.update_transaction(leg.id, cargo_transfer_type=CargoTransferType.AUTOLOAD)
+    result = await ledger_service.update_transaction(
+        leg.id, cargo_transfer_type=CargoTransferType.AUTOLOAD, user_id=OWNER,
+    )
 
     assert result.cargo_transfer_type == CargoTransferType.AUTOLOAD
     assert result.transferred_at == transferred_at
@@ -348,7 +356,7 @@ async def test_update_transaction_allows_sale_quantity_above_bought(monkeypatch)
     session = _FakeSession(get_value=leg, execute_value=None)
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
 
-    result = await ledger_service.update_transaction(leg.id, quantity_scu=99999)
+    result = await ledger_service.update_transaction(leg.id, quantity_scu=99999, user_id=OWNER)
 
     assert result.quantity_scu == 99999
 
@@ -363,7 +371,7 @@ async def test_finalize_run_raises_when_a_leg_is_unfinished(monkeypatch):
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: _FakeSession(execute_value=run))
 
     with pytest.raises(ValueError, match="unfinished legs"):
-        await ledger_service.finalize_run(run.id)
+        await ledger_service.finalize_run(run.id, user_id=OWNER)
 
 
 async def test_finalize_run_succeeds_when_every_leg_is_done(monkeypatch):
@@ -378,7 +386,7 @@ async def test_finalize_run_succeeds_when_every_leg_is_done(monkeypatch):
     session = _FakeSession(execute_value=run)
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
 
-    result = await ledger_service.finalize_run(run.id)
+    result = await ledger_service.finalize_run(run.id, user_id=OWNER)
 
     assert result.finalized_at is not None
     assert session.committed
@@ -398,18 +406,107 @@ async def test_delete_run_deletes_when_found(monkeypatch):
     session = _DeleteSession()
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
 
-    await ledger_service.delete_run(run.id)
+    await ledger_service.delete_run(run.id, user_id=OWNER)
 
     assert session.deleted is run
     assert session.committed
 
 
-async def test_delete_run_is_a_noop_when_not_found(monkeypatch):
+async def test_delete_run_raises_not_found_when_missing(monkeypatch):
     session = _FakeSession(get_value=None)
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
 
-    await ledger_service.delete_run(uuid.uuid4())  # must not raise
+    with pytest.raises(ledger_service.NotFoundError, match="No trade run"):
+        await ledger_service.delete_run(uuid.uuid4(), user_id=OWNER)
 
+    assert session.committed is False
+
+
+# Ownership: another pilot's run/leg must look exactly like a missing one (NotFoundError,
+# same message) and must not be touched. The fake session ignores the WHERE clause, so
+# these exercise the service's own post-fetch user_id check.
+
+OTHER_PILOT = uuid.uuid4()
+
+
+async def test_advance_leg_rejects_another_pilots_leg(monkeypatch):
+    leg = _make_leg(LegType.ACQUISITION, started_at=datetime.now(UTC))
+    session = _FakeSession(get_value=leg)
+    monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
+
+    with pytest.raises(ledger_service.NotFoundError, match="No trade leg"):
+        await ledger_service.advance_leg(leg.id, user_id=OTHER_PILOT)
+
+    assert leg.reached_at is None
+    assert session.committed is False
+
+
+async def test_record_purchase_rejects_another_pilots_leg(monkeypatch):
+    leg = _make_leg(LegType.ACQUISITION)
+    session = _FakeSession(get_value=leg)
+    monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
+
+    with pytest.raises(ledger_service.NotFoundError):
+        await ledger_service.record_purchase(leg.id, 1, 1, CargoTransferType.MANUAL, 0, user_id=OTHER_PILOT)
+
+    assert leg.transaction_completed_at is None
+    assert session.committed is False
+
+
+async def test_record_sale_rejects_another_pilots_leg(monkeypatch):
+    leg = _make_leg(LegType.SALE)
+    session = _FakeSession(get_value=leg)
+    monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
+
+    with pytest.raises(ledger_service.NotFoundError):
+        await ledger_service.record_sale(leg.id, 1, 1, CargoTransferType.MANUAL, 0, user_id=OTHER_PILOT)
+
+    assert leg.transaction_completed_at is None
+    assert session.committed is False
+
+
+async def test_update_transaction_rejects_another_pilots_leg(monkeypatch):
+    leg = _make_leg(LegType.ACQUISITION, transaction_completed_at=datetime.now(UTC))
+    session = _FakeSession(get_value=leg, execute_value=None)
+    monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
+
+    with pytest.raises(ledger_service.NotFoundError):
+        await ledger_service.update_transaction(leg.id, quantity_scu=999, user_id=OTHER_PILOT)
+
+    assert leg.quantity_scu == 10
+    assert session.committed is False
+
+
+async def test_finalize_run_rejects_another_pilots_run(monkeypatch):
+    run = _make_run([])
+    session = _FakeSession(execute_value=run)
+    monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
+
+    with pytest.raises(ledger_service.NotFoundError, match="No trade run"):
+        await ledger_service.finalize_run(run.id, user_id=OTHER_PILOT)
+
+    assert run.finalized_at is None
+    assert session.committed is False
+
+
+async def test_delete_run_rejects_another_pilots_run(monkeypatch):
+    run = _make_run([])
+
+    class _DeleteSession(_FakeSession):
+        def __init__(self):
+            super().__init__(get_value=run)
+            self.deleted = None
+
+        async def delete(self, obj):
+            self.deleted = obj
+
+    session = _DeleteSession()
+    monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
+
+    with pytest.raises(ledger_service.NotFoundError, match="No trade run"):
+        await ledger_service.delete_run(run.id, user_id=OTHER_PILOT)
+
+    assert session.deleted is None
     assert session.committed is False
 
 

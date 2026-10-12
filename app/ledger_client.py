@@ -12,11 +12,23 @@ the difference.
 """
 from uuid import UUID
 
-from api_client import authenticated_client, raise_for_status
+import httpx
+
+from api_client import authenticated_client
+from api_client import raise_for_status as _api_raise_for_status
 from db.models import CargoTransferType, LegMilestone
 from db.trade_run_store import next_unset_field
 from ledger_schemas import TradeLegOut, TradeRunOut
 from tools.uexcorp.trade_data import UEXTradeRoute
+
+
+def raise_for_status(response: httpx.Response) -> None:
+    # The ledger routes return 404 {"detail": "No trade leg with id ..."} for a run/leg
+    # that doesn't exist or isn't this pilot's. That used to be a 400, so surface it as
+    # the same ValueError the tools' `except ValueError` handling already expects.
+    if response.status_code == 404:
+        raise ValueError(response.json().get("detail", response.text))
+    _api_raise_for_status(response)
 
 
 async def create_run_from_route(route: UEXTradeRoute, quantity_scu: int, ship: str | None) -> TradeRunOut:

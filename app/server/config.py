@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     discord_client_id: str = ""
     discord_client_secret: str = ""
     discord_redirect_uri: str = "http://localhost:8000/auth/discord/callback"
+    # Where /auth/discord/login may send the browser (with the JWT in the query string)
+    # once login completes. Loopback http://localhost:<port> and http://127.0.0.1:<port>
+    # (the desktop client's one-shot listener, auth/discord_identity.py) are always
+    # allowed; this adds exact origins on top, e.g. ["https://heyalice.help"] for a future
+    # web client. Env: AUTH_ALLOWED_REDIRECT_ORIGINS='["https://heyalice.help"]'.
+    auth_allowed_redirect_origins: list[str] = []
 
     # JWT
     jwt_secret_key: str = ""

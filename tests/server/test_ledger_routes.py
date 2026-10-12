@@ -7,6 +7,7 @@ JWT — server/test_auth.py already covers the auth relay itself.
 import uuid
 from datetime import UTC, datetime
 
+import pytest
 from fastapi.testclient import TestClient
 
 from db.models import LegType, TradeLeg, TradeRun, User
@@ -72,8 +73,11 @@ def test_update_transaction_returns_the_updated_leg(monkeypatch):
     app.dependency_overrides[get_current_user] = lambda: fake_user
     leg_id = uuid.uuid4()
 
-    async def fake_update_transaction(given_leg_id, quantity_scu, price_per_unit, cargo_transfer_fee, cargo_transfer_type):
+    async def fake_update_transaction(
+            given_leg_id, quantity_scu, price_per_unit, cargo_transfer_fee, cargo_transfer_type, *, user_id,
+    ):
         assert given_leg_id == leg_id
+        assert user_id == fake_user.id
         assert quantity_scu == 99
         return _make_leg(id=leg_id, quantity_scu=99, transaction_completed_at=datetime.now(UTC))
 
@@ -114,7 +118,7 @@ def test_advance_leg_surfaces_a_value_error_as_400(monkeypatch):
     app.dependency_overrides[get_current_user] = lambda: fake_user
     leg_id = uuid.uuid4()
 
-    async def fake_advance_leg(given_leg_id):
+    async def fake_advance_leg(given_leg_id, *, user_id):
         assert given_leg_id == leg_id
         raise ValueError(f"Trade leg {leg_id} is already finalized")
 
@@ -128,3 +132,75 @@ def test_advance_leg_surfaces_a_value_error_as_400(monkeypatch):
 
     assert response.status_code == 400
     assert "already finalized" in response.json()["detail"]
+
+
+# Ownership at the HTTP layer: every id-based mutating route must hand the JWT's user.id
+# to the service and turn its NotFoundError into a 404 (not 403 — that would confirm the
+# id belongs to someone). The real service is used against a fake session holding a
+# run/leg owned by a different pilot, so this covers routes + service together.
+
+class _OtherPilotsSession:
+    def __init__(self, record):
+        self._record = record
+        self.committed = False
+        self.deleted = None
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def get(self, model, entity_id):
+        return self._record
+
+    async def execute(self, stmt):
+        record = self._record
+
+        class _Result:
+            def scalar_one_or_none(self):
+                return record
+
+        return _Result()
+
+    async def delete(self, obj):
+        self.deleted = obj
+
+    async def commit(self):
+        self.committed = True
+
+
+_TXN = {"quantity_scu": 5, "price_per_unit": 7, "cargo_transfer_type": "manual", "cargo_transfer_fee": 0}
+
+
+@pytest.mark.parametrize(("method", "path", "json", "kind"), [
+    ("post", "/trade-runs/{id}/finalize", None, "run"),
+    ("delete", "/trade-runs/{id}", None, "run"),
+    ("post", "/trade-runs/legs/{id}/advance", None, "leg"),
+    ("post", "/trade-runs/legs/{id}/purchase", _TXN, "leg"),
+    ("post", "/trade-runs/legs/{id}/sale", _TXN, "sale_leg"),
+    ("patch", "/trade-runs/legs/{id}/transaction", {"quantity_scu": 999}, "done_leg"),
+])
+def test_mutating_routes_return_404_for_another_pilots_record(monkeypatch, method, path, json, kind):
+    caller = User(id=uuid.uuid4(), discord_id="caller")
+    owner_id = uuid.uuid4()
+    record = {
+        "run": lambda: _make_run([], user_id=owner_id),
+        "leg": lambda: _make_leg(user_id=owner_id, started_at=datetime.now(UTC)),
+        "sale_leg": lambda: _make_leg(user_id=owner_id, leg_type=LegType.SALE),
+        "done_leg": lambda: _make_leg(user_id=owner_id, transaction_completed_at=datetime.now(UTC)),
+    }[kind]()
+    session = _OtherPilotsSession(record)
+    monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
+    app.dependency_overrides[get_current_user] = lambda: caller
+
+    try:
+        client = TestClient(app)
+        response = client.request(method, path.format(id=record.id), json=json)
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert response.status_code == 404
+    assert str(record.id) in response.json()["detail"]
+    assert session.committed is False
+    assert session.deleted is None

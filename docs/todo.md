@@ -318,11 +318,13 @@ fine, but don't design it now.
 - [x] **Runs scoped to owner — done 2026-09-25.** `get_in_progress_runs`/
       `get_finalized_runs` filter by the JWT-resolved `user_id` server-side now, instead
       of a client-side process-global. No cross-visibility of active runs.
-      **Scoping boundary, on purpose, unchanged by the server move:**
-      `advance_leg`/`record_purchase`/`record_sale`/`finalize_run`/`delete_run` take an
-      id directly and don't re-check ownership — a leg/run id is only ever learned via
-      the two filtered list functions above, so this is scoped transitively. Revisit if
-      ids ever start getting shared/logged cross-tenant.
+      **Id-based mutations ownership-checked — 2026-10-12.** `advance_leg`/
+      `record_purchase`/`record_sale`/`update_transaction`/`finalize_run`/`delete_run`
+      used to rely on ids being learned only via the filtered lists ("transitive"
+      scoping); any authenticated pilot holding another's id could mutate it. They now
+      take the JWT's `user_id` and 404 (not 403) on a run/leg that isn't the caller's.
+      Same pass: `/auth/discord/login`'s `redirect_uri` is allowlisted (loopback +
+      `AUTH_ALLOWED_REDIRECT_ORIGINS`) — it was an open redirect carrying the JWT.
 - [x] Update CLAUDE.md's multi-tenancy framing — already done (it currently reads
       "Multi-tenancy is on the roadmap", no "v1 scope … no multi-tenancy" language left).
 
