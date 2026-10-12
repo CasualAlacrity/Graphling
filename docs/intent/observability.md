@@ -1,7 +1,10 @@
 # Intent — observability and alerting
 
-**Status:** not started (2026-09-18). Hardware is on hand (Pis, 2.5" SSDs for FrankenRack);
-nothing is instrumented yet.
+**Status:** not started (2026-09-18). Hardware is on hand (Pis, 2.5" SSDs for FrankenRack).
+**Update 2026-10-12:** the first data is being collected. The LLM and TTS gateways write
+`llm_usage` / `tts_usage` rows (backend, fallback reason tagged as peak diversion vs. failure,
+latency, concurrency, cost). Panels, queries and the gaps that remain are in `docs/analytics.md`.
+No dashboard or alerting yet.
 
 ## Problem
 

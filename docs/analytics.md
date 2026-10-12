@@ -3,6 +3,15 @@
 **Status:** the data is collected (2026-10-12); the dashboard isn't built yet. These are the notes
 for building it in Grafana once there are pilots to look at.
 
+**This is the usage and cost slice of [intent/observability.md](intent/observability.md)** (decided
+2026-09-18), which sets the overall plan: where Grafana runs, what pages Jeff, and LangSmith vs.
+Grafana. Where they overlap, that doc wins. In short:
+- **Grafana runs on the FrankenRack Pis at home.**
+- **Alerting runs from Hetzner,** with a dead-man's switch to an external service, so a dark house
+  still pages.
+- **Grafana answers "is something degrading" across all users; LangSmith answers "what happened
+  in this one conversation"** (sampled low).
+
 **The questions it answers:**
 - How much of ALICE runs on our own hardware vs. paid cloud APIs, and what each costs.
 - How close frankencompute runs to its limits.
@@ -24,7 +33,9 @@ metadata only, never text.
 - `latency_ms`
 - `status`: `ok` or `error`
 - `fallback_reason`: `down`, `timeout`, `5xx`, `overflow` or `digest_mismatch`; NULL means
-  frankencompute answered
+  frankencompute answered. `overflow` is *planned peak diversion*; every other value is a
+  *failure fallback*. They're tagged separately on purpose: [intent/model-stack.md](intent/model-stack.md)
+  says they must never share a counter.
 - `cost_usd`
 
 **LLM-only:** `role`, `model`, `prompt_tokens`, `cache_read_tokens`, `completion_tokens`, and
@@ -62,8 +73,10 @@ Make the same panel for `tts_usage`. The headline stat is the **local share**:
 SELECT fallback_reason, count(*), sum(cost_usd) AS usd
 FROM llm_usage WHERE $__timeFilter(created_at) AND fallback_reason IS NOT NULL GROUP BY 1;
 ```
-- `overflow` means the box was full, which is a capacity signal.
-- `down`, `timeout` and `5xx` mean it was off or broken, which is a reliability signal.
+- `overflow` means the box was full, which is a capacity signal. It's capacity management
+  working as designed, so it never pages.
+- `down`, `timeout`, `5xx` and `digest_mismatch` mean it was off or broken. That's the
+  **failure-fallback rate**, a priority alert (below), not just a panel.
 
 **Concurrency**, the number guessed at before launch (about 2.5% busy per active pilot) and now measured:
 ```sql
@@ -110,11 +123,39 @@ WHERE backend = 'elevenlabs' AND created_at >= date_trunc('month', now());
 | Local share of TTS | TTS requests by backend | Low = ElevenLabs is covering outages. Count the characters against the plan. |
 | Turns/month vs. break-even | `count(*)` of respond calls | The box beats Haiku-only at roughly 18k–55k turns/month (docs/frankencompute-bench.md). |
 
+## Alerts (from intent/observability.md)
+
+- **Failure-fallback rate and spend:** fallbacks excluding `overflow`. Every one is a paid call a
+  local model was meant to serve, so the threshold is money. Alert when failure-fallback
+  `sum(cost_usd)` over a week passes a set figure. Tune it against real usage, don't guess.
+- **Hard spend caps come before alerts.** The planned `FALLBACK_DAILY_USD_CAP` in
+  [llm-gateway.md](llm-gateway.md) (Limits) bounds a runaway weekend. An alert only tells you
+  about it.
+
+## Gaps against intent/observability.md (not collected yet)
+
+- **Time to first token.** The observability doc names *TTFT under concurrency* as the
+  hardware-purchase trigger. Today `llm_usage.latency_ms` is the whole call. The gateway already
+  streams frankencompute's reply, so adding a `first_token_ms` column is a small change: stamp
+  the first chunk. Do it before relying on the latency panel for a purchase decision.
+- **Decline rate by classify `reason`** (guardrail health) is client-side, in the graph's
+  classify_topic. It never reaches the server. It needs either the turn-metrics upload below,
+  or the gateway reading the classify response.
+- **Client turn timings** (`turn_metrics.jsonl`: Whisper, TTS first byte, round trip). Uploading
+  them was deferred on 2026-10-01 ([voice-stage-timing.md](voice-stage-timing.md)) until there
+  are several pilots. The plan is one more table in this Postgres, written best-effort.
+- **Product signals** (routes recommended vs. runs started, runs started vs. finalized) and
+  **extraction health** (OCR, not built). These come from the ledger tables and the future
+  OCR pipeline, not from these usage tables.
+
 ## Setting up Grafana (when it's time)
 
-- **Datasource:** a read-only Postgres role (`GRANT SELECT ON llm_usage, tts_usage, users`), never
-  the app's own user.
-- **Postgres isn't exposed outside Docker today, on purpose.** Run Grafana as one more container on
-  the same compose network, or give Grafana Cloud access over Tailscale.
-- **The Hetzner box has ~2.7 GB of RAM free.** Grafana itself is ~200 MB, which fits.
+- **Where:** on the FrankenRack Pis, per intent/observability.md.
+- **Postgres stays private.** It isn't exposed outside Docker today, on purpose. Reach it from
+  the Pis over Tailscale: publish Postgres on the Hetzner host's Tailscale IP only, never on
+  0.0.0.0.
+- **Datasource:** a read-only Postgres role (`GRANT SELECT ON llm_usage, tts_usage, users`),
+  never the app's own user.
+- **Alerts stay off the Pis.** Alert delivery runs from Hetzner, because a dashboard at home
+  can't page about the home being dark.
 - **Keep the dashboard JSON in this repo**, so panels are reviewed like code.
