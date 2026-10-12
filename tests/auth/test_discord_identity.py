@@ -281,3 +281,23 @@ def test_refusal_message_names_the_discord_account():
 ])
 def test_callback_page_tells_the_pilot_what_happened(result, expected):
     assert expected in discord_identity._callback_page(result)
+
+
+@pytest.mark.parametrize("cached_token, expected, unexpected", [
+    (None, "Opening your browser to sign in", "expired"),
+    ("old", "Your login has expired", None),
+])
+async def test_relogin_only_says_expired_when_there_was_a_token(
+    monkeypatch, tmp_path, capsys, cached_token, expected, unexpected,
+):
+    monkeypatch.setattr(discord_identity, "IDENTITY_CACHE_PATH", tmp_path / "identity.json")
+    if cached_token is not None:
+        discord_identity._save_cached_session(discord_identity.PilotSession(token=cached_token, username="jeff"))
+    monkeypatch.setattr(discord_identity, "login", _returning(discord_identity.PilotSession(token="new", username="jeff")))
+
+    await discord_identity.relogin_after_rejection(cached_token)
+
+    printed = capsys.readouterr().out
+    assert expected in printed
+    if unexpected:
+        assert unexpected not in printed

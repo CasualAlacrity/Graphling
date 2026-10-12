@@ -234,7 +234,13 @@ async def relogin_after_rejection(rejected_token: str | None) -> str:
         cached = _load_cached_session()
         if cached is not None and cached.token != rejected_token:
             return cached.token
-        print("[ALICE] Your login has expired. Opening your browser to sign in with Discord again...", flush=True)
+        if rejected_token is None:
+            # Nothing cached at all: a first install, or the last login was refused. On a
+            # first install this is where the very first login happens (the startup
+            # reference-data fetch), so "expired" would be wrong.
+            print("[ALICE] Opening your browser to sign in with Discord...", flush=True)
+        else:
+            print("[ALICE] Your login has expired. Opening your browser to sign in with Discord again...", flush=True)
         session = await login()
         return session.token
     finally:
