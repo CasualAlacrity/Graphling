@@ -19,7 +19,7 @@ services:
       retries: 20
 
   server:
-    image: feenstra32/graphling-server:5fb2462
+    image: feenstra32/graphling-server:b337ff1
     restart: unless-stopped
     depends_on:
       postgres:
@@ -40,6 +40,13 @@ services:
       # default anthropic). Only the chosen provider's key is needed.
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      # TTS gateway: Kokoro on frankencompute over Tailscale, e.g. http://100.x.y.z:8880.
+      # ElevenLabs is the optional fallback (a different voice); leave its key empty to
+      # have ALICE stay quiet instead while frankencompute is down.
+      FRANKENCOMPUTE_TTS_URL: ${FRANKENCOMPUTE_TTS_URL}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
+      ELEVENLABS_VOICE_ID: ${ELEVENLABS_VOICE_ID:-}
+      ELEVENLABS_USD_PER_1K_CHARS: ${ELEVENLABS_USD_PER_1K_CHARS:-0}
     # Bound to loopback only, not 0.0.0.0 — nginx (already on this box, see
     # docs/deploy.md) is the only path in, proxying api.heyalice.help to here, same
     # shape as Flockt's app.flockt.farm -> 127.0.0.1:8088.

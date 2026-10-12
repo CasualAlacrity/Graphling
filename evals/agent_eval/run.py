@@ -132,8 +132,8 @@ def _resolve_model_name(model_provider: str) -> str:
     (llm.py's get_chat_llm/get_classification_llm, OLLAMA_CHAT_MODEL vs
     OLLAMA_CLASSIFICATION_MODEL) -- when those two differ, report a composite label
     rather than silently naming the run after only one of the two models that
-    actually ran. turn_metrics.DEFAULT_LOCAL_POWER_WATTS covers the cost lookup for
-    a label like this with no matching table entry."""
+    actually ran. Local calls are priced by duration (model_pricing.local_energy_cost_usd),
+    so a label like this needs no pricing entry."""
     if model_provider == "alice":
         # The gateway picks the real model server-side; per-call models (and fallbacks)
         # are in each record's cost_by_node / turn usage, not knowable up front.

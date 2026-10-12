@@ -1,10 +1,11 @@
 import os
 
-import httpx
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
+
+from auth.session_auth import PilotSessionAuth
 
 load_dotenv()
 
@@ -16,23 +17,6 @@ ALICE_CHAT_ROLE = "alice-chat"
 ALICE_CLASSIFY_ROLE = "alice-classify"
 
 
-class _PilotSessionAuth(httpx.Auth):
-    """Attaches the pilot's JWT per request, read from the login cache at send time.
-    It can't be baked in when the LLM is built: graph.py builds its LLMs at import,
-    and on a first install that happens while the pilot is still mid-login
-    (voice.run gathers get_pilot_session alongside everything else)."""
-
-    def auth_flow(self, request):
-        # Imported here, not at module level -- auth.discord_identity has no reason to
-        # load for the ollama/openai/anthropic providers.
-        from auth.discord_identity import cached_session_token
-
-        token = cached_session_token()
-        if token is not None:
-            request.headers["Authorization"] = f"Bearer {token}"
-        yield request
-
-
 def _alice_llm(role: str, reasoning: bool) -> ChatOllama:
     """ChatOllama pointed at the gateway, which speaks Ollama's native /api/chat -- the
     same protocol the evals ran against, so the frankencompute path is unchanged.
@@ -42,7 +26,7 @@ def _alice_llm(role: str, reasoning: bool) -> ChatOllama:
     back in later history -- the same message shape the evals ran with."""
     api_url = os.getenv("ALICE_API_URL", "http://localhost:8000").rstrip("/")
     return ChatOllama(
-        model=role, reasoning=reasoning, base_url=f"{api_url}/llm", client_kwargs={"auth": _PilotSessionAuth()},
+        model=role, reasoning=reasoning, base_url=f"{api_url}/llm", client_kwargs={"auth": PilotSessionAuth()},
     )
 
 

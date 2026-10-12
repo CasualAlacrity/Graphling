@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import turn_metrics
+import model_pricing
 from turn_metrics import (
     LLMCallUsage,
     TurnMetricsCallback,
@@ -105,9 +105,11 @@ def test_openai_cached_read_priced_at_half():
 
 
 def test_ollama_priced_by_call_duration(monkeypatch):
-    monkeypatch.setattr(turn_metrics, "ELECTRICITY_RATE_USD_PER_KWH", 0.34)
+    monkeypatch.setattr(model_pricing, "ELECTRICITY_EUR_PER_KWH", 0.34)
+    monkeypatch.setattr(model_pricing, "USD_PER_EUR", 1.10)
     call = LLMCallUsage(node="respond", provider="ollama", model="gemma4", latency_ms=3_600_000)
-    assert call_cost_usd(call) == pytest.approx(0.420 * 0.34)
+    # One busy hour at the measured 210 W above idle.
+    assert call_cost_usd(call) == pytest.approx(0.210 * 0.34 * 1.10)
 
 
 def test_unknown_hosted_model_is_unpriced():

@@ -185,7 +185,7 @@ class LlmUsage(Base):
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     role: Mapped[str] = mapped_column(String, nullable=False)  # alice-chat / alice-classify
-    backend: Mapped[str] = mapped_column(String, nullable=False)  # frankencompute / openai
+    backend: Mapped[str] = mapped_column(String, nullable=False)  # frankencompute / anthropic / openai
     model: Mapped[str] = mapped_column(String, nullable=False)  # what actually answered
     prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     cache_read_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -195,6 +195,34 @@ class LlmUsage(Base):
     # Why this call didn't go to frankencompute: down / timeout / 5xx / overflow /
     # digest_mismatch. None = it did.
     fallback_reason: Mapped[str | None] = mapped_column(String, nullable=True)
-    # Hosted calls only, from model_pricing. None for frankencompute (electricity isn't
-    # per-call knowable server-side) and for an unpriced hosted model.
+    # Hosted calls: tokens x model_pricing rates (None if the model has no entry).
+    # frankencompute: the call's duration x measured watts above idle x the tariff
+    # (model_pricing.local_energy_cost_usd) -- the box's idle draw is a fixed cost,
+    # reported separately rather than spread over calls.
+    cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # How many requests were already running on frankencompute when this one arrived.
+    # Gives real concurrency (how often pilots overlap, how close the box runs to
+    # llm_max_inflight) instead of guessing it. Nullable: rows from before 2026-10-12.
+    inflight_at_start: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class TtsUsage(Base):
+    """One row per speech request relayed by the TTS gateway (server/tts_service.py) --
+    the speech counterpart of llm_usage. Character counts are what ElevenLabs bills, so
+    a plan's cost can be recomputed from here even for calls made on its free tier.
+    Usage metadata only, never the text itself."""
+
+    __tablename__ = "tts_usage"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    backend: Mapped[str] = mapped_column(String, nullable=False)  # frankencompute / elevenlabs
+    voice: Mapped[str] = mapped_column(String, nullable=False)  # kokoro voice name or ElevenLabs voice id
+    characters: Mapped[int] = mapped_column(Integer, nullable=False)
+    audio_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)  # None when unknown (errors)
+    latency_ms: Mapped[float] = mapped_column(Float, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)  # ok / error
+    # Why this didn't go to frankencompute: down / timeout / 5xx. None = it did.
+    fallback_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    # frankencompute: electricity, as llm_usage. ElevenLabs: characters x
+    # settings.elevenlabs_usd_per_1k_chars (0 while on the free tier).
     cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)

@@ -25,30 +25,12 @@ from pathlib import Path
 from langchain_core.callbacks import AsyncCallbackHandler
 from pydantic import BaseModel, Field, computed_field
 
-from model_pricing import MODEL_PRICING
+from model_pricing import MODEL_PRICING, local_energy_cost_usd
 
-# A local model isn't free -- electricity is the real cost, and it doesn't scale
-# with tokens the way a hosted API's bill does. It scales with wall-clock time the
-# GPU is actually busy, so that's what this prices: estimated system power draw (in
-# watts) x that one LLM call's own duration x an electricity rate. Per call, not per
-# turn: a turn's wall-clock also includes tool time (UEX/wiki/ledger HTTP), when the
-# GPU is idle.
-#
-# Watts are rough estimates, not measured: RTX 4080 reference TDP (320W) + ~100W
-# guessed for the rest of the system (CPU/RAM/motherboard/PSU losses) while
-# actively inferencing. Refine with a real wall-meter (Kill-A-Watt or similar)
-# reading under load if more precision matters later.
-#
-# Every local model measured so far gets the same estimate -- it's the same box/GPU
-# regardless of which model is loaded, and a bigger model mostly shows up as more
-# latency, not more watts. DEFAULT_LOCAL_POWER_WATTS is that shared estimate; entries
-# below only exist for a model that's genuinely known to differ (none do yet).
-DEFAULT_LOCAL_POWER_WATTS = 420.0
-LOCAL_MODEL_POWER_WATTS: dict[str, float] = {}
-
-# $/kWh -- Jeff's real rate, not a guess. Override via this env var if it changes
-# or this ever runs on someone else's meter.
-ELECTRICITY_RATE_USD_PER_KWH = float(os.getenv("ELECTRICITY_RATE_USD_PER_KWH", "0.34"))
+# A local model isn't free -- electricity is the real cost, and it scales with how long
+# the GPU is busy, not with tokens. Per call, not per turn: a turn's wall-clock also
+# includes tool time (UEX/wiki/ledger HTTP), when the GPU is idle. The measured watts and
+# the tariff live in model_pricing (shared with the server's llm_usage pricing).
 
 _warned_unpriced: set[tuple[str, str]] = set()
 
@@ -105,9 +87,7 @@ def usage_from_metadata(usage_metadata: dict | None) -> dict[str, int]:
 
 def call_cost_usd(call: LLMCallUsage) -> float | None:
     if call.provider == "ollama":
-        watts = LOCAL_MODEL_POWER_WATTS.get(call.model, DEFAULT_LOCAL_POWER_WATTS)
-        kwh = (watts / 1000) * (call.latency_ms / 3_600_000)
-        return kwh * ELECTRICITY_RATE_USD_PER_KWH
+        return local_energy_cost_usd(call.latency_ms)
 
     rates = MODEL_PRICING.get((call.provider, call.model))
     if rates is None:

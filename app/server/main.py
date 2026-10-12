@@ -8,6 +8,7 @@ from server import llm_gateway_service
 from server.routes.auth import router as auth_router
 from server.routes.ledger import router as ledger_router
 from server.routes.llm import router as llm_router
+from server.routes.tts import router as tts_router
 from server.routes.uex_cache import router as uex_cache_router
 from server.routes.wiki_cache import router as wiki_cache_router
 
@@ -29,6 +30,7 @@ app = FastAPI(title="ALICE Ledger API", lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(ledger_router)
 app.include_router(llm_router)
+app.include_router(tts_router)
 app.include_router(uex_cache_router)
 app.include_router(wiki_cache_router)
 

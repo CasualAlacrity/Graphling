@@ -1,0 +1,22 @@
+# ALICE's voice on frankencompute (frankencompute/kokoro_server.py).
+# Install: copy kokoro_server.py to /home/seven/tts/, this file to
+# /etc/systemd/system/kokoro-tts.service, then `systemctl enable --now kokoro-tts`.
+[Unit]
+Description=Kokoro TTS for ALICE
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=seven
+WorkingDirectory=/home/seven/tts
+ExecStart=/home/seven/tts/kokoro-env/bin/python /home/seven/tts/kokoro_server.py
+Environment=KOKORO_PORT=8880
+Environment=KOKORO_VOICE=bf_isabella
+# The model and voices are already in ~/.cache/huggingface; don't reach the network on
+# every boot. Unset this if the voice or Kokoro version ever changes.
+Environment=HF_HUB_OFFLINE=1
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

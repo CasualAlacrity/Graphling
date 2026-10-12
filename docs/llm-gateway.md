@@ -1,6 +1,6 @@
 # LLM gateway — self-hosted models behind the ledger server
 
-**Status:** LLM gateway built 2026-10-09 (server + client + tests, verified end to end against frankencompute). TTS proxy, UEX move, limits, and deploy still to do.
+**Status:** LLM gateway built 2026-10-09 and deployed. TTS gateway (Kokoro on frankencompute) built 2026-10-12, not yet deployed. UEX move and limits still to do. Usage analytics: docs/analytics.md.
 **Measured costs and choices** (power, local model shoot-out, local TTS = Kokoro `bf_isabella`,
 3 parallel slots): [frankencompute-bench.md](frankencompute-bench.md).
 **Goal:** the client ships as a whole product. 10 new pilots using ALICE within 2 weeks (by
@@ -248,23 +248,42 @@ something a new user can't supply:
 **Decided 2026-10-09: every third-party key moves to Hetzner.** After this, a shipped client
 holds only `ALICE_API_URL` and the pilot's JWT.
 
-### TTS proxy (ElevenLabs)
+### TTS proxy (Kokoro on frankencompute, ElevenLabs optional) — built 2026-10-12
 
-- `POST /tts` with `{"text": ...}`, behind `get_current_user`. The server holds
-  `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID`, calls `text_to_speech.convert(...)`
-  (same `eleven_turbo_v2_5` / `mp3_44100_128` as `voice/tts.py` today), and **relays the chunks
-  as they arrive** via a FastAPI `StreamingResponse`. Nothing is buffered server-side, so the
-  first audio byte reaches the client one hop after ElevenLabs sends it.
-- nginx must not buffer the stream. Add `proxy_buffering off;` to the `api.heyalice.help`
-  location (docs/deploy.md step 2), or the first-chunk win disappears.
-- Client: `voice/tts.synthesize()` becomes an `httpx` stream against `/tts` with the JWT. Keep
-  measuring `tts_first_chunk_ms` on the client, since it now includes the Hetzner hop, which is
-  exactly what's worth watching (docs/voice-stage-timing.md).
-- Meter characters per user into a `tts_usage` row (or reuse `llm_usage` with `role="tts"`).
-  ElevenLabs bills per character and is likely the biggest per-turn cost once the LLM is on
-  frankencompute. Only add a **runaway guard** (a per-user daily cap well above any real
-  session, same 429 shape as the LLM limits), not a usage limit. The goal is to *observe* where
-  ElevenLabs starts to hurt.
+Changed from the ElevenLabs-only plan after the 2026-10-12 bench (docs/frankencompute-bench.md):
+Kokoro `bf_isabella` on frankencompute won by ear, especially on numbers, and costs only electricity.
+
+- **frankencompute:** `frankencompute/kokoro_server.py`, run by the `kokoro-tts` systemd service
+  (`frankencompute/kokoro-tts.service`).
+  - `POST /tts {"text", "voice"}` returns a whole 24 kHz WAV, with `X-Audio-Seconds`.
+  - A typical reply takes ~0.1 s, so nothing streams yet.
+  - It listens on :8880; ufw allows that port on `tailscale0` only, the same as Ollama.
+- **Server:** `POST /tts {"text"}` behind `get_current_user` (`server/routes/tts.py` →
+  `server/tts_service.py`).
+  - Tries Kokoro first. On a connect error, timeout or 5xx it benches the box for 30 s and falls
+    back to ElevenLabs, but **only if `ELEVENLABS_API_KEY` is set**, because that's a different voice.
+  - With no key: 503, ALICE stays quiet for that turn and still answers in the overlay, and every
+    request retries the box.
+  - A 4xx (empty or too long) is never retried on ElevenLabs.
+  - Text is capped at 2,000 characters.
+  - The response says which backend answered in `X-Alice-TTS-Backend`.
+- **Metering:** one `tts_usage` row per attempt: backend, voice, characters, audio seconds,
+  latency, status, fallback reason, cost.
+  - Kokoro is priced as electricity, like llm_usage.
+  - ElevenLabs is priced as characters × `ELEVENLABS_USD_PER_1K_CHARS` (0 on the free tier).
+    Characters are always stored, so a paid plan's cost can be recomputed later.
+  - Planned, not built: a **runaway guard** (per-user daily cap, 429), not a usage limit.
+- **Client:** `TTS_PROVIDER=alice` sends `voice/tts.synthesize()` to `<ALICE_API_URL>/tts` with
+  the pilot's JWT (`auth/session_auth.py`, shared with the LLM gateway).
+  - `play_audio` decodes WAV and MP3 alike.
+  - Any server failure means empty audio and a printed reason, never a crashed turn.
+  - `tts_first_chunk_ms` still measures time to first byte, now including the Hetzner hop.
+- **Not needed yet:** `proxy_buffering off` in nginx. Responses are whole files, so there's no
+  stream to protect. Add it if Kokoro ever streams sentence by sentence.
+- **A Kokoro fallback off frankencompute** (same voice when the box is down) was considered.
+  - The Hetzner web host is 2 shared vCPUs that also serve the other apps, too small to do it well.
+  - frankencompute's own CPU manages only ~3× real time and dies with the box anyway.
+  - If outages make the voice switch annoying, rent a small dedicated CPU box for it.
 - STT stays local (Whisper `base` on the pilot's machine, `voice/voice_input.py`). It needs no
   key, adds no server load, and keeps raw audio off the server.
 

@@ -186,6 +186,9 @@ async def test_healthy_frankencompute_is_passed_through(monkeypatch, usage_rows)
     assert usage_rows[0]["backend"] == "frankencompute"
     assert usage_rows[0]["prompt_tokens"] == 900
     assert usage_rows[0]["fallback_reason"] is None
+    assert usage_rows[0]["inflight_at_start"] == 0
+    # Priced by how long the box was busy, not left blank.
+    assert usage_rows[0]["cost_usd"] > 0
     assert gateway.state.inflight == 0
 
 
@@ -252,6 +255,7 @@ async def test_overflow_goes_to_fallback(monkeypatch, usage_rows):
     await collect(await gateway.open_chat(CHAT_PAYLOAD, USER_ID))
 
     assert usage_rows[0]["fallback_reason"] == "overflow"
+    assert usage_rows[0]["inflight_at_start"] == 2
 
 
 async def test_no_fallback_key_means_no_backend(monkeypatch, usage_rows):

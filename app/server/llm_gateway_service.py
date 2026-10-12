@@ -18,7 +18,8 @@ Routing, per request:
    can't answer: connect error, timeout, or 5xx. Never because an answer looks bad,
    and never after any bytes have reached the client (non-streamed fallback is what
    makes this clean).
-4. Every call writes one llm_usage row.
+4. Every call writes one llm_usage row, including how many requests were already running
+   on frankencompute when it arrived (real concurrency, for hardware sizing).
 
 In-memory state (the down flag, the in-flight count) assumes one server process, the
 same assumption server/routes/auth.py's _PENDING_LOGINS already makes.
@@ -38,7 +39,7 @@ import httpx
 
 from db.models import LlmUsage
 from db.session import SessionLocal
-from model_pricing import MODEL_PRICING
+from model_pricing import MODEL_PRICING, local_energy_cost_usd
 from server import anthropic_fallback
 from server.config import settings
 from server.tool_call_ids import with_tool_call_ids
@@ -156,6 +157,17 @@ class Relay:
     body: AsyncIterator[bytes]
 
 
+@dataclass(frozen=True)
+class CallContext:
+    """What a fallback relay needs to answer and to write its llm_usage row."""
+    role_name: str
+    role: Role
+    user_id: uuid.UUID
+    started: float
+    fallback_reason: str
+    inflight_at_start: int
+
+
 async def open_chat(payload: dict, user_id: uuid.UUID) -> Relay:
     role_name = payload.get("model")
     role = roles().get(role_name)
@@ -163,10 +175,11 @@ async def open_chat(payload: dict, user_id: uuid.UUID) -> Relay:
         raise UnknownRole(f"Unknown model role {role_name!r}; expected one of {sorted(roles())}")
 
     started = time.monotonic()
+    inflight_at_start = state.inflight
     fallback_reason = skip_frankencompute_reason(started)
     if fallback_reason is None:
         try:
-            return await _open_frankencompute(payload, role_name, role, user_id, started)
+            return await _open_frankencompute(payload, role_name, role, user_id, started, inflight_at_start)
         except FrankencomputeFailed as failure:
             fallback_reason = failure.reason
             state.mark_down(failure.reason, time.monotonic() + DOWN_FOR_S)
@@ -174,9 +187,10 @@ async def open_chat(payload: dict, user_id: uuid.UUID) -> Relay:
 
     if not fallback_configured():
         raise NoBackendAvailable(f"frankencompute unavailable ({fallback_reason}) and no fallback is configured")
+    context = CallContext(role_name, role, user_id, started, fallback_reason, inflight_at_start)
     if settings.fallback_provider == ANTHROPIC:
-        return await _relay_anthropic(payload, role_name, role, user_id, started, fallback_reason)
-    return await _relay_openai(payload, role_name, role, user_id, started, fallback_reason)
+        return await _relay_anthropic(payload, context)
+    return await _relay_openai(payload, context)
 
 
 # ---- frankencompute (pass-through) ----
@@ -192,7 +206,7 @@ def frankencompute_payload(payload: dict, role: Role) -> dict:
 
 
 async def _open_frankencompute(
-    payload: dict, role_name: str, role: Role, user_id: uuid.UUID, started: float,
+    payload: dict, role_name: str, role: Role, user_id: uuid.UUID, started: float, inflight_at_start: int,
 ) -> Relay:
     client = _http_client(
         base_url=settings.frankencompute_url,
@@ -244,12 +258,14 @@ async def _open_frankencompute(
             state.inflight -= 1
             await response.aclose()
             await client.aclose()
+            latency_ms = (time.monotonic() - started) * 1000
             await record_usage(
                 user_id=user_id, role=role_name, backend=FRANKENCOMPUTE, model=role.frankencompute_model,
                 prompt_tokens=final.get("prompt_eval_count", 0), cache_read_tokens=0,
                 completion_tokens=final.get("eval_count", 0),
-                latency_ms=(time.monotonic() - started) * 1000, status=status,
-                fallback_reason=None, cost_usd=None,
+                latency_ms=latency_ms, status=status, fallback_reason=None,
+                # A failed call still kept the GPU busy, so it's priced too.
+                cost_usd=local_energy_cost_usd(latency_ms), inflight_at_start=inflight_at_start,
             )
 
     media_type = response.headers.get("content-type", "application/x-ndjson")
@@ -344,10 +360,8 @@ def openai_cost_usd(model: str, prompt_tokens: int, cache_read_tokens: int, comp
     return dollars / 1_000_000
 
 
-async def _relay_openai(
-    payload: dict, role_name: str, role: Role, user_id: uuid.UUID, started: float, fallback_reason: str,
-) -> Relay:
-    model = role.fallback_model
+async def _relay_openai(payload: dict, context: CallContext) -> Relay:
+    model = context.role.fallback_model
     try:
         async with _http_client(timeout=OPENAI_TIMEOUT_S) as client:
             response = await client.post(
@@ -356,11 +370,11 @@ async def _relay_openai(
                 headers={"Authorization": f"Bearer {settings.openai_api_key}"},
             )
     except httpx.HTTPError as exc:
-        await _record_fallback_error(user_id, role_name, OPENAI, model, started, fallback_reason)
+        await _record_fallback_error(context, OPENAI, model)
         raise NoBackendAvailable(f"fallback request failed: {exc!r}") from exc
 
     if response.status_code != 200:
-        await _record_fallback_error(user_id, role_name, OPENAI, model, started, fallback_reason)
+        await _record_fallback_error(context, OPENAI, model)
         error_line = json.dumps({"error": f"fallback model returned {response.status_code}: {response.text[:500]}"})
         return Relay(status_code=502, media_type="application/json", body=_one_line(error_line))
 
@@ -370,10 +384,12 @@ async def _relay_openai(
     cache_read_tokens = (usage.get("prompt_tokens_details") or {}).get("cached_tokens", 0)
     completion_tokens = usage.get("completion_tokens", 0)
     await record_usage(
-        user_id=user_id, role=role_name, backend=OPENAI, model=model,
+        user_id=context.user_id, role=context.role_name, backend=OPENAI, model=model,
         prompt_tokens=prompt_tokens, cache_read_tokens=cache_read_tokens, completion_tokens=completion_tokens,
-        latency_ms=(time.monotonic() - started) * 1000, status="ok", fallback_reason=fallback_reason,
+        latency_ms=(time.monotonic() - context.started) * 1000, status="ok",
+        fallback_reason=context.fallback_reason,
         cost_usd=openai_cost_usd(model, prompt_tokens, cache_read_tokens, completion_tokens),
+        inflight_at_start=context.inflight_at_start,
     )
     return Relay(
         status_code=200,
@@ -382,27 +398,26 @@ async def _relay_openai(
     )
 
 
-async def _relay_anthropic(
-    payload: dict, role_name: str, role: Role, user_id: uuid.UUID, started: float, fallback_reason: str,
-) -> Relay:
-    model = role.fallback_model
+async def _relay_anthropic(payload: dict, context: CallContext) -> Relay:
+    model = context.role.fallback_model
     try:
         message = await anthropic_fallback.create(payload, model)
     except anthropic.APIStatusError as exc:
-        await _record_fallback_error(user_id, role_name, ANTHROPIC, model, started, fallback_reason)
+        await _record_fallback_error(context, ANTHROPIC, model)
         error_line = json.dumps({"error": f"fallback model returned {exc.status_code}: {exc.message[:500]}"})
         return Relay(status_code=502, media_type="application/json", body=_one_line(error_line))
     except anthropic.APIConnectionError as exc:
-        await _record_fallback_error(user_id, role_name, ANTHROPIC, model, started, fallback_reason)
+        await _record_fallback_error(context, ANTHROPIC, model)
         raise NoBackendAvailable(f"fallback request failed: {exc!r}") from exc
 
     usage = message.usage
     chunk = anthropic_fallback.ollama_final_chunk(message, model)
     await record_usage(
-        user_id=user_id, role=role_name, backend=ANTHROPIC, model=model,
+        user_id=context.user_id, role=context.role_name, backend=ANTHROPIC, model=model,
         prompt_tokens=chunk["prompt_eval_count"], cache_read_tokens=usage.cache_read_input_tokens or 0,
-        completion_tokens=usage.output_tokens, latency_ms=(time.monotonic() - started) * 1000, status="ok",
-        fallback_reason=fallback_reason, cost_usd=anthropic_fallback.cost_usd(model, usage),
+        completion_tokens=usage.output_tokens, latency_ms=(time.monotonic() - context.started) * 1000,
+        status="ok", fallback_reason=context.fallback_reason, cost_usd=anthropic_fallback.cost_usd(model, usage),
+        inflight_at_start=context.inflight_at_start,
     )
     return Relay(status_code=200, media_type="application/x-ndjson", body=_one_line(json.dumps(chunk)))
 
@@ -411,13 +426,12 @@ async def _one_line(line: str) -> AsyncIterator[bytes]:
     yield (line + "\n").encode()
 
 
-async def _record_fallback_error(
-    user_id: uuid.UUID, role_name: str, backend: str, model: str, started: float, fallback_reason: str,
-) -> None:
+async def _record_fallback_error(context: CallContext, backend: str, model: str) -> None:
     await record_usage(
-        user_id=user_id, role=role_name, backend=backend, model=model, prompt_tokens=0, cache_read_tokens=0,
-        completion_tokens=0, latency_ms=(time.monotonic() - started) * 1000, status="error",
-        fallback_reason=fallback_reason, cost_usd=None,
+        user_id=context.user_id, role=context.role_name, backend=backend, model=model, prompt_tokens=0,
+        cache_read_tokens=0, completion_tokens=0, latency_ms=(time.monotonic() - context.started) * 1000,
+        status="error", fallback_reason=context.fallback_reason, cost_usd=None,
+        inflight_at_start=context.inflight_at_start,
     )
 
 

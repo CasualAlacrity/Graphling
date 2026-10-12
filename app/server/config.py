@@ -39,8 +39,9 @@ class Settings(BaseSettings):
     # than silently serving an unevaluated build.
     frankencompute_model_digest: str = ""
     # Requests already running on frankencompute before new ones overflow to fallback.
-    # 0 disables overflow (everything queues on the box).
-    llm_max_inflight: int = 2
+    # Matches the box's OLLAMA_NUM_PARALLEL=3 (docs/frankencompute-bench.md): beyond 3,
+    # a request would only queue there. 0 disables overflow (everything queues on the box).
+    llm_max_inflight: int = 3
 
     # Fallback when frankencompute can't answer: "anthropic" or "openai". No key for the
     # chosen provider = no fallback (503 instead). Empty model = that provider's default
@@ -50,6 +51,20 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     fallback_chat_model: str = ""
     fallback_classify_model: str = ""
+
+    # TTS gateway (server/tts_service.py). Kokoro on frankencompute over Tailscale
+    # (frankencompute/kokoro_server.py), e.g. http://100.x.y.z:8880. bf_isabella was
+    # picked by ear over ElevenLabs and Chatterbox (docs/frankencompute-bench.md).
+    frankencompute_tts_url: str = "http://localhost:8880"
+    tts_voice: str = "bf_isabella"
+    # Fallback when frankencompute can't speak. ALICE then sounds different (a different
+    # voice), so it's optional: no key = no fallback (503, ALICE stays quiet but still
+    # answers in the overlay). The rate prices tts_usage rows; 0 while on the free tier,
+    # set it to the plan's per-1k-character rate once paying.
+    elevenlabs_api_key: str = ""
+    elevenlabs_voice_id: str = ""
+    elevenlabs_model: str = "eleven_turbo_v2_5"
+    elevenlabs_usd_per_1k_chars: float = 0.0
 
 
 @lru_cache

@@ -1,9 +1,12 @@
-"""Hosted-model token prices, shared by the desktop client (turn_metrics.py) and the
-server (server/llm_gateway_service.py, which prices fallback calls for llm_usage).
+"""Hosted-model token prices and frankencompute's electricity price, shared by the desktop
+client (turn_metrics.py) and the server (server/llm_gateway_service.py and
+server/tts_service.py, which price every call for llm_usage / tts_usage).
 
 Its own module, not part of turn_metrics.py, because turn_metrics imports langchain_core
 and the server image deliberately doesn't install LangChain (see app/server/requirements.txt).
 """
+import os
+
 from pydantic import BaseModel
 
 
@@ -43,3 +46,32 @@ MODEL_PRICING: dict[tuple[str, str], ModelRates] = {
         input=2.00, output=10.00, cache_read=0.20, cache_write_5m=2.50, cache_write_1h=4.00,
     ),
 }
+
+
+# ---- Local hardware (frankencompute) ----
+#
+# A local call costs electricity, which scales with how long the box is busy, not with
+# tokens. Measured 2026-10-11 with a smart plug at the wall (docs/frankencompute-bench.md):
+# the box idles at ~80 W whether or not a model is loaded, and a gemma4 turn used
+# ~0.17 Wh above idle over ~2.9 s of model time, i.e. ~210 W on top of idle while busy.
+#
+# Per call this prices only that MARGINAL energy. The idle draw (~80 W, ~EUR 20/month)
+# is a fixed cost of having the box on at all -- report it as its own line, not spread
+# across calls, or cost per call would depend on how busy the month was.
+#
+# Known overcount: with parallel slots (OLLAMA_NUM_PARALLEL=3) overlapping calls each
+# bill their whole duration, though they share the GPU. Small at today's concurrency.
+LOCAL_BUSY_WATTS_ABOVE_IDLE = 210.0
+LOCAL_IDLE_WATTS = 80.0
+
+# Jeff's tariff is in euros; every cost column is in USD because the hosted providers
+# bill in USD. USD_PER_EUR is approximate -- set the env var to the current rate when a
+# precise figure matters (it moves a cost that is fractions of a cent per call).
+ELECTRICITY_EUR_PER_KWH = float(os.getenv("ELECTRICITY_EUR_PER_KWH", "0.34"))
+USD_PER_EUR = float(os.getenv("USD_PER_EUR", "1.10"))
+
+
+def local_energy_cost_usd(busy_ms: float, watts: float = LOCAL_BUSY_WATTS_ABOVE_IDLE) -> float:
+    """Electricity for `busy_ms` of frankencompute work, above idle, in USD."""
+    kwh = (watts / 1000) * (busy_ms / 3_600_000)
+    return kwh * ELECTRICITY_EUR_PER_KWH * USD_PER_EUR
