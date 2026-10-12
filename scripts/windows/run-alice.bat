@@ -19,7 +19,7 @@ if not exist .venv\Scripts\python.exe (
 )
 
 if not exist .env (
-    echo No .env file found. Copy your API keys into a .env file in this folder first.
+    echo No .env file found. Run scripts\windows\setup.bat first.
     pause
     exit /b 1
 )

@@ -32,30 +32,18 @@ if errorlevel 1 (
     exit /b 1
 )
 
-where docker >nul 2>nul
-if errorlevel 1 (
-    echo.
-    echo WARNING: Docker not found on PATH. Install Docker Desktop, then run
-    echo   docker compose up -d
-    echo yourself before using the trade route tracker or overlay.
+if not exist .env (
+    echo Creating .env from the pilot settings ^(.env-pilot^)...
+    copy .env-pilot .env >nul
 ) else (
-    echo Starting Postgres ^(trade route tracker storage^)...
-    docker compose up -d --wait
-    if errorlevel 1 (
-        echo.
-        echo WARNING: docker compose up failed. Is Docker Desktop running?
-    ) else (
-        echo Applying database migrations...
-        .venv\Scripts\python -m alembic upgrade head
-        if errorlevel 1 (
-            echo.
-            echo WARNING: alembic upgrade failed. Scroll up for the error.
-        )
-    )
+    echo .env already exists, leaving it as it is.
 )
+
+REM No database here: the client talks only to ALICE's server, which owns Postgres. A
+REM developer running a local ledger server follows the README instead.
 
 echo.
 echo Setup complete.
-echo Make sure a .env file with your API keys exists in this folder before running.
 echo Run scripts\windows\run-alice.bat to start ALICE (voice + overlay together).
+echo The first launch opens your browser to sign in with Discord.
 pause

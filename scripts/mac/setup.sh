@@ -27,26 +27,17 @@ if ! .venv/bin/python -m pip install -e .; then
     exit 1
 fi
 
-if ! command -v docker >/dev/null 2>&1; then
-    echo
-    echo "WARNING: Docker not found on PATH. Install Docker Desktop, then run"
-    echo "  docker compose up -d"
-    echo "yourself before using the trade route tracker or overlay."
+if [ ! -f .env ]; then
+    echo "Creating .env from the pilot settings (.env-pilot)..."
+    cp .env-pilot .env
 else
-    echo "Starting Postgres (trade route tracker storage)..."
-    if ! docker compose up -d --wait; then
-        echo
-        echo "WARNING: docker compose up failed. Is Docker Desktop running?"
-    else
-        echo "Applying database migrations..."
-        if ! .venv/bin/python -m alembic upgrade head; then
-            echo
-            echo "WARNING: alembic upgrade failed. Scroll up for the error."
-        fi
-    fi
+    echo ".env already exists, leaving it as it is."
 fi
+
+# No database here: the client talks only to ALICE's server, which owns Postgres. A
+# developer running a local ledger server follows the README instead.
 
 echo
 echo "Setup complete."
-echo "Make sure a .env file with your API keys exists in this folder before running."
 echo "Run scripts/mac/run-alice.sh to start ALICE (voice + overlay together)."
+echo "The first launch opens your browser to sign in with Discord."

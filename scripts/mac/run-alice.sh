@@ -28,7 +28,7 @@ if [ ! -x .venv/bin/python3 ]; then
 fi
 
 if [ ! -f .env ]; then
-    echo "No .env file found. Copy your API keys into a .env file in this folder first."
+    echo "No .env file found. Run scripts/mac/setup.sh first."
     exit 1
 fi
 

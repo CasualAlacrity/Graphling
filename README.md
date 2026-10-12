@@ -151,8 +151,11 @@ Windows:
 scripts\windows\setup.bat
 ```
 
-Either script creates a Python 3.11 virtualenv, installs dependencies, and — if Docker is
-running — starts Postgres and applies migrations.
+Either script creates a Python 3.11 virtualenv, installs dependencies, and — if there's no
+`.env` yet — copies `.env-pilot` to `.env`: ALICE's deployed server, no API keys, Discord login
+on first launch. That's the whole pilot setup. For development (local models, your own keys,
+a local server) start from `.env-template` instead; the local server's Postgres comes from
+`docker compose up -d postgres` below.
 
 **Run the ledger server** (skip this and just set `ALICE_API_URL` if you're pointing at an
 already-deployed one):
