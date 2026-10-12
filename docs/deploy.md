@@ -67,11 +67,14 @@ existing `app.flockt.farm` → `127.0.0.1:8088` site.
    JWT_SECRET_KEY=<python -c "import secrets; print(secrets.token_hex(32))">
    UEXCORP_API_KEY=<same value as your own local .env>
    UEXCORP_BEARER_TOKEN=<same value as your own local .env>
+   BETA_GUILD_ID=<ALICE Discord server ID; empty = no beta gating>
+   BETA_ROLE_ID=<the beta role's ID>
    ```
    `docker-compose.prod.yml` reads these via `${VAR}` substitution from this file. The
    last two are new as of the UEX/wiki cache move — if `/opt/graphling/.env` predates
    that, add them before redeploying or every UEX cache endpoint fails with an empty
-   key/token.
+   key/token. The `BETA_*` pair gates sign-in to the beta role (docs/llm-gateway.md);
+   they're optional, and leaving them out means anyone with Discord can sign in.
 
 ## Deploying
 

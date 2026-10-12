@@ -243,3 +243,41 @@ async def test_a_401_triggers_one_relogin_and_the_request_is_retried(monkeypatch
     assert [auth for auth, _ in seen] == ["Bearer old", "Bearer new"]
     # The body was resent intact on the retry.
     assert seen[0][1] == seen[1][1]
+
+
+@pytest.mark.parametrize("reason, expected", [
+    ("not_in_beta", "isn't in the ALICE beta yet"),
+    ("beta_check_failed", "Discord didn't answer"),
+])
+async def test_login_raises_login_refused_when_the_server_refuses(monkeypatch, tmp_path, reason, expected):
+    monkeypatch.setattr(discord_identity, "IDENTITY_CACHE_PATH", tmp_path / "identity.json")
+    captured_state = {}
+
+    def fake_open(url, *args, **kwargs):
+        captured_state["state"] = dict(_query_pairs(url))["client_state"]
+        return True
+
+    monkeypatch.setattr(discord_identity, "webbrowser", _NoOpWebbrowser(open_fn=fake_open))
+    monkeypatch.setattr(
+        discord_identity, "_await_callback",
+        lambda port: {"token": None, "username": "jeff", "state": captured_state["state"], "error": reason},
+    )
+
+    with pytest.raises(discord_identity.LoginRefused, match=expected) as refused:
+        await discord_identity.login()
+
+    assert refused.value.reason == reason
+    assert discord_identity._load_cached_session() is None
+
+
+def test_refusal_message_names_the_discord_account():
+    assert "(jeff)" in str(discord_identity.LoginRefused("not_in_beta", "jeff"))
+
+
+@pytest.mark.parametrize("result, expected", [
+    ({"token": "a.b.c", "username": "jeff", "state": "s", "error": None}, "Signed in for ALICE"),
+    ({"token": None, "username": "jeff", "state": "s", "error": "not_in_beta"}, "isn&#x27;t in the ALICE beta yet"),
+    ({"token": None, "username": None, "state": None, "error": "access_denied"}, "didn&#x27;t complete"),
+])
+def test_callback_page_tells_the_pilot_what_happened(result, expected):
+    assert expected in discord_identity._callback_page(result)

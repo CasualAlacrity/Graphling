@@ -17,10 +17,17 @@ secret only a server can hold — is done:
    <redirect_uri>?token=<jwt>&state=<client_state> — completing the loop back to the
    desktop app's own listener.
 
+Beta gating (settings.beta_guild_id) slots in between 3 and 4: while it's on, login also
+asks for guilds.members.read, and the callback checks the pilot's membership and role
+with the same Discord access token before any local user exists. A refused pilot gets
+<redirect_uri>?error=<reason>&state=<client_state> instead of a token. Renewal is just
+another browser login, so it re-checks for free.
+
 _PENDING_LOGINS is in-memory and unbounded-until-consumed, which is fine at pilot-count
 scale (single process, a handful of users) — revisit if this ever needs to survive a
 restart or run behind multiple server processes.
 """
+import logging
 import secrets
 import time
 from datetime import UTC, datetime, timedelta
@@ -41,6 +48,14 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 DISCORD_AUTHORIZE_URL = "https://discord.com/oauth2/authorize"
 DISCORD_TOKEN_URL = "https://discord.com/api/oauth2/token"
 DISCORD_USER_URL = "https://discord.com/api/users/@me"
+DISCORD_GUILD_MEMBER_URL = "https://discord.com/api/users/@me/guilds/{guild_id}/member"
+
+# Values of the callback redirect's `error` param when beta gating refuses a login. The
+# client (auth/discord_identity.py) keys its pilot-facing message on these.
+NOT_IN_BETA = "not_in_beta"
+BETA_CHECK_FAILED = "beta_check_failed"
+
+log = logging.getLogger(__name__)
 
 _LOOPBACK_HOSTS = {"localhost", "127.0.0.1"}
 
@@ -83,6 +98,34 @@ def _is_allowed_redirect_uri(redirect_uri: str) -> bool:
     return origin in {o.rstrip("/").lower() for o in settings.auth_allowed_redirect_origins}
 
 
+def _oauth_scope() -> str:
+    return "identify guilds.members.read" if settings.beta_guild_id else "identify"
+
+
+async def _beta_refusal(client: httpx.AsyncClient, access_token: str) -> str | None:
+    """None if the pilot may sign in, else the refusal reason. Asked with the pilot's own
+    access token, so no bot has to sit in the server. Fails closed: anything other than a
+    clear yes or a clear "not a member" (404) is BETA_CHECK_FAILED, not a pass."""
+    try:
+        response = await client.get(
+            DISCORD_GUILD_MEMBER_URL.format(guild_id=settings.beta_guild_id),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+    except httpx.HTTPError:
+        return BETA_CHECK_FAILED
+    if response.status_code == 404:
+        return NOT_IN_BETA
+    if response.status_code != 200:
+        return BETA_CHECK_FAILED
+    try:
+        roles = response.json()["roles"]
+    except (ValueError, KeyError, TypeError):
+        return BETA_CHECK_FAILED
+    if settings.beta_role_id and settings.beta_role_id not in roles:
+        return NOT_IN_BETA
+    return None
+
+
 def _issue_jwt(user_id) -> str:
     expire = datetime.now(UTC) + timedelta(minutes=settings.jwt_expire_minutes)
     return jwt.encode({"sub": str(user_id), "exp": expire}, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
@@ -97,7 +140,7 @@ async def discord_login(redirect_uri: str, client_state: str) -> RedirectRespons
         "client_id": settings.discord_client_id,
         "redirect_uri": settings.discord_redirect_uri,
         "response_type": "code",
-        "scope": "identify",
+        "scope": _oauth_scope(),
         "state": nonce,
     }
     return RedirectResponse(f"{DISCORD_AUTHORIZE_URL}?{httpx.QueryParams(params)}")
@@ -126,6 +169,21 @@ async def discord_callback(code: str, state: str) -> RedirectResponse:
         profile_response = await client.get(DISCORD_USER_URL, headers={"Authorization": f"Bearer {access_token}"})
         profile_response.raise_for_status()
         profile = profile_response.json()
+
+        refusal = await _beta_refusal(client, access_token) if settings.beta_guild_id else None
+    # access_token goes out of scope here and is never stored: identity and the beta check
+    # are all it was asked for.
+
+    if refusal is not None:
+        # The waitlist: `docker compose logs server | grep "beta sign-in refused"`.
+        log.warning(
+            "beta sign-in refused: discord_id=%s reason=%s at=%s",
+            profile["id"], refusal, datetime.now(UTC).isoformat(timespec="seconds"),
+        )
+        refusal_params = httpx.QueryParams({
+            "error": refusal, "state": pending["client_state"], "username": profile["username"],
+        })
+        return RedirectResponse(f"{pending['redirect_uri']}?{refusal_params}")
 
     user = await get_or_create_user(str(profile["id"]))
     token = _issue_jwt(user.id)

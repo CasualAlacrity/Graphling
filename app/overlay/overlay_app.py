@@ -11,6 +11,7 @@ from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import QApplication
 
 from api_client import api_url
+from auth.discord_identity import LoginRefused
 from overlay import theme, uex_lookup
 
 
@@ -38,6 +39,10 @@ def main():
             f"ALICE's server at {api_url()} answered {exc.response.status_code} at startup.",
             "It may be restarting; try again in a minute.",
         )
+    except LoginRefused as refused:
+        # A first install has no token yet, so this fetch's 401 is where the Discord
+        # login actually happens -- and where a pilot outside the beta is refused.
+        _exit_with(str(refused))
     print("Reference data loaded. Building overlay windows...", flush=True)
 
     # Imported after uex_lookup.init() rather than at module top — panels read
@@ -126,8 +131,9 @@ if __name__ == "__main__":
     main()
 
 
-def _exit_with(problem: str, advice: str) -> None:
+def _exit_with(problem: str, advice: str | None = None) -> None:
     print()
     print(f"[ALICE] {problem}")
-    print(f"[ALICE] {advice}")
+    if advice:
+        print(f"[ALICE] {advice}")
     sys.exit(1)

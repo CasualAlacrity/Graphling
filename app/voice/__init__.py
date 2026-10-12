@@ -16,7 +16,7 @@ import uuid
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 
-from auth.discord_identity import get_pilot_session
+from auth.discord_identity import LoginRefused, get_pilot_session
 from transcript_log import this_turns_messages, tool_calls_with_results, write_event
 from turn_metrics import TurnMetricsCallback, log_turn_metrics
 from voice import voice_input
@@ -45,11 +45,19 @@ async def run() -> None:
     # concurrently rather than one after another. On a first-time install this also
     # means the prewarm and the UEX fetch happen *while* the pilot is off in their
     # browser doing the one-time login, not queued up after it.
-    session, cache, _ = await asyncio.gather(
-        get_pilot_session(),
-        uex_client.get_uex_cache(),
-        prewarm(),
-    )
+    try:
+        session, cache, _ = await asyncio.gather(
+            get_pilot_session(),
+            uex_client.get_uex_cache(),
+            prewarm(),
+        )
+    except LoginRefused as refused:
+        # Not in the beta (or Discord couldn't confirm it): nothing ALICE can do without a
+        # token, so say why and close the whole app, overlay included -- this thread
+        # exiting alone would leave a window that can't do anything.
+        print()
+        print(f"[ALICE] {refused}", flush=True)
+        os._exit(1)
     print(f"[ALICE] Signed in as {session.username}.")
     # Ledger ownership is resolved server-side per-request from this session's token now
     # (server/dependencies.get_current_user) — nothing to set up client-side for it.

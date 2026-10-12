@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     # allowed; this adds exact origins on top, e.g. ["https://heyalice.help"] for a future
     # web client. Env: AUTH_ALLOWED_REDIRECT_ORIGINS='["https://heyalice.help"]'.
     auth_allowed_redirect_origins: list[str] = []
+    # Beta gating (routes/auth.py's discord_callback): only members of this Discord
+    # server holding this role get a JWT. Empty BETA_GUILD_ID = gating off, scope stays
+    # "identify" -- clearing it at release is the whole switch-off, nothing is stored per
+    # user. Empty BETA_ROLE_ID with a guild set = membership of the server alone is enough.
+    beta_guild_id: str = ""
+    beta_role_id: str = ""
 
     # JWT
     jwt_secret_key: str = ""

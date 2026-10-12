@@ -29,6 +29,9 @@ services:
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
       DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET}
       DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI}
+      # Beta gating (server/config.py beta_guild_id): unset/empty = anyone can sign in.
+      BETA_GUILD_ID: ${BETA_GUILD_ID:-}
+      BETA_ROLE_ID: ${BETA_ROLE_ID:-}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       UEXCORP_API_KEY: ${UEXCORP_API_KEY}
       UEXCORP_BEARER_TOKEN: ${UEXCORP_BEARER_TOKEN}

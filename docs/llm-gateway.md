@@ -6,10 +6,28 @@
 **Goal:** the client ships as a whole product. 10 new pilots using ALICE within 2 weeks (by
 ~2026-10-23), with nobody added by hand. Discord login is the only onboarding step.
 
-**Later, not v1: beta access gating.** Discord can also decide *who* may use ALICE, e.g. require
-membership of a specific Discord server or a "beta" role. It's checked once in the OAuth callback
-(`server/routes/auth.py`), which would need the `guilds.members.read` scope. No JWT or client
-change is needed: an unauthorized user just doesn't get a token.
+**Beta access gating (built 2026-10-12).** Only Discord accounts that are in the ALICE Discord
+server *and* hold the beta role get a JWT. It's two server settings, `BETA_GUILD_ID` and
+`BETA_ROLE_ID` (`server/config.py`); an empty `BETA_GUILD_ID` turns gating off. **At release: clear
+`BETA_GUILD_ID` and redeploy.** No code change, no migration, and existing accounts are untouched,
+because beta status is never stored.
+- **Where:** only the Discord callback (`server/routes/auth.py`). While gating is on, login asks for
+  `identify guilds.members.read` (just `identify` when off). After the code exchange, the callback
+  calls `GET /users/@me/guilds/{guild}/member` with the pilot's own access token, so no bot has
+  to be in the server. The access token is then discarded, never stored.
+- **Refused:** no token and no `users` row. The browser goes back to the client's listener with
+  `?error=not_in_beta` (not a member, or no role) or `?error=beta_check_failed` (any other
+  Discord answer, including errors and rate limits, so it **fails closed**).
+  `auth/discord_identity.py` raises `LoginRefused`, and the client prints the reason and exits.
+- **Waitlist:** every refusal logs `beta sign-in refused: discord_id=… reason=… at=…` (a
+  warning on the server's stderr): `docker compose logs server | grep "beta sign-in refused"`.
+  Container logs don't survive the container being recreated (every deploy), so copy them out
+  before deploying if they matter.
+- **Renewal re-checks for free:** the callback is the only place a JWT is minted, and both
+  client renewal paths (pre-emptive at startup, re-login after a 401) go through the browser
+  login. **Not revocation:** removing the role takes effect at the pilot's next login, so an
+  issued token keeps working for up to `JWT_EXPIRE_MINUTES` (7 days).
+- Discord is the identity provider only. Nothing else (tiers, features, names) reads the role.
 
 **Growth model:** grow users slowly and watch cost per active user across every paid or
 self-hosted service: frankencompute (electricity, already estimated in `turn_metrics`), hosted LLM

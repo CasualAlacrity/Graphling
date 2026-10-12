@@ -14,7 +14,9 @@ Flow (see server/routes/auth.py for the other half):
    the server's URL, not Discord's.
 2. The server does its own exchange with Discord, then redirects the browser back to
    the listener with ?token=<jwt>&username=<name>&state=<state>.
-3. Validate state, cache {token, username}, done.
+3. Validate state, cache {token, username}, done. While the beta is gated
+   (server/config.py's beta_guild_id), the server may instead send ?error=not_in_beta or
+   ?error=beta_check_failed — login() raises LoginRefused with a message for the pilot.
 
 Only ever needs one round trip. The goal is a durable session to key the trade ledger
 by, not ongoing interactive use — so the session is cached locally after the first
@@ -29,6 +31,7 @@ things keep a pilot from ever hitting the wall mid-flight:
 """
 import asyncio
 import base64
+import html
 import json
 import os
 import secrets
@@ -59,6 +62,27 @@ REFRESH_WITHIN_S = 24 * 3600
 # overlay (qasync) and voice (its own thread) run separate event loops, and an
 # asyncio.Lock is bound to one of them.
 _relogin_lock = threading.Lock()
+
+
+# The server's refusal reasons (server/routes/auth.py's NOT_IN_BETA / BETA_CHECK_FAILED),
+# worded for the pilot. "{account}" is the Discord name they signed in with, since a
+# second Discord account is the likeliest reason a real beta pilot gets refused.
+_REFUSAL_MESSAGES = {
+    "not_in_beta": "This Discord account{account} isn't in the ALICE beta yet. "
+                   "Ask in the ALICE Discord server for beta access, then start ALICE again.",
+    "beta_check_failed": "Discord didn't answer when ALICE checked your beta access. "
+                         "This is usually brief; start ALICE again in a minute.",
+}
+
+
+class LoginRefused(RuntimeError):
+    """The server completed the Discord login but refused to issue a token (beta gating).
+    str() is the pilot-facing message."""
+
+    def __init__(self, reason: str, username: str | None):
+        self.reason = reason
+        account = f" ({username})" if username else ""
+        super().__init__(_REFUSAL_MESSAGES[reason].format(account=account))
 
 
 @dataclass
@@ -109,12 +133,23 @@ class _CallbackHandler(BaseHTTPRequestHandler):
             "error": params.get("error", [None])[0],
         }
         self.send_response(200)
-        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Type", "text/html; charset=utf-8")
         self.end_headers()
-        self.wfile.write(b"<html><body>Signed in for ALICE. You can close this tab.</body></html>")
+        self.wfile.write(_callback_page(self.server.result).encode())
 
     def log_message(self, format, *args):
         pass  # BaseHTTPRequestHandler logs every request to stderr by default.
+
+
+def _callback_page(result: dict) -> str:
+    error = result["error"]
+    if error in _REFUSAL_MESSAGES:
+        message = str(LoginRefused(error, result["username"]))
+    elif error or not result["token"]:
+        message = "ALICE sign-in didn't complete. Close this tab and start ALICE again."
+    else:
+        message = "Signed in for ALICE. You can close this tab."
+    return f"<html><body>{html.escape(message)}</body></html>"
 
 
 def _await_callback(port: int) -> dict:
@@ -141,6 +176,8 @@ async def login() -> PilotSession:
     # to run off the event loop or it'd stall everything else ALICE is doing.
     result = await get_running_loop().run_in_executor(None, _await_callback, port)
 
+    if result is not None and result.get("error") in _REFUSAL_MESSAGES and result.get("state") == state:
+        raise LoginRefused(result["error"], result.get("username"))
     if result is None or result.get("error") or not result.get("token"):
         raise RuntimeError(f"ALICE login failed or was cancelled: {result}")
     if result.get("state") != state:

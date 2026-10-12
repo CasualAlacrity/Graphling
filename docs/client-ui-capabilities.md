@@ -54,7 +54,7 @@ and a local listener on port 8765 catches the result. Built; it has no UI yet.
 | Failed or cancelled | Reason, plus try again | P0 | |
 | Session renewed | Pre-emptive renewal at startup when under 24 h is left: the same waiting state, with copy explaining why | P0 | Built 2026-10-12 (logic only). |
 | Mid-session re-login | Notice: "Your login expired — finish signing in in your browser"; ALICE waits | P0 | Built (logic). Today it's a console print only. |
-| Not in the beta | "This Discord account isn't in the beta yet", with a link to request access | P1 | Discord role gating isn't built (docs/llm-gateway.md). |
+| Not in the beta | "This Discord account isn't in the beta yet", with a link to request access | P1 | Built 2026-10-12 (logic, docs/llm-gateway.md): the browser tab and the console both show it, naming the Discord account, then ALICE exits. "Discord couldn't confirm" is a separate message. No link yet: the current invite expires 2026-11-11, so it needs a permanent one first. |
 | Sign out | In settings | P1 | |
 | Port 8765 in use | Detect it and pick another port automatically, or explain | P1 | Today it's `DISCORD_LOCAL_REDIRECT_URI` in `.env`. |
 
