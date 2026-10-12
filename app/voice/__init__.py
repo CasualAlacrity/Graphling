@@ -34,7 +34,7 @@ async def run() -> None:
     print("  ALICE — Push to talk")
     print("=" * 40)
 
-    load_whisper("base")
+    load_whisper()
 
     # The session, the UEX vocabulary cache, and warming the LLMs (graph.prewarm — see
     # its own docstring for why) are all independent of each other — run them

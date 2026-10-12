@@ -5,7 +5,16 @@ Flow:
   - Hold PTT key → mic opens
   - Release PTT key → recording stops → Whisper transcribes → returns text
 
-load_whisper() is slow (~5s first call). Call it once at startup.
+load_whisper() is slow (a few seconds; the first launch also downloads the model).
+Call it once at startup.
+
+Whisper runs through faster-whisper (CTranslate2, 8-bit weights on the CPU), not
+openai-whisper: measured 2026-10-12, `small` here needs ~700 MB of RAM on an x86 CPU
+against ~820 MB for openai-whisper's `base`, hears station and commodity names much
+better ("best route out of Port Tressler", not "Best Root Out of Portressler"), and
+drops PyTorch from the client install. It's slower per utterance (~1-3 s for `small`
+on a CPU, depending on the machine), so WHISPER_MODEL=base is the faster fallback.
+It never uses the GPU, so it takes nothing from the game.
 """
 import os
 import threading
@@ -13,10 +22,10 @@ import time
 
 import numpy as np
 import sounddevice as sd
-import whisper
+from faster_whisper import WhisperModel
 from pynput import keyboard
 
-_model: whisper.Whisper | None = None
+_model: WhisperModel | None = None
 
 SAMPLE_RATE = 16000  # Whisper expects 16kHz
 
@@ -31,11 +40,14 @@ MIN_SPEECH_SECONDS = 0.35
 SILENCE_RMS_THRESHOLD = 0.005
 
 
-def load_whisper(model_size: str = "base") -> None:
-    """Load Whisper model into memory. Call once at startup."""
+def load_whisper(model_size: str | None = None) -> None:
+    """Load the Whisper model into memory. Call once at startup. WHISPER_MODEL picks the
+    size: small (default, best with names), base (faster, lighter), or the English-only
+    small.en / base.en."""
     global _model
-    print(f"[Voice] Loading Whisper '{model_size}' model...")
-    _model = whisper.load_model(model_size)
+    model_size = model_size or os.getenv("WHISPER_MODEL", "small")
+    print(f"[Voice] Loading Whisper '{model_size}' model (the first launch downloads it)...")
+    _model = WhisperModel(model_size, device="cpu", compute_type="int8")
     print("[Voice] Whisper ready")
 
 
@@ -137,9 +149,10 @@ def transcribe(audio: np.ndarray, initial_prompt: str | None = None) -> tuple[st
         return "", 0.0
 
     start = time.monotonic()
-    result = _model.transcribe(audio, fp16=False, language="en", initial_prompt=initial_prompt)
+    segments, _ = _model.transcribe(audio, language="en", initial_prompt=initial_prompt, beam_size=5)
+    # segments is lazy: decoding happens while it's consumed, so the join is inside the timing.
+    text = " ".join(segment.text.strip() for segment in segments).strip()
     whisper_ms = (time.monotonic() - start) * 1000
-    text = result["text"].strip()
     print(f"[Voice] Transcribed: {text!r}")
     return text, whisper_ms
 

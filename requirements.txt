@@ -23,7 +23,7 @@ jellyfish
 # Voice (push-to-talk + TTS)
 sounddevice==0.5.5
 soundfile==0.14.0
-openai-whisper==20250625
+faster-whisper==1.2.1
 numpy
 pynput==1.8.2
 elevenlabs==2.52.0
