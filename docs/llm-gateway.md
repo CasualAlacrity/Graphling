@@ -1,6 +1,6 @@
 # LLM gateway — self-hosted models behind the ledger server
 
-**Status:** LLM gateway built 2026-10-09 and deployed. TTS gateway (Kokoro on frankencompute) built and deployed 2026-10-12. UEX calls moved server-side 2026-10-12 (not yet deployed). Limits still to do. Usage analytics: docs/analytics.md.
+**Status:** LLM gateway built 2026-10-09 and deployed. TTS gateway (Kokoro on frankencompute) built and deployed 2026-10-12. UEX calls moved server-side, runaway limits and client re-login built 2026-10-12 (not yet deployed). Usage analytics: docs/analytics.md.
 **Measured costs and choices** (power, local model shoot-out, local TTS = Kokoro `bf_isabella`,
 3 parallel slots): [frankencompute-bench.md](frankencompute-bench.md).
 **Goal:** the client ships as a whole product. 10 new pilots using ALICE within 2 weeks (by
@@ -142,14 +142,34 @@ New table `llm_usage` (Alembic migration):
 This table is the seed of the subscription story: cost per user, who's active, and how often
 fallback (real money) fires. It's the server-side counterpart to the turn-metrics → Grafana idea.
 
-### Limits (cheap insurance for 10 users)
+### Limits (cheap insurance for 10 users) — built 2026-10-12
 
-- **Per-user rate limit:** 30 requests/min, in-memory. A normal turn is 2–3 calls.
-- **Global daily fallback-spend cap:** `FALLBACK_DAILY_USD_CAP`, default $5. Computed from
-  `llm_usage` × the same `MODEL_PRICING` rates. Past the cap, fallback returns 503 with a clear
-  message instead of silently billing. At about 21.6k tokens/turn, a gpt-4o-mini turn is roughly
-  $0.003, so $5 is about 1,500 fallback turns. The cap is a runaway guard, not a budget.
-- **Body size cap:** 512 KB. History is already windowed client-side (`HISTORY_TURNS`).
+These are runaway guards, not rationing. Every threshold sits well above a real session
+(`server/limits.py`, settings in `server/config.py`).
+
+- **Per-user rate limits** (in memory, sliding minute):
+  - `LLM_REQUESTS_PER_MINUTE=30`; a normal turn is 2–3 calls.
+  - `TTS_REQUESTS_PER_MINUTE=20`.
+  - Over the limit: `429` with `Retry-After`.
+- **Speech runaway guard:** `TTS_DAILY_CHARS_PER_USER=50000` per pilot per UTC day, in memory.
+  A 3-hour session is about 20k characters.
+- **Global daily fallback budget:** `FALLBACK_DAILY_USD_CAP`, default $5, summed from today's
+  hosted `llm_usage.cost_usd`. Read from the table, so a restart can't reset it; fails open if
+  the database can't answer.
+  - **Past the cap, an *overflow* queues on frankencompute instead of paying.** The box is busy,
+    not broken.
+  - **Past the cap, an *outage* gets `503`** ("try again shortly") instead of open-ended billing.
+  - **What $5 buys:** about 10–25k Haiku 5.5 fallback calls, roughly $0.0002–0.0005 each.
+- **Body size cap:** 512 KB on `/llm/api/chat`, and 2,000 characters on `/tts`.
+
+**Staying logged in (client, also 2026-10-12).** Every call to the server uses
+`auth/session_auth.PilotSessionAuth`.
+- **On `401`** it opens the Discord login once, even if several requests failed together, then
+  retries the request (`relogin_after_rejection`).
+- **At startup,** a token with less than 24 h left is renewed straight away. The browser opens
+  while the pilot launches ALICE, not mid-run.
+- **No per-request check:** the old `/auth/users/me` call before every ledger and UEX request is
+  gone.
 
 ### Config (new `Settings` fields + `docker-compose.prod.yml` env)
 

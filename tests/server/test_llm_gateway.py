@@ -43,6 +43,15 @@ def fresh_state(monkeypatch):
     monkeypatch.setattr(settings, "fallback_classify_model", "")
     monkeypatch.setattr(settings, "llm_max_inflight", 2)
     monkeypatch.setattr(settings, "frankencompute_model_digest", "")
+    # No test reaches Postgres for the budget; the budget tests set their own spend.
+    monkeypatch.setattr(settings, "fallback_daily_usd_cap", 5.0)
+    monkeypatch.setattr(gateway, "fallback_spend_today_usd", _spent(0.0))
+
+
+def _spent(amount):
+    async def spend():
+        return amount
+    return spend
 
 
 @pytest.fixture
@@ -461,3 +470,44 @@ def test_both_fallback_translations_pair_id_less_wire_history():
     openai_messages = gateway.openai_request({"messages": WIRE_HISTORY}, "gpt-4o-mini")["messages"]
     call_ids = [call["id"] for call in openai_messages[1]["tool_calls"]]
     assert [openai_messages[2]["tool_call_id"], openai_messages[3]["tool_call_id"]] == call_ids
+
+
+# ---- daily fallback budget ----
+
+async def test_an_outage_over_budget_is_refused_instead_of_billed(monkeypatch, usage_rows):
+    tried = []
+
+    def handler(request):
+        tried.append(request.url.host)
+        raise httpx.ConnectError("no route to host")
+
+    route_http(monkeypatch, handler)
+    monkeypatch.setattr(gateway, "fallback_spend_today_usd", _spent(5.01))
+
+    with pytest.raises(gateway.NoBackendAvailable, match="budget"):
+        await gateway.open_chat(CHAT_PAYLOAD, USER_ID)
+    assert "api.openai.com" not in tried
+
+
+async def test_overflow_over_budget_queues_on_frankencompute(monkeypatch, usage_rows):
+    def handler(request):
+        assert request.url.host != "api.openai.com"
+        return httpx.Response(200, headers={"content-type": "application/x-ndjson"}, text=ndjson(
+            {"model": "gemma4", "message": {"role": "assistant", "content": "ok"}, "done": True},
+        ))
+
+    route_http(monkeypatch, handler)
+    monkeypatch.setattr(gateway, "fallback_spend_today_usd", _spent(9.0))
+    gateway.state.inflight = 3
+
+    await collect(await gateway.open_chat(CHAT_PAYLOAD, USER_ID))
+
+    assert usage_rows[0]["backend"] == "frankencompute"
+    assert usage_rows[0]["inflight_at_start"] == 3
+
+
+async def test_a_zero_cap_means_no_budget(monkeypatch):
+    monkeypatch.setattr(settings, "fallback_daily_usd_cap", 0.0)
+    monkeypatch.setattr(gateway, "fallback_spend_today_usd", _spent(1000.0))
+
+    assert await gateway.fallback_budget_exhausted() is False

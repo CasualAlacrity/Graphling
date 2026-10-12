@@ -17,7 +17,8 @@ Routing, per request:
 3. Fall back (settings.fallback_provider: Anthropic or OpenAI) only when frankencompute
    can't answer: connect error, timeout, or 5xx. Never because an answer looks bad,
    and never after any bytes have reached the client (non-streamed fallback is what
-   makes this clean).
+   makes this clean). Once the day's hosted spend passes fallback_daily_usd_cap, an
+   overflow queues on the box instead, and an outage gets a 503.
 4. Every call writes one llm_usage row, including how many requests were already running
    on frankencompute when it arrived (real concurrency, for hardware sizing).
 
@@ -36,6 +37,7 @@ from datetime import UTC, datetime
 
 import anthropic
 import httpx
+from sqlalchemy import func, select
 
 from db.models import LlmUsage
 from db.session import SessionLocal
@@ -177,6 +179,10 @@ async def open_chat(payload: dict, user_id: uuid.UUID) -> Relay:
     started = time.monotonic()
     inflight_at_start = state.inflight
     fallback_reason = skip_frankencompute_reason(started)
+    if fallback_reason == "overflow" and await fallback_budget_exhausted():
+        # Busy, not broken: with the day's budget spent, wait for a slot on the box
+        # rather than pay for the call.
+        fallback_reason = None
     if fallback_reason is None:
         try:
             return await _open_frankencompute(payload, role_name, role, user_id, started, inflight_at_start)
@@ -187,6 +193,12 @@ async def open_chat(payload: dict, user_id: uuid.UUID) -> Relay:
 
     if not fallback_configured():
         raise NoBackendAvailable(f"frankencompute unavailable ({fallback_reason}) and no fallback is configured")
+    if await fallback_budget_exhausted():
+        log.error("frankencompute unavailable (%s) and today's fallback budget ($%.2f) is spent",
+                  fallback_reason, settings.fallback_daily_usd_cap)
+        raise NoBackendAvailable(
+            f"frankencompute unavailable ({fallback_reason}) and today's fallback budget is spent -- try again shortly"
+        )
     context = CallContext(role_name, role, user_id, started, fallback_reason, inflight_at_start)
     if settings.fallback_provider == ANTHROPIC:
         return await _relay_anthropic(payload, context)
@@ -433,6 +445,34 @@ async def _record_fallback_error(context: CallContext, backend: str, model: str)
         status="error", fallback_reason=context.fallback_reason, cost_usd=None,
         inflight_at_start=context.inflight_at_start,
     )
+
+
+# ---- fallback budget ----
+
+async def fallback_budget_exhausted() -> bool:
+    cap = settings.fallback_daily_usd_cap
+    if not cap:
+        return False
+    return await fallback_spend_today_usd() >= cap
+
+
+async def fallback_spend_today_usd() -> float:
+    """Hosted spend since UTC midnight, across every pilot. Read from llm_usage (not kept
+    in memory) so a restart can't reset the budget. Fails open: if the database can't
+    answer, the gateway has bigger problems than a budget, and blocking every fallback
+    on top of them would turn a DB hiccup into an outage."""
+    midnight = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    try:
+        async with SessionLocal() as session:
+            result = await session.execute(
+                select(func.coalesce(func.sum(LlmUsage.cost_usd), 0.0)).where(
+                    LlmUsage.backend != FRANKENCOMPUTE, LlmUsage.created_at >= midnight,
+                )
+            )
+            return float(result.scalar_one())
+    except Exception:
+        log.exception("couldn't read today's fallback spend; not enforcing the cap for this call")
+        return 0.0
 
 
 # ---- usage log ----

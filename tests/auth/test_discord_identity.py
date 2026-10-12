@@ -4,10 +4,22 @@ cache-then-validate-then-relogin flow — with the network and the one-shot HTTP
 faked out. Nothing here talks to Discord, the real server, or opens a real port/browser
 tab.
 """
+import base64
+import json
+import time
+
 import httpx
 import pytest
 
 from auth import discord_identity
+from auth.session_auth import PilotSessionAuth
+
+
+def _jwt(expires_in_s: float) -> str:
+    """A JWT-shaped token whose payload carries `exp` -- unsigned, which is all the
+    client-side expiry check reads."""
+    payload = base64.urlsafe_b64encode(json.dumps({"exp": time.time() + expires_in_s}).encode()).decode().rstrip("=")
+    return f"header.{payload}.signature"
 
 
 def test_cache_round_trips_a_session(tmp_path, monkeypatch):
@@ -36,7 +48,7 @@ def test_cache_returns_none_rather_than_raising_on_a_corrupted_file(tmp_path, mo
 
 
 async def test_get_pilot_session_returns_the_cache_without_logging_in_again(monkeypatch):
-    cached = discord_identity.PilotSession(token="abc.def.ghi", username="jeff")
+    cached = discord_identity.PilotSession(token=_jwt(5 * 24 * 3600), username="jeff")
     monkeypatch.setattr(discord_identity, "_load_cached_session", lambda: cached)
     monkeypatch.setattr(discord_identity, "_is_valid", _returning(True))
 
@@ -164,3 +176,70 @@ class _NoOpWebbrowser:
 def _query_pairs(url):
     from urllib.parse import parse_qsl, urlparse
     return parse_qsl(urlparse(url).query)
+
+
+# ---- staying logged in (2026-10-12) ----
+
+def test_token_expiry_is_read_from_the_jwt_payload():
+    assert discord_identity.token_expires_within(_jwt(3600), 24 * 3600)
+    assert not discord_identity.token_expires_within(_jwt(3 * 24 * 3600), 24 * 3600)
+    # Unreadable counts as expiring, so it gets replaced rather than trusted.
+    assert discord_identity.token_expires_within("not-a-jwt", 24 * 3600)
+
+
+async def test_get_pilot_session_renews_a_token_about_to_expire_at_startup(monkeypatch):
+    cached = discord_identity.PilotSession(token=_jwt(3600), username="jeff")
+    fresh = discord_identity.PilotSession(token=_jwt(7 * 24 * 3600), username="jeff")
+    monkeypatch.setattr(discord_identity, "_load_cached_session", lambda: cached)
+    monkeypatch.setattr(discord_identity, "_is_valid", _returning(True))
+    monkeypatch.setattr(discord_identity, "login", _returning(fresh))
+
+    assert await discord_identity.get_pilot_session() is fresh
+
+
+async def test_relogin_after_rejection_logs_in_once_for_many_rejected_requests(tmp_path, monkeypatch):
+    monkeypatch.setattr(discord_identity, "IDENTITY_CACHE_PATH", tmp_path / "identity.json")
+    discord_identity._save_cached_session(discord_identity.PilotSession(token="old", username="jeff"))
+    logins = []
+
+    async def fake_login():
+        logins.append(1)
+        session = discord_identity.PilotSession(token="new", username="jeff")
+        discord_identity._save_cached_session(session)
+        return session
+
+    monkeypatch.setattr(discord_identity, "login", fake_login)
+
+    first = await discord_identity.relogin_after_rejection("old")
+    # A second request rejected with the same old token, finishing after the first
+    # re-login, gets the new token without another browser login.
+    second = await discord_identity.relogin_after_rejection("old")
+
+    assert (first, second) == ("new", "new")
+    assert logins == [1]
+
+
+async def test_a_401_triggers_one_relogin_and_the_request_is_retried(monkeypatch):
+    tokens = iter(["old"])
+    monkeypatch.setattr(discord_identity, "cached_session_token", lambda: next(tokens, "new"))
+
+    async def fake_relogin(rejected):
+        assert rejected == "old"
+        return "new"
+
+    monkeypatch.setattr(discord_identity, "relogin_after_rejection", fake_relogin)
+    seen = []
+
+    def handler(request):
+        seen.append((request.headers.get("Authorization"), request.content))
+        if request.headers.get("Authorization") == "Bearer old":
+            return httpx.Response(401, json={"detail": "Invalid or expired token"})
+        return httpx.Response(200, json={"ok": True})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler), auth=PilotSessionAuth()) as client:
+        response = await client.post("http://test/tts", json={"text": "Hello."})
+
+    assert response.status_code == 200
+    assert [auth for auth, _ in seen] == ["Bearer old", "Bearer new"]
+    # The body was resent intact on the retry.
+    assert seen[0][1] == seen[1][1]

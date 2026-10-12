@@ -18,12 +18,22 @@ Flow (see server/routes/auth.py for the other half):
 
 Only ever needs one round trip. The goal is a durable session to key the trade ledger
 by, not ongoing interactive use — so the session is cached locally after the first
-login and nothing here refreshes it until it expires (server-issued JWTs currently last
-7 days — see server/config.py's jwt_expire_minutes).
+login. Server-issued JWTs last 7 days (server/config.py's jwt_expire_minutes), and two
+things keep a pilot from ever hitting the wall mid-flight:
+- get_pilot_session (at startup) logs in again if the token expires within
+  REFRESH_WITHIN, so the browser opens while the pilot is launching ALICE, not in the
+  middle of a run;
+- if a request is still rejected (401) later, auth/session_auth.py calls
+  relogin_after_rejection, which opens one login no matter how many requests failed
+  at once, and retries.
 """
+import asyncio
+import base64
 import json
 import os
 import secrets
+import threading
+import time
 import webbrowser
 from asyncio import get_running_loop
 from dataclasses import dataclass
@@ -39,6 +49,16 @@ DEFAULT_REDIRECT_URI = "http://localhost:8765/callback"
 # per install (until the token expires). Per-user home directory, not the repo, same
 # reasoning as any other local machine state.
 IDENTITY_CACHE_PATH = Path.home() / ".alice" / "identity.json"
+
+# At startup, a token with less than this left is renewed straight away rather than left
+# to expire during a session.
+REFRESH_WITHIN_S = 24 * 3600
+
+# One login at a time: classify, respond and a TTS call can all get a 401 together, and
+# each opening its own browser tab would be a mess. A threading lock, not asyncio's: the
+# overlay (qasync) and voice (its own thread) run separate event loops, and an
+# asyncio.Lock is bound to one of them.
+_relogin_lock = threading.Lock()
 
 
 @dataclass
@@ -143,13 +163,42 @@ async def _is_valid(session: PilotSession) -> bool:
         return True
 
 
+def token_expires_within(token: str, seconds: float) -> bool:
+    """Whether the JWT's own `exp` is less than `seconds` away. Reads the payload without
+    verifying it — the server does that; this only decides when to renew. An unreadable
+    token counts as expiring, so it gets replaced."""
+    try:
+        payload = token.split(".")[1]
+        payload += "=" * (-len(payload) % 4)
+        expires_at = json.loads(base64.urlsafe_b64decode(payload))["exp"]
+    except (IndexError, ValueError, KeyError, TypeError):
+        return True
+    return expires_at - time.time() < seconds
+
+
 async def get_pilot_session() -> PilotSession:
-    """The entry point everything else calls — the cached session if one exists and
-    still validates against the server, otherwise runs the login flow once and caches
-    the result for next time. Checked here rather than left to fail on the first real
-    ledger call, so an expired token surfaces as one clear re-login instead of a
-    confusing 401 from whatever tool the pilot happened to use first."""
+    """Run once at startup (voice.run): the cached session if one exists, still validates
+    against the server, and isn't about to expire — otherwise logs in now and caches the
+    result. Checked up front so an expired or nearly-expired token surfaces as one clear
+    login while the pilot is launching ALICE, instead of a 401 from whatever tool the
+    pilot happened to use first."""
     cached = _load_cached_session()
-    if cached is not None and await _is_valid(cached):
+    if cached is not None and not token_expires_within(cached.token, REFRESH_WITHIN_S) and await _is_valid(cached):
         return cached
     return await login()
+
+
+async def relogin_after_rejection(rejected_token: str | None) -> str:
+    """The server said 401 to `rejected_token`. Logs in again and returns the new token —
+    unless another request already did that while this one waited for the lock, in which
+    case the fresh token is returned without a second login."""
+    await asyncio.to_thread(_relogin_lock.acquire)
+    try:
+        cached = _load_cached_session()
+        if cached is not None and cached.token != rejected_token:
+            return cached.token
+        print("[ALICE] Your login has expired. Opening your browser to sign in with Discord again...", flush=True)
+        session = await login()
+        return session.token
+    finally:
+        _relogin_lock.release()

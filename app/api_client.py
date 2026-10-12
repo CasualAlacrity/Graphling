@@ -6,7 +6,7 @@ import os
 
 import httpx
 
-from auth.discord_identity import get_pilot_session
+from auth.session_auth import PilotSessionAuth
 
 
 def api_url() -> str:
@@ -14,8 +14,10 @@ def api_url() -> str:
 
 
 async def authenticated_client() -> httpx.AsyncClient:
-    session = await get_pilot_session()
-    return httpx.AsyncClient(base_url=api_url(), headers={"Authorization": f"Bearer {session.token}"}, timeout=15)
+    """The token rides on PilotSessionAuth: attached per request, and a 401 triggers one
+    re-login and a retry. No per-call validation round trip — get_pilot_session already
+    checked the session at startup."""
+    return httpx.AsyncClient(base_url=api_url(), auth=PilotSessionAuth(), timeout=15)
 
 
 def raise_for_status(response: httpx.Response) -> None:

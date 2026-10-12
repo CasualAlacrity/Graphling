@@ -66,6 +66,18 @@ class Settings(BaseSettings):
     elevenlabs_model: str = "eleven_turbo_v2_5"
     elevenlabs_usd_per_1k_chars: float = 0.0
 
+    # Runaway guards (server/limits.py, docs/llm-gateway.md Limits) -- set well above any
+    # real session; they exist to stop a broken client or a loop, not to ration use.
+    # A normal turn is 2-3 LLM calls and 1 TTS call.
+    llm_requests_per_minute: int = 30
+    tts_requests_per_minute: int = 20
+    # ~250 spoken replies a day per pilot; a 3-hour session is ~20k.
+    tts_daily_chars_per_user: int = 50_000
+    # Hosted-fallback spend across ALL pilots per UTC day, from llm_usage. Past it, an
+    # outage means 503 instead of open-ended billing; a merely-busy frankencompute just
+    # queues instead of overflowing. 0 = no cap.
+    fallback_daily_usd_cap: float = 5.0
+
 
 @lru_cache
 def get_settings() -> Settings:
