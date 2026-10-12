@@ -1,29 +1,25 @@
 # Intent — per-role model stack and fallback ranks
 
-**Status:** not started (2026-09-18). Decisions below came out of the FrankenLab hardware
-discussion; nothing is built yet.
+**Status:** mostly built.
+- **2026-09-18:** the decisions below came out of the FrankenLab hardware discussion.
+- **2026-10-09:** the LLM gateway shipped (docs/llm-gateway.md). It does per-role models,
+  fallback, timeouts and peak-diversion tagging.
+- **2026-10-11/12:** measured on the real hardware (docs/frankencompute-bench.md). The TTS role
+  was added.
+- **Still open:** hard spend caps, and the embedding / Uplink roles.
 
-## Problem
+## Problem (as of 2026-09-18)
 
-`app/llm.py` exposes one `get_chat_llm()` reading a single global `LLM_PROVIDER`, and
-`graph.py` uses it for both the agent and the classifier:
-
-```python
-llm = get_chat_llm().bind_tools(tools)
-classifier_llm = get_chat_llm().with_structured_output(TopicClassification)
-```
-
-Same model for both. But `classify_topic` runs in front of **every** user turn
-(`START → classify_topic → respond|decline`), so a full chat model pays full latency to
-answer a binary on-topic question, and that lands on every single reply.
-
-There's also no fallback of any kind: if the configured provider is unreachable, the turn
-fails outright.
+`app/llm.py` exposed one `get_chat_llm()` reading a single global `LLM_PROVIDER`, and
+`graph.py` used it for both the agent and the classifier. `classify_topic` runs in front of
+**every** user turn (`START → classify_topic → respond|decline`), so a full chat model paid
+full latency to answer a binary on-topic question on every reply. There was no fallback:
+an unreachable provider failed the turn outright.
 
 ## Desired outcome
 
-Each role — chat, classifier, embedding, and eventually Uplink — resolves to its own
-provider and model, each with a **ranked list** of fallbacks, configured per install.
+Each role — chat, classifier, speech, and eventually embedding and Uplink — resolves to its
+own provider and model, each with a **ranked list** of fallbacks, configured server-side.
 
 The role split isn't only about cost. `docs/intent/agent-roles.md` argues the datarunner
 wants a fundamentally smaller model than ALICE does, and that delegating the fetch loop to
@@ -31,74 +27,133 @@ it collapses large-model round trips — today the graph re-invokes the full cha
 after every tool result. That makes per-role selection a throughput lever on a
 capacity-constrained GPU, not just a billing one.
 
+## Current stack (2026-10-12)
+
+The client asks for a **role**, never a model. The Hetzner server picks the backend
+(`server/llm_gateway_service.py`, `server/tts_service.py`).
+
+| Role | Primary | Fallback | Notes |
+|---|---|---|---|
+| `alice-chat` | gemma4 `dc35e8d9c606` on frankencompute, thinking on | Claude Haiku 5.5 | Digest-pinned: a different build is treated as down |
+| `alice-classify` | gemma4 on frankencompute, thinking off | Claude Haiku 5.5 | Same loaded model as chat, so no extra VRAM |
+| speech (`/tts`) | Kokoro `bf_isabella` on frankencompute | ElevenLabs, only if a key is set | Different voice, so the fallback is optional |
+| STT | Whisper `base` on the pilot's machine | — | Free, no server load, keeps audio off the server |
+
+**Fallback triggers:**
+- **Failure:** connect error, timeout (2 s connect, 30 s between streamed chunks) or a 5xx.
+- **Peak diversion:** `overflow`, when frankencompute already has `LLM_MAX_INFLIGHT=3` requests
+  running.
+
+Each LLM call writes an `llm_usage` row and each speech call a `tts_usage` row, with cost and
+the fallback reason (docs/analytics.md).
+
 ## Decided
 
-- **Chat runs local on FrankenLab.** This is what drops marginal LLM cost per user to
-  electricity, which is what makes a cheap subscription viable at all.
-- **Classifier stays on a cheap hosted model (GPT-4o-mini).** Clearest "don't self-host
-  this" case in the system: the work is tiny, structured output is where small local
-  models are least reliable, and keeping it off the GPU leaves all 16 GB of VRAM for the
-  chat model, which is the piece that actually benefits from being local. The current
-  classifier was built knowing a smaller model was coming and was cheap to leave rough
-  because the LLM calls ran on a school API key — neither condition holds now.
-- **Fallback ranks are ordered by cost-of-failure, not by quality.** If rank 2 is a
-  frontier model, every capacity overflow costs premium. Cheap at rank 2, expensive at
-  rank 3: routine overflow degrades quality slightly and stays affordable, and only real
-  outages reach the costly tier.
-- **A model must be qualified against tool selection before it enters a rank.** With 18
-  tools bound, a model that converses well but mis-picks tools is *worse* than one that's
-  unavailable — it takes confident wrong actions on a live trade run. This is a second job
-  for the Phase 3 harness: not just evaluating upgrades, but earning a model its place in
-  the ranking.
+- **Chat runs local on frankencompute.** *Built.* This is what drops marginal LLM cost per
+  user to electricity, which is what makes a cheap subscription viable at all.
+  - Measured: ~0.17 Wh, about €0.00006, per turn above idle.
+  - Plus a fixed ~€20/month for the box being on (80 W idle).
+- **~~Classifier stays on a cheap hosted model (GPT-4o-mini).~~** *Superseded 2026-10-09:*
+  the classifier runs on frankencompute's gemma4, with thinking off.
+  - **VRAM wasn't the constraint it was expected to be.** gemma4 with 3 parallel slots uses 6.4
+    GB of 16, and classify reuses the already-loaded model, so it costs no extra VRAM.
+  - **gemma4 honours Ollama's JSON-schema `format`,** so its structured output is reliable.
+  - **Keeping it local takes the per-turn hosted call off every reply.**
+  - Not every local model is like this. gpt-oss:20b ignores `format` entirely
+    (docs/frankencompute-bench.md), so any candidate has to be checked on structured output.
+- **Fallback ranks are ordered by cost-of-failure, not by quality.** *Built as one cheap
+  rank:* Haiku 5.5, at ~$0.0002–0.0005 per call, $0.10/$0.50 per M tokens.
+  - Haiku 4.5 was rejected at 10× the price and with worse tool use (33/45 vs 45/45).
+  - No expensive rank 3 exists yet. A real outage is served by Haiku, and spend caps are what
+    bound it.
+- **A model must be qualified against tool selection before it enters a rank.** *Done for
+  the current ranks* (evals/agent_eval, judge Haiku 5.5). Results on the full suite:
+
+  | Model | Passed | Seconds per turn |
+  |---|---|---|
+  | gemma4 | 88% | 2.9 |
+  | nemotron-3.5-lightning 30B | 74% | 47 |
+  | qwen3.8 27B | 71% | 114 |
+  | gpt-oss:20b | 67% | 3.4 |
+
+  Only gemma4 earned the primary slot.
 - **Planned peak diversion and failure fallback are distinct events, tagged at emit
-  time.** They're different beasts handled differently, and if they share a counter the
-  "trending fallbacks" alert gets diluted by routine capacity management — paging on
-  working-as-designed. Tagging costs nothing while writing it and is painful to untangle
-  afterwards. See `docs/intent/observability.md`.
-- **Hard provider spend caps before there are users.** A runaway fallback can outspend a
+  time.** *Built:* `fallback_reason = overflow` vs `down`/`timeout`/`5xx`/`digest_mismatch`.
+  They're different beasts handled differently, and if they share a counter the "trending
+  fallbacks" alert gets diluted by routine capacity management — paging on
+  working-as-designed. See `docs/intent/observability.md` and `docs/analytics.md`.
+- **Hard provider spend caps before there are users.** *Not built yet* — planned as
+  `FALLBACK_DAILY_USD_CAP` (docs/llm-gateway.md, Limits). A runaway fallback can outspend a
   month of subscription revenue in a weekend. "ALICE is busy, try again shortly" is ugly
   and bounded; an uncapped key isn't.
+- **Wait vs. spend under load: spend, but rarely.** *Decided 2026-10-12.* frankencompute runs 3
+  parallel slots (`OLLAMA_NUM_PARALLEL=3`), and a 4th simultaneous request diverts to Haiku.
+  - **Three-way sharing slows turns** from 2.9 s to ~5.0 s. Haiku answers in ~4.3 s, so beyond 3,
+    diverting is the faster option, not just the more expensive one.
+  - **Diversion should be rare at launch scale.** Estimated at 10–20 pilots, assuming ~2.5% busy
+    per active pilot: overflow is well under 1% of the time.
+  - `inflight_at_start` on every `llm_usage` row replaces that estimate with real numbers.
+
+## Hardware: frankencompute (built 2026-10-08)
+
+| Part | Spec |
+|---|---|
+| CPU | AMD Ryzen Threadripper 1900X, 8 cores / 16 threads |
+| Board | MSI X399 Gaming Pro Carbon AC |
+| RAM | 64 GB DDR4-2666 (4 × 16 GB) |
+| GPU | NVIDIA RTX 4080, 16 GB, in PCI_E1 at PCIe gen3 x16 (the board's maximum) |
+| Storage | 250 GB SATA SSD |
+| OS / serving | Ubuntu 26.04, Ollama 0.40.2 (`KEEP_ALIVE=-1`, 32k context, 3 parallel slots), `kokoro-tts` service |
+| Network | 1 Gb/s wired LAN; reached from Hetzner over Tailscale only (ufw allows 11434/8880 on `tailscale0`) |
+
+**VRAM budget:**
+
+| What | VRAM |
+|---|---|
+| gemma4 + 3 context slots | 6.4 GB |
+| Kokoro | ~1.4 GB |
+| **Total** | **~7.8 of 16 GB** |
+
+That leaves headroom for a larger chat model, or for more slots.
+
+This replaces the earlier plan: a laptop with the 4080 as an eGPU over OCuLink (PCIe 4.0 x4)
+and 16 GB of system RAM. The RAM purchase it debated was made with the board: 64 GB.
 
 ## Constraints
 
-- **`with_fallbacks()` triggers on exception**, so an unreachable provider falls back
-  correctly but a *slow* one (alive, 30 s, no error) never does. Needs a timeout, or the
-  fallback misses the failure mode users actually notice.
-- **16 GB VRAM, 16 GB system RAM** (64 GB deferred — RAM is ~$300-500 per 16 GB stick at
-  current prices, and the cheap step is +16 GB into the empty second slot, not the ~$1,300
-  jump to 64 GB).
-- **The model must stay fully VRAM-resident.** OCuLink is PCIe 4.0 x4, roughly a quarter
-  of a desktop x16 slot. Irrelevant while weights stay on the card; brutal the moment
-  anything streams across it.
+- **The model must stay fully VRAM-resident.** The earlier reason was the OCuLink link, which no
+  longer exists. Measured on the real box, the cost is the CPU and RAM side:
+  - **nemotron 30B (48% on the CPU)** took 47 s per turn.
+  - **qwen3.8 27B (36% on the CPU)** took 114 s per turn.
+  - **Energy per turn rose 10–25×.** A model either fits in 16 GB or it isn't a candidate.
+- **Kokoro belongs on the GPU.** On the 1900X's CPU it manages ~3× real time (0.7–6 s per reply),
+  against 60–130 ms on the 4080. A CPU fallback on a separate machine would keep the same voice
+  during outages, but the Hetzner web host (2 shared vCPUs) is too small for it.
 - **Whisper stays client-side.** Free STT on the user's own machine, no server VRAM.
+- ~~`with_fallbacks()` triggers on exception, so a slow provider never falls back.~~
+  *Resolved by the gateway:* timeouts fall back (2 s connect, 30 s between chunks), and the box
+  is benched for 30 s after a failure.
 
 ## Open questions
 
-- **Benchmark before buying anything.** A small MoE (the ~30B-total / ~3B-active shape)
-  quantised to fit entirely in 16 GB VRAM never touches system RAM or OCuLink, and gets
-  MoE's speed benefit from low active-parameter count. If it meets the latency and quality
-  bar against Gemma 4, the RAM purchase defers indefinitely. MoE *with expert offload* is
-  the configuration to avoid here — it's the one case where the x4 link is the bottleneck.
-- Ollama's fine-grained MoE offload control is weaker than llama.cpp's. If the winning
-  configuration needs tensor-level placement, that may mean dropping below Ollama — which
-  matters because `get_chat_llm()` is `ChatOllama`-shaped. It also matters for
-  `graph.prewarm()` (2026-09-24, `PREWARM_OLLAMA` in `.env-template`): that only fires
-  for `LLM_PROVIDER=ollama`, on the assumption that prewarming is a local-dev-hardware
-  concern that stops mattering once FrankenLab or a closed-weight provider takes over.
-  That's only true if FrankenLab *also* ends up Ollama-shaped — the ~30s cold prompt-eval
-  measured on this Mac's base M4 doesn't disappear on better GPU, it just shrinks (same
-  math, faster hardware); it fully goes away only the day nothing in the stack is Ollama
-  anymore. If this question resolves toward llama.cpp instead, prewarm either needs a
-  llama.cpp-shaped equivalent or becomes genuinely dev-only for real.
-- Timeout values, and the spend-cap figures.
-- **Wait-vs-spend under load is a product decision, not a retry detail.** Today the design
-  would silently choose "spend money" over "make users wait." At 2 users that's invisible;
-  it should be chosen deliberately before it isn't. Current lean: queue locally and accept
-  a second or two of degradation, since that's quality loss rather than failure — see the
-  scale discussion in `docs/presence-layer.md` about making a wait visible.
+- **Larger chat model?** There is VRAM headroom (~8 GB free). Any candidate has to:
+  - fit fully in 16 GB alongside Kokoro;
+  - honour Ollama's `format`;
+  - beat gemma4's 88% / 2.9 s on the eval.
+
+  Measured so far, nothing does. MoE models with expert offload are ruled out by the
+  constraint above.
+- **Ollama vs. llama.cpp:** stays Ollama while nothing needs tensor-level placement. On the box,
+  `KEEP_ALIVE=-1` keeps the model resident, so the cold-start concern behind `graph.prewarm()` /
+  `PREWARM_OLLAMA` is now dev-only (`LLM_PROVIDER=ollama` on the Mac).
+- **Timeout values in practice, and the spend-cap figures.** Tune them against `llm_usage` once
+  pilots are active.
+- **Time to first token** isn't recorded yet. It's the hardware-purchase trigger in
+  `docs/intent/observability.md`; see the gaps in `docs/analytics.md`.
+- **Embedding and Uplink roles:** no consumer yet.
 
 ## Cleanup while in here
 
-`OLLAMA_EMBED_MODEL` and `OPENAI_EMBED_MODEL` in `.env-template` are dead config —
-embeddings went unused when the generic memory system was shelved. Either drop them or
-give the embedding role a real consumer.
+`OLLAMA_EMBED_MODEL` and `OPENAI_EMBED_MODEL` in `.env-template` (commented out) are dead
+config — embeddings went unused when the generic memory system was shelved. Either drop them
+or give the embedding role a real consumer.
