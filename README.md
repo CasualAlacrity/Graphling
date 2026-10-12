@@ -7,23 +7,32 @@ Pydantic — not a toy chatbot.
 
 ## Features
 
-- **Voice-first interaction** — push-to-talk speech-to-text (local Whisper) and spoken replies
-  (ElevenLabs TTS). No mic or hotkey permissions yet? `PTT_MODE=text` swaps in a terminal prompt,
-  same graph underneath.
+- **Voice-first interaction** — push-to-talk speech-to-text (faster-whisper, local on the
+  pilot's CPU, model size set by `WHISPER_MODEL`) and spoken replies through ALICE's TTS gateway
+  (self-hosted Kokoro, ElevenLabs as fallback). `PTT_MODE=text` swaps in a terminal prompt for
+  development, same graph underneath.
 - **19 tools on one agent** — live commodity/item/vehicle prices, refinery yields, mining
   locations, best-route and travel-time planning, and full trade-run tracking (buy/sell legs,
   milestones, profit).
 - **Persistent trade-run tracker** — buy/sell legs, milestones, and profit, backed by a
   Postgres-backed ledger server. Survives restarts; it's a ledger, not a chat memory.
 - **Server-mediated, multi-tenant backend** — a small FastAPI ledger server is the *only*
-  thing that ever talks to Postgres. Pilots authenticate with Discord OAuth (the server holds
-  the real client secret, never the desktop app); trade-run data and the shared UEX/wiki
-  reference caches are pooled across every pilot's install, not siloed per machine.
+  thing that ever talks to Postgres, the model box, or the TTS engine. Pilots authenticate with
+  Discord OAuth (the server holds the real client secret, never the desktop app). Each pilot's
+  trade runs are their own; the UEX/wiki reference caches are shared across every install.
+- **LLM and TTS gateways** — pilots hold no API keys. The server routes chat to gemma4 on a
+  self-hosted GPU box and falls back to Claude Haiku 5.5 only when that box is down, under a
+  daily spend cap; speech goes the same way (Kokoro first, ElevenLabs fallback). Every call is
+  metered per user.
+- **Agent-behavior evals** — every phrasing of every case runs through the real graph against a
+  deterministic fake world, scored per dimension (topic gate, tool, args, location, price,
+  unit, unsupported claims) with Claude Haiku 5.5 judging free text. Used to choose the serving
+  model.
 - **On-topic guardrail as a graph node** — a dedicated classifier step declines off-topic
   requests before they ever reach the main agent, instead of relying on a prompt instruction.
 - **Desktop overlay** (PySide6) — hotkey-toggled trade-run/filter panel that runs alongside the
   voice loop for at-a-glance state.
-- **Swappable LLM backend** — OpenAI, Anthropic, or fully local via Ollama, one env var.
+- **Swappable LLM backend** — ALICE's gateway, OpenAI, Anthropic, or local Ollama, one env var.
 - **Full LangSmith tracing**, with the persona and classifier prompts themselves versioned in the
   LangSmith Hub rather than hardcoded strings.
 
@@ -36,7 +45,7 @@ small ledger server that's the *only* thing that ever opens a Postgres connectio
  User (voice PTT or PTT_MODE=text)
         │
         ▼
- speech → text (local Whisper)
+ speech → text (faster-whisper, local)
         │
         ▼
  ┌─────────────────┐
@@ -61,13 +70,14 @@ small ledger server that's the *only* thing that ever opens a Postgres connectio
                      ▼
         ┌─────────────────────────────┐
         │   ledger server (FastAPI)   │  auth relay · trade-run CRUD ·
-        │  the sole Postgres client   │  shared UEX/wiki reference cache
+        │  the sole Postgres client   │  shared UEX/wiki reference cache ·
+        │                             │  LLM + TTS gateways
         └──────────────┬──────────────┘
                        ▼
                   PostgreSQL
         │
         ▼ (back in ALICE)
- text → speech (ElevenLabs)
+ text → speech (TTS gateway: Kokoro, ElevenLabs fallback)
         │
         ▼
    spoken / printed reply
@@ -95,7 +105,10 @@ client-to-Postgres access.
 | Backend API | FastAPI | Thin ledger + cache server; the only process that ever touches Postgres |
 | Auth | Discord OAuth2 + JWT | Server-side code exchange (real client secret); relayed to the desktop client via a local loopback listener — no long-lived credentials on the client |
 | Desktop overlay | PySide6 | LGPL licensing (vs. PyQt6) and real layout/styling power (vs. tkinter) |
-| Voice | Whisper (local) + ElevenLabs | Free/local STT, natural-sounding TTS |
+| Speech-to-text | faster-whisper (local, CPU) | Free, private, no server round trip; model size picked by `WHISPER_MODEL` |
+| Text-to-speech | Kokoro (self-hosted) + ElevenLabs fallback | ~0.1 s per reply on the home GPU and no per-character bill; the hosted voice only covers outages |
+| Model serving | Ollama (gemma4) + Claude Haiku 5.5 fallback | Chosen on eval results; hosted fallback only when the home box is down, capped by daily spend |
+| Evals | Custom harness + Claude Haiku 5.5 judge | Real graph, deterministic fake world: reproducible regardless of today's market |
 | Local infra | Docker Compose | Postgres for a locally-run ledger server (skip it and point at an already-deployed server instead) |
 
 ## Demo
@@ -105,41 +118,43 @@ the overlay._
 
 ## Setup
 
-**Requirements**
+**Requirements — pilot**
 
 - Python 3.11
-- A ledger server for ALICE to talk to (`app/server/`, see [Architecture](#architecture)) —
-  either point `ALICE_API_URL` at one already running somewhere, or run your own locally:
+- A Discord account — the first thing ALICE does is open a browser for you to log in with it;
+  there's no separate app-level password
+
+That's all. The setup script points ALICE at the deployed server, which handles the LLM, the
+voice, and market data; no API keys live on the pilot's machine.
+
+**Requirements — development** (local models, your own keys, or your own server)
+
+- An LLM: `LLM_PROVIDER=alice` uses the deployed gateway; otherwise an OpenAI or Anthropic API
+  key, or a local [Ollama](https://ollama.com) install
+- A voice: `TTS_PROVIDER=alice` uses the deployed gateway; otherwise an
+  [ElevenLabs](https://elevenlabs.io) key
+- [LangSmith](https://smith.langchain.com), optional — tracing, and the persona/classifier
+  prompts are pulled from the Hub at startup. Without a key, the committed snapshot
+  (`prompts/.prompt_cache.json`) is used.
+- Only to run your own ledger server (`app/server/`, see [Architecture](#architecture)):
   - Docker Desktop (Postgres for that local server)
   - A [Discord](https://discord.com/developers/applications) OAuth2 application, "Public
     Client" turned off, with a Client ID/Secret and a redirect URI matching your server —
     see [docs/deploy.md](docs/deploy.md)'s "Local dev" section
-- A [LangSmith](https://smith.langchain.com) account + API key — not just for tracing, the
-  persona and classifier prompts are pulled from the Hub at startup (a committed local snapshot,
-  `prompts/.prompt_cache.json`, covers you if the pull fails)
-- One LLM provider: an OpenAI or Anthropic API key, or a local [Ollama](https://ollama.com)
-  install
-- A [UEX Corp](https://uexcorp.space) API key + bearer token — required at startup for every
-  entry point (`graph.py` constructs the client eagerly), not just the price-lookup tools
-- An [ElevenLabs](https://elevenlabs.io) key — required. Voice and the overlay always run
-  together as one package now, and spoken replies aren't conditional on `PTT_MODE`
-  (that only swaps the input side for typed text)
-- A Discord account — the first thing ALICE does is open a browser for you to log in with it;
-  there's no separate app-level password
+  - A [UEX Corp](https://uexcorp.space) API key + bearer token — the server makes every UEX
+    call now, the desktop client makes none
 
 **Install**
 
 ```bash
 git clone <this repo>
 cd Graphling
-cp .env-template .env   # fill in your keys
 ```
 
-Only running your own local ledger server (skip this if pointing `ALICE_API_URL` at one
-someone else deployed): open `app/server/.env-template` and add its vars
-(`TRADE_DB_URL`, `DISCORD_CLIENT_ID`/`SECRET`, `DISCORD_REDIRECT_URI`, `JWT_SECRET_KEY`)
-into the same `.env` — skip `UEXCORP_API_KEY`/`UEXCORP_BEARER_TOKEN`, already there from
-the client template above.
+For development, `cp .env-template .env` and fill in what you need before running setup. To
+run your own ledger server, also add the vars from `app/server/.env-template`
+(`TRADE_DB_URL`, `DISCORD_CLIENT_ID`/`SECRET`, `DISCORD_REDIRECT_URI`, `JWT_SECRET_KEY`,
+`UEXCORP_API_KEY`/`UEXCORP_BEARER_TOKEN`) to the same `.env`.
 
 macOS:
 ```bash
@@ -222,8 +237,9 @@ pytest
 
 Being upfront about what's next, not just what's built:
 
-- **Evals** — none yet. Planned before the tool surface grows further, so regressions in
-  tool-selection or persona behavior get caught automatically instead of by hand-testing.
+- **Tool selection at scale** — 19 tools with no selection logic, past the point the
+  literature says accuracy drops. The eval harness to measure a selector against now exists;
+  the selector itself isn't wired in yet.
 - **Routing** — today's guardrail is a single binary on/off-topic classifier. No multi-intent
   routing yet.
 - **Memory** — a generic long-term memory system (structured Postgres + semantic Chroma
