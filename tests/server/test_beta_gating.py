@@ -141,17 +141,17 @@ def test_membership_alone_is_enough_when_no_role_is_configured(monkeypatch, gati
     assert result["token"]
 
 
-@pytest.mark.parametrize("member_response, expected_error", [
-    (httpx.Response(200, json={"roles": ["999"]}), auth.NOT_IN_BETA),                   # member, no beta role
-    (httpx.Response(404, json={"message": "Unknown Guild", "code": 10004}), auth.NOT_IN_BETA),  # not in the server
-    (httpx.Response(500), auth.BETA_CHECK_FAILED),
-    (httpx.Response(429, json={"retry_after": 1}), auth.BETA_CHECK_FAILED),
-    (httpx.Response(403, json={"message": "Missing Access"}), auth.BETA_CHECK_FAILED),
-    (httpx.Response(200, text="not json"), auth.BETA_CHECK_FAILED),
-    (httpx.ConnectTimeout("timed out"), auth.BETA_CHECK_FAILED),
+@pytest.mark.parametrize("member_response, expected_error, expected_missing", [
+    (httpx.Response(200, json={"roles": ["999"]}), auth.NOT_IN_BETA, auth.MISSING_ROLE),  # member, no beta role
+    (httpx.Response(404, json={"message": "Unknown Guild", "code": 10004}), auth.NOT_IN_BETA, auth.MISSING_SERVER),
+    (httpx.Response(500), auth.BETA_CHECK_FAILED, None),
+    (httpx.Response(429, json={"retry_after": 1}), auth.BETA_CHECK_FAILED, None),
+    (httpx.Response(403, json={"message": "Missing Access"}), auth.BETA_CHECK_FAILED, None),
+    (httpx.Response(200, text="not json"), auth.BETA_CHECK_FAILED, None),
+    (httpx.ConnectTimeout("timed out"), auth.BETA_CHECK_FAILED, None),
 ])
 def test_refused_logins_get_no_token_and_no_user(
-    monkeypatch, gating_on, created_users, caplog, member_response, expected_error,
+    monkeypatch, gating_on, created_users, caplog, member_response, expected_error, expected_missing,
 ):
     _fake_discord(monkeypatch, member_response)
 
@@ -160,6 +160,7 @@ def test_refused_logins_get_no_token_and_no_user(
 
     assert "token" not in result
     assert result["error"] == expected_error
+    assert result.get("missing") == expected_missing
     assert result["state"] == "client-state"
     assert result["username"] == "jeff"
     assert created_users == []
@@ -168,3 +169,24 @@ def test_refused_logins_get_no_token_and_no_user(
         "beta sign-in refused" in record.getMessage() and f"discord_id={DISCORD_ID}" in record.getMessage()
         for record in caplog.records
     )
+
+
+def test_cancel_on_discords_consent_screen_goes_back_to_the_client(monkeypatch, created_users):
+    _fake_discord(monkeypatch, AssertionError("no Discord call expected after a cancel"))
+    login = client.get(
+        "/auth/discord/login",
+        params={"redirect_uri": CLIENT_REDIRECT, "client_state": "client-state"},
+        follow_redirects=False,
+    )
+    nonce = parse_qs(urlsplit(login.headers["location"]).query)["state"][0]
+
+    callback = client.get(
+        "/auth/discord/callback",
+        params={"error": "access_denied", "error_description": "The resource owner denied the request", "state": nonce},
+        follow_redirects=False,
+    )
+
+    result = {key: values[0] for key, values in parse_qs(urlsplit(callback.headers["location"]).query).items()}
+    assert callback.headers["location"].startswith(CLIENT_REDIRECT + "?")
+    assert result == {"error": "access_denied", "state": "client-state"}
+    assert created_users == []

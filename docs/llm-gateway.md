@@ -16,9 +16,13 @@ because beta status is never stored.
   calls `GET /users/@me/guilds/{guild}/member` with the pilot's own access token, so no bot has
   to be in the server. The access token is then discarded, never stored.
 - **Refused:** no token and no `users` row. The browser goes back to the client's listener with
-  `?error=not_in_beta` (not a member, or no role) or `?error=beta_check_failed` (any other
-  Discord answer, including errors and rate limits, so it **fails closed**).
-  `auth/discord_identity.py` raises `LoginRefused`, and the client prints the reason and exits.
+  `?error=not_in_beta&missing=server|role` (not in the Discord server, or in it without the
+  role) or `?error=beta_check_failed` (any other Discord answer, including errors and rate
+  limits, so it **fails closed**). `auth/discord_identity.py` raises `LoginRefused`, and the
+  client prints the reason and exits. The browser tab shows a branded page with the same words
+  (`auth/login_pages.py`, one page per outcome: signed in, missing role, not in server, check
+  failed, cancelled, failed). A Cancel on Discord's consent screen is forwarded the same way
+  (`?error=access_denied`).
 - **Waitlist:** every refusal logs `beta sign-in refused: discord_id=… reason=… at=…` (a
   warning on the server's stderr): `docker compose logs server | grep "beta sign-in refused"`.
   Container logs don't survive the container being recreated (every deploy), so copy them out

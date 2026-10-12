@@ -15,8 +15,11 @@ Flow (see server/routes/auth.py for the other half):
 2. The server does its own exchange with Discord, then redirects the browser back to
    the listener with ?token=<jwt>&username=<name>&state=<state>.
 3. Validate state, cache {token, username}, done. While the beta is gated
-   (server/config.py's beta_guild_id), the server may instead send ?error=not_in_beta or
-   ?error=beta_check_failed — login() raises LoginRefused with a message for the pilot.
+   (server/config.py's beta_guild_id), the server may instead send ?error=not_in_beta
+   (with missing=server|role) or ?error=beta_check_failed, and login() raises
+   LoginRefused. A cancel on Discord's consent screen comes back as ?error=access_denied.
+   Either way the browser tab shows a branded page saying what happened
+   (auth/login_pages.py), and the exception carries the same words for the console.
 
 Only ever needs one round trip. The goal is a durable session to key the trade ledger
 by, not ongoing interactive use — so the session is cached locally after the first
@@ -31,7 +34,6 @@ things keep a pilot from ever hitting the wall mid-flight:
 """
 import asyncio
 import base64
-import html
 import json
 import os
 import secrets
@@ -45,6 +47,8 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse
 
 import httpx
+
+from auth.login_pages import Outcome, console_message, outcome_for, render_page
 
 DEFAULT_REDIRECT_URI = "http://localhost:8765/callback"
 
@@ -64,25 +68,23 @@ REFRESH_WITHIN_S = 24 * 3600
 _relogin_lock = threading.Lock()
 
 
-# The server's refusal reasons (server/routes/auth.py's NOT_IN_BETA / BETA_CHECK_FAILED),
-# worded for the pilot. "{account}" is the Discord name they signed in with, since a
-# second Discord account is the likeliest reason a real beta pilot gets refused.
-_REFUSAL_MESSAGES = {
-    "not_in_beta": "This Discord account{account} isn't in the ALICE beta yet. "
-                   "Ask in the ALICE Discord server for beta access, then start ALICE again.",
-    "beta_check_failed": "Discord didn't answer when ALICE checked your beta access. "
-                         "This is usually brief; start ALICE again in a minute.",
-}
+# Outcomes where the server finished the Discord login but wouldn't issue a token.
+_REFUSED = {"missing_role", "not_in_server", "not_in_beta", "beta_check_failed"}
 
 
-class LoginRefused(RuntimeError):
-    """The server completed the Discord login but refused to issue a token (beta gating).
-    str() is the pilot-facing message."""
+class LoginFailed(RuntimeError):
+    """The browser login ended without a token. str() is the pilot-facing message (the
+    same words as the browser page), naming the Discord account when known, since a
+    second Discord account is the likeliest reason a real beta pilot gets refused."""
 
-    def __init__(self, reason: str, username: str | None):
-        self.reason = reason
-        account = f" ({username})" if username else ""
-        super().__init__(_REFUSAL_MESSAGES[reason].format(account=account))
+    def __init__(self, outcome: Outcome, username: str | None, detail: str | None = None):
+        self.reason = outcome.key
+        message = console_message(outcome, username)
+        super().__init__(f"{message} ({detail})" if detail else message)
+
+
+class LoginRefused(LoginFailed):
+    """The server completed the Discord login but refused to issue a token (beta gating)."""
 
 
 @dataclass
@@ -131,25 +133,16 @@ class _CallbackHandler(BaseHTTPRequestHandler):
             "username": params.get("username", [None])[0],
             "state": params.get("state", [None])[0],
             "error": params.get("error", [None])[0],
+            "missing": params.get("missing", [None])[0],
         }
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.end_headers()
-        self.wfile.write(_callback_page(self.server.result).encode())
+        page = render_page(outcome_for(self.server.result), self.server.result["username"])
+        self.wfile.write(page.encode())
 
     def log_message(self, format, *args):
         pass  # BaseHTTPRequestHandler logs every request to stderr by default.
-
-
-def _callback_page(result: dict) -> str:
-    error = result["error"]
-    if error in _REFUSAL_MESSAGES:
-        message = str(LoginRefused(error, result["username"]))
-    elif error or not result["token"]:
-        message = "ALICE sign-in didn't complete. Close this tab and start ALICE again."
-    else:
-        message = "Signed in for ALICE. You can close this tab."
-    return f"<html><body>{html.escape(message)}</body></html>"
 
 
 def _await_callback(port: int) -> dict:
@@ -176,12 +169,15 @@ async def login() -> PilotSession:
     # to run off the event loop or it'd stall everything else ALICE is doing.
     result = await get_running_loop().run_in_executor(None, _await_callback, port)
 
-    if result is not None and result.get("error") in _REFUSAL_MESSAGES and result.get("state") == state:
-        raise LoginRefused(result["error"], result.get("username"))
-    if result is None or result.get("error") or not result.get("token"):
-        raise RuntimeError(f"ALICE login failed or was cancelled: {result}")
+    if result is None:
+        raise LoginFailed(outcome_for(None), None)
     if result.get("state") != state:
-        raise RuntimeError("Login response didn't match the request that started it — aborting.")
+        raise LoginFailed(outcome_for(None), None, detail="the login response didn't match the request that started it")
+    outcome = outcome_for(result)
+    if outcome.key in _REFUSED:
+        raise LoginRefused(outcome, result.get("username"))
+    if outcome.key != "signed_in":
+        raise LoginFailed(outcome, result.get("username"), detail=result.get("error"))
 
     session = PilotSession(token=result["token"], username=result.get("username") or "pilot")
     _save_cached_session(session)

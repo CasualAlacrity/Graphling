@@ -16,7 +16,7 @@ import uuid
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 
-from auth.discord_identity import LoginRefused, get_pilot_session
+from auth.discord_identity import LoginFailed, get_pilot_session
 from transcript_log import this_turns_messages, tool_calls_with_results, write_event
 from turn_metrics import TurnMetricsCallback, log_turn_metrics
 from voice import voice_input
@@ -51,12 +51,12 @@ async def run() -> None:
             uex_client.get_uex_cache(),
             prewarm(),
         )
-    except LoginRefused as refused:
-        # Not in the beta (or Discord couldn't confirm it): nothing ALICE can do without a
-        # token, so say why and close the whole app, overlay included -- this thread
-        # exiting alone would leave a window that can't do anything.
+    except LoginFailed as failed:
+        # Refused (not in the beta), cancelled, or otherwise no token: nothing ALICE can
+        # do without one, so say why and close the whole app, overlay included -- this
+        # thread exiting alone would leave a window that can't do anything.
         print()
-        print(f"[ALICE] {refused}", flush=True)
+        print(f"[ALICE] {failed}", flush=True)
         os._exit(1)
     print(f"[ALICE] Signed in as {session.username}.")
     # Ledger ownership is resolved server-side per-request from this session's token now

@@ -11,7 +11,7 @@ import time
 import httpx
 import pytest
 
-from auth import discord_identity
+from auth import discord_identity, login_pages
 from auth.session_auth import PilotSessionAuth
 
 
@@ -108,7 +108,7 @@ async def test_login_raises_when_the_callback_reports_an_error(monkeypatch):
         lambda port: {"token": None, "username": None, "state": None, "error": "access_denied"},
     )
 
-    with pytest.raises(RuntimeError, match="failed or was cancelled"):
+    with pytest.raises(discord_identity.LoginFailed, match="didn't match"):
         await discord_identity.login()
 
 
@@ -245,42 +245,112 @@ async def test_a_401_triggers_one_relogin_and_the_request_is_retried(monkeypatch
     assert seen[0][1] == seen[1][1]
 
 
-@pytest.mark.parametrize("reason, expected", [
-    ("not_in_beta", "isn't in the ALICE beta yet"),
-    ("beta_check_failed", "Discord didn't answer"),
-])
-async def test_login_raises_login_refused_when_the_server_refuses(monkeypatch, tmp_path, reason, expected):
-    monkeypatch.setattr(discord_identity, "IDENTITY_CACHE_PATH", tmp_path / "identity.json")
+def _fake_login_callback(monkeypatch, **result):
+    """Makes login()'s listener return `result`, echoing back the state login() put in
+    the URL it opened (as the server's real redirect would) unless `state` is given."""
     captured_state = {}
 
     def fake_open(url, *args, **kwargs):
         captured_state["state"] = dict(_query_pairs(url))["client_state"]
         return True
 
-    monkeypatch.setattr(discord_identity, "webbrowser", _NoOpWebbrowser(open_fn=fake_open))
-    monkeypatch.setattr(
-        discord_identity, "_await_callback",
-        lambda port: {"token": None, "username": "jeff", "state": captured_state["state"], "error": reason},
-    )
+    def fake_await_callback(port):
+        full = {"token": None, "username": None, "state": captured_state["state"], "error": None, "missing": None}
+        full.update(result)
+        return full
 
-    with pytest.raises(discord_identity.LoginRefused, match=expected) as refused:
+    monkeypatch.setattr(discord_identity, "webbrowser", _NoOpWebbrowser(open_fn=fake_open))
+    monkeypatch.setattr(discord_identity, "_await_callback", fake_await_callback)
+
+
+@pytest.mark.parametrize("error, missing, expected_reason, expected_text", [
+    ("not_in_beta", "role", "missing_role", "is in the ALICE Discord, but doesn't have beta access"),
+    ("not_in_beta", "server", "not_in_server", "isn't in the ALICE Discord server"),
+    ("not_in_beta", None, "not_in_beta", "isn't in the ALICE beta yet"),
+    ("beta_check_failed", None, "beta_check_failed", "Discord didn't answer"),
+])
+async def test_login_raises_login_refused_when_the_server_refuses(
+    monkeypatch, tmp_path, error, missing, expected_reason, expected_text,
+):
+    monkeypatch.setattr(discord_identity, "IDENTITY_CACHE_PATH", tmp_path / "identity.json")
+    _fake_login_callback(monkeypatch, username="jeff", error=error, missing=missing)
+
+    with pytest.raises(discord_identity.LoginRefused, match=expected_text) as refused:
         await discord_identity.login()
 
-    assert refused.value.reason == reason
+    assert refused.value.reason == expected_reason
     assert discord_identity._load_cached_session() is None
 
 
+async def test_login_cancelled_on_discord_says_so(monkeypatch, tmp_path):
+    monkeypatch.setattr(discord_identity, "IDENTITY_CACHE_PATH", tmp_path / "identity.json")
+    _fake_login_callback(monkeypatch, error="access_denied")
+
+    with pytest.raises(discord_identity.LoginFailed, match="cancelled the Discord sign-in") as failed:
+        await discord_identity.login()
+
+    assert not isinstance(failed.value, discord_identity.LoginRefused)
+    assert discord_identity._load_cached_session() is None
+
+
+async def test_a_refusal_with_the_wrong_state_is_not_trusted(monkeypatch):
+    _fake_login_callback(monkeypatch, error="not_in_beta", missing="role", state="someone-elses")
+
+    with pytest.raises(discord_identity.LoginFailed, match="didn't match") as failed:
+        await discord_identity.login()
+
+    assert not isinstance(failed.value, discord_identity.LoginRefused)
+
+
 def test_refusal_message_names_the_discord_account():
-    assert "(jeff)" in str(discord_identity.LoginRefused("not_in_beta", "jeff"))
+    refused = discord_identity.LoginRefused(login_pages.OUTCOMES["missing_role"], "jeff")
+
+    assert "This Discord account (jeff)" in str(refused)
 
 
-@pytest.mark.parametrize("result, expected", [
-    ({"token": "a.b.c", "username": "jeff", "state": "s", "error": None}, "Signed in for ALICE"),
-    ({"token": None, "username": "jeff", "state": "s", "error": "not_in_beta"}, "isn&#x27;t in the ALICE beta yet"),
-    ({"token": None, "username": None, "state": None, "error": "access_denied"}, "didn&#x27;t complete"),
+@pytest.mark.parametrize("result, expected_key", [
+    ({"token": "a.b.c", "error": None}, "signed_in"),
+    ({"token": None, "error": "not_in_beta", "missing": "role"}, "missing_role"),
+    ({"token": None, "error": "not_in_beta", "missing": "server"}, "not_in_server"),
+    ({"token": None, "error": "not_in_beta"}, "not_in_beta"),
+    ({"token": None, "error": "beta_check_failed"}, "beta_check_failed"),
+    ({"token": None, "error": "access_denied"}, "cancelled"),
+    ({"token": None, "error": "server_error"}, "failed"),
+    ({"token": None, "error": None}, "failed"),
+    (None, "failed"),
 ])
-def test_callback_page_tells_the_pilot_what_happened(result, expected):
-    assert expected in discord_identity._callback_page(result)
+def test_outcome_for_each_listener_result(result, expected_key):
+    assert login_pages.outcome_for(result).key == expected_key
+
+
+@pytest.mark.parametrize("key", list(login_pages.OUTCOMES))
+def test_every_outcome_renders_a_self_contained_page(key):
+    page = login_pages.render_page(login_pages.OUTCOMES[key], "jeff")
+
+    assert page.startswith("<!doctype html>")
+    assert login_pages.OUTCOMES[key].title.replace("'", "&#x27;") in page
+    if "{account}" in login_pages.OUTCOMES[key].body:
+        assert "<strong>jeff</strong>" in page
+    # The listener closes after this one response, so nothing may load from elsewhere.
+    assert "src=" not in page
+    assert "http" not in page
+
+
+def test_page_escapes_the_discord_username():
+    page = login_pages.render_page(login_pages.OUTCOMES["missing_role"], "<script>x</script>")
+
+    assert "<script>" not in page
+    assert "&lt;script&gt;" in page
+
+
+def test_invite_button_only_when_an_invite_is_configured(monkeypatch):
+    outcome = login_pages.OUTCOMES["not_in_server"]
+    assert "Join the ALICE Discord" not in login_pages.render_page(outcome, "jeff")
+
+    monkeypatch.setattr(login_pages, "ALICE_DISCORD_INVITE_URL", "https://discord.gg/example")
+
+    assert 'href="https://discord.gg/example"' in login_pages.render_page(outcome, "jeff")
+    assert "Join the ALICE Discord" not in login_pages.render_page(login_pages.OUTCOMES["missing_role"], "jeff")
 
 
 @pytest.mark.parametrize("cached_token, expected, unexpected", [
