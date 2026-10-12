@@ -19,7 +19,7 @@ services:
       retries: 20
 
   server:
-    image: feenstra32/graphling-server:92d7d9c
+    image: feenstra32/graphling-server:e43f336
     restart: unless-stopped
     depends_on:
       postgres:
