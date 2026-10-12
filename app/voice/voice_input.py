@@ -22,7 +22,15 @@ import time
 
 import numpy as np
 import sounddevice as sd
-from faster_whisper import WhisperModel
+
+# The model downloads from Hugging Face on first launch. On Windows that prints two
+# alarming-looking but harmless warnings: no symlink support for a normal user (files
+# are copied instead), and "unauthenticated requests" (a public model needs no token).
+# Pilots can't act on either, so silence them. Set before huggingface_hub is imported.
+os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
+os.environ.setdefault("HF_HUB_VERBOSITY", "error")
+
+from faster_whisper import WhisperModel  # noqa: E402 -- after the env defaults above
 from pynput import keyboard
 
 _model: WhisperModel | None = None
