@@ -5,6 +5,7 @@ import threading
 
 import httpx
 import qasync
+from dotenv import load_dotenv
 from pynput import keyboard
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import QApplication
@@ -14,6 +15,12 @@ from overlay import theme, uex_lookup
 
 
 def main():
+    # First thing, before any setting is read: the `alice` entry point starts here, and
+    # .env used to be loaded only later, as a side effect of importing voice/graph. The
+    # reference-data fetch below ran before that, so it always used the built-in
+    # ALICE_API_URL default (localhost) -- invisible on a dev machine, where that
+    # default is right, and broken for every pilot (first Windows test, 2026-10-12).
+    load_dotenv()
     print("Loading reference data from UEX...", flush=True)
     try:
         uex_lookup.init()
