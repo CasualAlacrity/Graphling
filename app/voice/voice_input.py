@@ -26,6 +26,11 @@ from faster_whisper import WhisperModel
 from pynput import keyboard
 
 _model: WhisperModel | None = None
+_model_size: str | None = None
+
+# What the last capture looked like, for the transcript log (transcript_log.py):
+# audio_s / rms of the recording, and why it was thrown away (None if it wasn't).
+last_capture: dict = {}
 
 SAMPLE_RATE = 16000  # Whisper expects 16kHz
 
@@ -44,8 +49,9 @@ def load_whisper(model_size: str | None = None) -> None:
     """Load the Whisper model into memory. Call once at startup. WHISPER_MODEL picks the
     size: small (default, best with names), base (faster, lighter), or the English-only
     small.en / base.en."""
-    global _model
+    global _model, _model_size
     model_size = model_size or os.getenv("WHISPER_MODEL", "small")
+    _model_size = model_size
     print(f"[Voice] Loading Whisper '{model_size}' model (the first launch downloads it)...")
     _model = WhisperModel(model_size, device="cpu", compute_type="int8")
     print("[Voice] Whisper ready")
@@ -133,19 +139,25 @@ def transcribe(audio: np.ndarray, initial_prompt: str | None = None) -> tuple[st
     if _model is None:
         raise RuntimeError("Whisper model not loaded — call load_whisper() at startup")
 
+    last_capture.clear()
+    last_capture.update(mode="voice", whisper_model=_model_size)
     if len(audio) == 0:
+        last_capture.update(audio_s=0.0, rms=0.0, ignored="no audio")
         return "", 0.0
 
     duration_seconds = len(audio) / SAMPLE_RATE
     rms = float(np.sqrt(np.mean(np.square(audio))))
     print(f"[Voice] Captured {duration_seconds:.2f}s, rms {rms:.4f}")
+    last_capture.update(audio_s=round(duration_seconds, 2), rms=round(rms, 4))
 
     if duration_seconds < MIN_SPEECH_SECONDS:
         print(f"[Voice] Ignored — shorter than {MIN_SPEECH_SECONDS}s")
+        last_capture["ignored"] = f"shorter than {MIN_SPEECH_SECONDS}s"
         return "", 0.0
 
     if rms < SILENCE_RMS_THRESHOLD:
         print(f"[Voice] Ignored — quieter than {SILENCE_RMS_THRESHOLD}")
+        last_capture["ignored"] = f"quieter than rms {SILENCE_RMS_THRESHOLD}"
         return "", 0.0
 
     start = time.monotonic()
@@ -166,6 +178,8 @@ def listen_once(hotkey: str | None = None, initial_prompt: str | None = None) ->
     whisper_ms is 0.0 in that case, since no model call happens.
     """
     if os.getenv("PTT_MODE", "hotkey") == "text":
+        last_capture.clear()
+        last_capture.update(mode="typed")
         return input("[Voice] Type your query: ").strip(), 0.0
 
     audio = record_until_release(hotkey)

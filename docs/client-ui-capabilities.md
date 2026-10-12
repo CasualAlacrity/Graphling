@@ -117,7 +117,7 @@ outside the console.
 | Controls | Push-to-talk key, workbench hotkey, type-instead-of-talk | P0 (same pickers as setup) |
 | Audio | Microphone + level + test, output + volume + test voice | P0 |
 | Overlay | Strip position, monitor, size or opacity | P1 |
-| Privacy & data | What's collected (same text as setup); opt-in debug logging / full tracing for a bug report | P1 |
+| Privacy & data | What's collected (same text as setup); opt-in debug logging / full tracing for a bug report. The local transcript log (`transcript_log.py`, built 2026-10-12): where it is, open the folder, clear it, turn it off | P1 |
 | About | Version, update status, links (Discord, status channel, website) | P0 (version), P1 (rest) |
 
 **Developer-only knobs that stay out of the UI** (baked in or `.env` for development):

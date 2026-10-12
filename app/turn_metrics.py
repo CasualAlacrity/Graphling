@@ -349,17 +349,23 @@ class TurnMetricsCallback(AsyncCallbackHandler):
         self._tool_name.pop(run_id, None)
 
 
-def _default_metrics_log_path() -> Path:
-    # User's app data, not the repo -- a local per-pilot log for now, never sent to the
-    # server (docs/voice-stage-timing.md). Its line shape is what the eventual analytics
-    # ingestion reads, so it's built to be shipped as-is later.
+def alice_data_dir() -> Path:
+    """ALICE's per-pilot folder in the user's app data (not the repo): turn_metrics.jsonl
+    and the transcript log live here. %APPDATA%\\ALICE on Windows."""
     if sys.platform == "win32":
         base = Path(os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming")))
     elif sys.platform == "darwin":
         base = Path.home() / "Library" / "Application Support"
     else:
         base = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share")))
-    return base / "ALICE" / "turn_metrics.jsonl"
+    return base / "ALICE"
+
+
+def _default_metrics_log_path() -> Path:
+    # A local per-pilot log for now, never sent to the server (docs/voice-stage-timing.md).
+    # Its line shape is what the eventual analytics ingestion reads, so it's built to be
+    # shipped as-is later.
+    return alice_data_dir() / "turn_metrics.jsonl"
 
 
 def turn_metrics_record(timings: TurnTimings, usage: TurnUsage, thread_id: str | None = None) -> dict:

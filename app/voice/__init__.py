@@ -8,14 +8,18 @@ The supported way to run is `alice` (scripts/mac/run-alice.sh,
 scripts/windows/run-alice.bat), which starts this loop alongside the overlay.
 """
 import asyncio
+import os
 import time
+import traceback
 import uuid
 
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 
 from auth.discord_identity import get_pilot_session
+from transcript_log import this_turns_messages, tool_calls_with_results, write_event
 from turn_metrics import TurnMetricsCallback, log_turn_metrics
+from voice import voice_input
 from voice.audio_output import play_audio
 from voice.tts import synthesize
 from voice.voice_input import listen_once, load_whisper
@@ -62,6 +66,13 @@ async def run() -> None:
     # vocabulary to bias toward: they're short, numerous, and the exact case that broke.
     ship_name_prompt = ", ".join(vehicle.name for vehicle in cache.vehicles)
 
+    write_event(
+        "session_start", thread_id=thread_id, pilot=session.username,
+        whisper_model=os.getenv("WHISPER_MODEL", "small"), llm_provider=os.getenv("LLM_PROVIDER"),
+        tts_provider=os.getenv("TTS_PROVIDER", "elevenlabs"),
+    )
+    turn = 0
+
     print("[ALICE] Ready. Hold PTT key to speak.")
 
     while True:
@@ -73,39 +84,66 @@ async def run() -> None:
         # listen_once() happens to return.
         round_trip_start = time.monotonic() - (whisper_ms / 1000)
 
+        heard = {**voice_input.last_capture, "text": text, "whisper_ms": round(whisper_ms)}
         if not text:
             print("[ALICE] Nothing transcribed, listening again...")
+            write_event("ignored", thread_id=thread_id, reason=heard.pop("ignored", "Whisper heard no words"), **heard)
             continue
 
         print(f"[ALICE] You: {text!r}")
-
-        metrics_callback = TurnMetricsCallback()
-        # A plain dict, not a full State(...) object -- a pydantic instance's
-        # model_dump() materializes every field's default (on_topic, reason,
-        # pending_confirmation), which would overwrite the checkpointed values from
-        # the *previous* turn before this turn's nodes ever run. A bare dict only
-        # updates the key actually given, leaving everything else to the checkpoint.
-        state_input = {"messages": [HumanMessage(content=text)]}
-        graph_start = time.monotonic()
-        result = await graph.ainvoke(state_input, config={**config, "callbacks": [metrics_callback]})
-        timings = metrics_callback.timings
-        timings.whisper_ms = whisper_ms
-        timings.graph_ms = (time.monotonic() - graph_start) * 1000
-        response_text = result["messages"][-1].content
-
-        print(f"[ALICE] ALICE: {response_text!r}")
-
-        tts_start = time.monotonic()
-        audio, tts_first_chunk_ms = await synthesize(response_text)
-        timings.tts_first_chunk_ms = tts_first_chunk_ms
-        timings.tts_total_ms = (time.monotonic() - tts_start) * 1000
-
-        # round_trip_ms stops here, at play_audio starting -- it blocks until playback
-        # finishes (voice/audio_output.py), which is not part of this metric.
-        timings.round_trip_ms = (time.monotonic() - round_trip_start) * 1000
-        log_turn_metrics(timings, metrics_callback.usage, thread_id)
-
+        turn += 1
+        try:
+            audio = await _run_turn(graph, config, thread_id, turn, text, whisper_ms, heard, round_trip_start)
+        except Exception as exc:
+            # One broken turn used to end the voice loop for the rest of the session.
+            # Now it's printed, logged with what was heard, and ALICE listens again.
+            traceback.print_exc()
+            print("[ALICE] That turn failed; listening again.")
+            write_event("turn", thread_id=thread_id, turn=turn, heard=heard, error=f"{type(exc).__name__}: {exc}")
+            continue
         play_audio(audio)
+
+
+async def _run_turn(
+    graph, config: dict, thread_id: str, turn: int, text: str, whisper_ms: float, heard: dict,
+    round_trip_start: float,
+) -> bytes:
+    """One pilot utterance through the graph and TTS. Returns the audio to play, after
+    writing the turn's metrics and transcript lines."""
+    metrics_callback = TurnMetricsCallback()
+    # A plain dict, not a full State(...) object -- a pydantic instance's
+    # model_dump() materializes every field's default (on_topic, reason,
+    # pending_confirmation), which would overwrite the checkpointed values from
+    # the *previous* turn before this turn's nodes ever run. A bare dict only
+    # updates the key actually given, leaving everything else to the checkpoint.
+    state_input = {"messages": [HumanMessage(content=text)]}
+    graph_start = time.monotonic()
+    result = await graph.ainvoke(state_input, config={**config, "callbacks": [metrics_callback]})
+    timings = metrics_callback.timings
+    timings.whisper_ms = whisper_ms
+    timings.graph_ms = (time.monotonic() - graph_start) * 1000
+    response_text = result["messages"][-1].content
+
+    print(f"[ALICE] ALICE: {response_text!r}")
+
+    tts_start = time.monotonic()
+    audio, tts_first_chunk_ms = await synthesize(response_text)
+    timings.tts_first_chunk_ms = tts_first_chunk_ms
+    timings.tts_total_ms = (time.monotonic() - tts_start) * 1000
+
+    # round_trip_ms stops here, at play_audio starting -- it blocks until playback
+    # finishes (voice/audio_output.py), which is not part of this metric.
+    timings.round_trip_ms = (time.monotonic() - round_trip_start) * 1000
+    log_turn_metrics(timings, metrics_callback.usage, thread_id)
+
+    turn_messages = this_turns_messages(result["messages"])
+    write_event(
+        "turn", thread_id=thread_id, turn=turn, heard=heard,
+        on_topic=result.get("on_topic"), classify_reason=result.get("reason"),
+        tools=tool_calls_with_results(turn_messages), reply=response_text, spoken=bool(audio),
+        timings=timings.model_dump(), usd=round(metrics_callback.usage.cost_usd, 6),
+    )
+    return audio
 
 
 def main() -> None:
