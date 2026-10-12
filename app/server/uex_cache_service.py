@@ -22,7 +22,19 @@ from tools.uexcorp.price_cache import (
     get_commodity_route_rows as _get_commodity_route_rows,
 )
 from tools.uexcorp.price_cache import (
+    get_item_price_rows as _get_item_price_rows,
+)
+from tools.uexcorp.price_cache import (
+    get_orbit_distance_rows as _get_orbit_distance_rows,
+)
+from tools.uexcorp.price_cache import (
     get_terminal_price_rows as _get_terminal_price_rows,
+)
+from tools.uexcorp.price_cache import (
+    get_vehicle_purchase_price_rows as _get_vehicle_purchase_price_rows,
+)
+from tools.uexcorp.price_cache import (
+    get_vehicle_rental_price_rows as _get_vehicle_rental_price_rows,
 )
 from tools.uexcorp.reference_cache import UexReferenceCache
 from tools.uexcorp.reference_cache_store import load_reference_cache, store_reference_cache
@@ -73,3 +85,23 @@ async def get_cached_routes_from_terminal(terminal_id: int) -> list[dict] | None
 async def fetch_routes_from_terminal(terminal_id: int) -> list[dict]:
     async with SessionLocal() as session:
         return await _fetch_routes_from_terminal(uex_client, session, terminal_id)
+
+
+async def get_item_price_rows(item_id: int) -> list[dict]:
+    async with SessionLocal() as session:
+        return await _get_item_price_rows(uex_client, session, item_id)
+
+
+async def get_vehicle_purchase_price_rows(vehicle_id: int) -> list[dict]:
+    async with SessionLocal() as session:
+        return await _get_vehicle_purchase_price_rows(uex_client, session, vehicle_id)
+
+
+async def get_vehicle_rental_price_rows(vehicle_id: int) -> list[dict]:
+    async with SessionLocal() as session:
+        return await _get_vehicle_rental_price_rows(uex_client, session, vehicle_id)
+
+
+async def get_orbit_distance_rows(orbit_id: int, star_system_id: int) -> list[dict]:
+    async with SessionLocal() as session:
+        return await _get_orbit_distance_rows(uex_client, session, orbit_id, star_system_id)

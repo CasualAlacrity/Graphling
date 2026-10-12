@@ -148,3 +148,29 @@ async def test_get_cached_routes_from_terminal_never_fetches(monkeypatch):
     result = await uex_cache_service.get_cached_routes_from_terminal(7)
 
     assert result is None
+
+
+async def test_static_price_and_distance_rows_delegate_with_the_service_uex_client(monkeypatch):
+    calls = []
+
+    def fake(name):
+        async def delegate(client, session, *ids):
+            calls.append((name, client, ids))
+            return [{"name": name}]
+        return delegate
+
+    monkeypatch.setattr(uex_cache_service, "SessionLocal", lambda: _FakeSession())
+    for name in ("_get_item_price_rows", "_get_vehicle_purchase_price_rows", "_get_vehicle_rental_price_rows",
+                 "_get_orbit_distance_rows"):
+        monkeypatch.setattr(uex_cache_service, name, fake(name))
+
+    await uex_cache_service.get_item_price_rows(1)
+    await uex_cache_service.get_vehicle_purchase_price_rows(2)
+    await uex_cache_service.get_vehicle_rental_price_rows(3)
+    await uex_cache_service.get_orbit_distance_rows(4, 68)
+
+    assert [(name, ids) for name, _, ids in calls] == [
+        ("_get_item_price_rows", (1,)), ("_get_vehicle_purchase_price_rows", (2,)),
+        ("_get_vehicle_rental_price_rows", (3,)), ("_get_orbit_distance_rows", (4, 68)),
+    ]
+    assert all(client is uex_cache_service.uex_client for _, client, _ in calls)

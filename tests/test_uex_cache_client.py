@@ -81,3 +81,24 @@ async def test_fetch_routes_from_terminal_posts_and_returns_rows(monkeypatch):
     assert requested["method"] == "POST"
     assert "/uex-cache/routes-from-terminal/100/fetch" in requested["url"]
     assert result == [{"origin": 100}]
+
+
+async def test_static_price_and_distance_rows_hit_their_endpoints(monkeypatch):
+    requested = []
+
+    def handler(request):
+        requested.append(str(request.url))
+        return httpx.Response(200, json=[{"ok": True}])
+
+    _mock_client(monkeypatch, handler)
+
+    await uex_cache_client.get_item_price_rows(11)
+    await uex_cache_client.get_vehicle_purchase_price_rows(22)
+    await uex_cache_client.get_vehicle_rental_price_rows(33)
+    rows = await uex_cache_client.get_orbit_distance_rows(44, 68)
+
+    assert rows == [{"ok": True}]
+    assert requested[0].endswith("/uex-cache/item-prices/11")
+    assert requested[1].endswith("/uex-cache/vehicle-purchase-prices/22")
+    assert requested[2].endswith("/uex-cache/vehicle-rental-prices/33")
+    assert requested[3].endswith("/uex-cache/orbit-distances/44?star_system_id=68")

@@ -1,5 +1,4 @@
 import asyncio
-import os
 
 from langsmith import tracing_context
 
@@ -11,10 +10,7 @@ from tools.uexcorp.matching import find_commodity_by_id as _find_commodity_by_id
 from tools.uexcorp.reference_cache import TerminalType
 from tools.uexcorp.trade_data import UEXTradeRoute
 
-uex_client = UEXCorpClient(
-    api_key=os.getenv("UEXCORP_API_KEY"),
-    bearer_token=os.getenv("UEXCORP_BEARER_TOKEN"),
-)
+uex_client = UEXCorpClient(via_server=True)  # no UEX key on the client; lookups go through the server cache
 scw_client = StarCitizenWikiClient()
 
 # Populated by init() — every function below that touches these assumes init() has

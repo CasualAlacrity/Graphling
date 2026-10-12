@@ -7,11 +7,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.models import UexCacheKind, UexPriceCache
 from tools.uexcorp.client import UEXCorpClient
 
-# Matches commodities_prices' own documented cache TTL (+30 minutes) — this cache
-# only ever answers "does this terminal/commodity pairing exist at all," never the
-# live price/stock fields, so it doesn't need to track UEX's data any more tightly
-# than UEX itself refreshes it.
-CACHE_TTL = timedelta(minutes=30)
+# How long each kind of cached row stays fresh (docs/llm-gateway.md, "Cache lifetimes by
+# how often the data actually changes", agreed 2026-10-09):
+# - Commodity prices and routes are player-driven and shift any second. 30 minutes is
+#   UEX's own max-age for them, so polling faster mostly gets the same answer back.
+#   best_route ranks on these rows and the overlay's volatility icon reads them, so this
+#   is real price data, not just "does this pairing exist".
+# - Item and vehicle prices only change with game versions (Jeff, 2026-10-09), and orbit
+#   distances are static world geometry: 7 days. A patch-day refresh comes from
+#   server/refresh_static_caches.py (and the planned game-version poll).
+PLAYER_DRIVEN_TTL = timedelta(minutes=30)
+PER_PATCH_TTL = timedelta(days=7)
+CACHE_TTL = {
+    UexCacheKind.COMMODITY: PLAYER_DRIVEN_TTL,
+    UexCacheKind.TERMINAL: PLAYER_DRIVEN_TTL,
+    UexCacheKind.ROUTE: PLAYER_DRIVEN_TTL,
+    UexCacheKind.ROUTE_BY_ORIGIN: PLAYER_DRIVEN_TTL,
+    UexCacheKind.ITEM: PER_PATCH_TTL,
+    UexCacheKind.VEHICLE_PURCHASE: PER_PATCH_TTL,
+    UexCacheKind.VEHICLE_RENTAL: PER_PATCH_TTL,
+    UexCacheKind.ORBIT_DISTANCES: PER_PATCH_TTL,
+}
 
 
 async def _get_cached_rows(session: AsyncSession, kind: UexCacheKind, entity_id: int) -> list[dict] | None:
@@ -21,7 +37,7 @@ async def _get_cached_rows(session: AsyncSession, kind: UexCacheKind, entity_id:
     cache_row = result.scalar_one_or_none()
     if cache_row is None:
         return None
-    if datetime.now(UTC) - cache_row.fetched_at > CACHE_TTL:
+    if datetime.now(UTC) - cache_row.fetched_at > CACHE_TTL[kind]:
         return None
     return cache_row.rows
 
@@ -102,3 +118,43 @@ async def fetch_routes_from_terminal(
     rows = await client.get_commodity_routes(origin_terminal_id=terminal_id)
     await _store_rows(session, UexCacheKind.ROUTE_BY_ORIGIN, terminal_id, rows)
     return rows
+
+
+async def _get_or_fetch(session: AsyncSession, kind: UexCacheKind, entity_id: int, fetch) -> list[dict]:
+    cached = await _get_cached_rows(session, kind, entity_id)
+    if cached is not None:
+        return cached
+    rows = await fetch()
+    await _store_rows(session, kind, entity_id, rows)
+    return rows
+
+
+async def get_item_price_rows(client: UEXCorpClient, session: AsyncSession, item_id: int) -> list[dict]:
+    return await _get_or_fetch(session, UexCacheKind.ITEM, item_id, lambda: client.get_item_prices(item_id))
+
+
+async def get_vehicle_purchase_price_rows(
+    client: UEXCorpClient, session: AsyncSession, vehicle_id: int
+) -> list[dict]:
+    return await _get_or_fetch(
+        session, UexCacheKind.VEHICLE_PURCHASE, vehicle_id, lambda: client.get_vehicle_purchase_prices(vehicle_id),
+    )
+
+
+async def get_vehicle_rental_price_rows(
+    client: UEXCorpClient, session: AsyncSession, vehicle_id: int
+) -> list[dict]:
+    return await _get_or_fetch(
+        session, UexCacheKind.VEHICLE_RENTAL, vehicle_id, lambda: client.get_vehicle_rental_prices(vehicle_id),
+    )
+
+
+async def get_orbit_distance_rows(
+    client: UEXCorpClient, session: AsyncSession, orbit_id: int, star_system_id: int
+) -> list[dict]:
+    """Keyed by orbit id alone: UEX orbit ids are unique across star systems, and UEX only
+    wants the star system alongside it as a required query parameter."""
+    return await _get_or_fetch(
+        session, UexCacheKind.ORBIT_DISTANCES, orbit_id,
+        lambda: client.get_orbit_distances(orbit_id, star_system_id),
+    )

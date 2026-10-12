@@ -54,3 +54,26 @@ async def fetch_routes_from_terminal(terminal_id: int) -> list[dict]:
         response = await client.post(f"/uex-cache/routes-from-terminal/{terminal_id}/fetch")
         raise_for_status(response)
         return response.json()
+
+
+async def get_item_price_rows(item_id: int) -> list[dict]:
+    return await _get_rows(f"/uex-cache/item-prices/{item_id}")
+
+
+async def get_vehicle_purchase_price_rows(vehicle_id: int) -> list[dict]:
+    return await _get_rows(f"/uex-cache/vehicle-purchase-prices/{vehicle_id}")
+
+
+async def get_vehicle_rental_price_rows(vehicle_id: int) -> list[dict]:
+    return await _get_rows(f"/uex-cache/vehicle-rental-prices/{vehicle_id}")
+
+
+async def get_orbit_distance_rows(orbit_id: int, star_system_id: int) -> list[dict]:
+    return await _get_rows(f"/uex-cache/orbit-distances/{orbit_id}", params={"star_system_id": star_system_id})
+
+
+async def _get_rows(path: str, params: dict | None = None) -> list[dict]:
+    async with await authenticated_client() as client:
+        response = await client.get(path, params=params)
+        raise_for_status(response)
+        return response.json()

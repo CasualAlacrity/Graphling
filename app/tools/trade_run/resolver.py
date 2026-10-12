@@ -1,4 +1,3 @@
-import os
 
 from rapidfuzz import fuzz
 
@@ -9,10 +8,7 @@ from ledger_schemas import TradeLegOut, TradeRunOut
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.matching import LOW_CONFIDENCE_MAX, match_by_name_or_code_with_score
 
-uex_client = UEXCorpClient(
-    api_key=os.getenv("UEXCORP_API_KEY"),
-    bearer_token=os.getenv("UEXCORP_BEARER_TOKEN"),
-)
+uex_client = UEXCorpClient(via_server=True)  # no UEX key on the client; lookups go through the server cache
 
 
 def _describe_run(run: TradeRunOut) -> str:

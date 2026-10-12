@@ -1,6 +1,6 @@
 # LLM gateway — self-hosted models behind the ledger server
 
-**Status:** LLM gateway built 2026-10-09 and deployed. TTS gateway (Kokoro on frankencompute) built 2026-10-12, not yet deployed. UEX move and limits still to do. Usage analytics: docs/analytics.md.
+**Status:** LLM gateway built 2026-10-09 and deployed. TTS gateway (Kokoro on frankencompute) built and deployed 2026-10-12. UEX calls moved server-side 2026-10-12 (not yet deployed). Limits still to do. Usage analytics: docs/analytics.md.
 **Measured costs and choices** (power, local model shoot-out, local TTS = Kokoro `bf_isabella`,
 3 parallel slots): [frankencompute-bench.md](frankencompute-bench.md).
 **Goal:** the client ships as a whole product. 10 new pilots using ALICE within 2 weeks (by
@@ -287,7 +287,20 @@ Kokoro `bf_isabella` on frankencompute won by ear, especially on numbers, and co
 - STT stays local (Whisper `base` on the pilot's machine, `voice/voice_input.py`). It needs no
   key, adds no server load, and keeps raw audio off the server.
 
-### UEX: all calls server-side
+### UEX: all calls server-side — built 2026-10-12
+
+**Done:**
+- The four missing routes exist: `/uex-cache/item-prices`, `/vehicle-purchase-prices`,
+  `/vehicle-rental-prices` and `/orbit-distances`.
+- The client's `UEXCorpClient(via_server=True)` sends every lookup to the server, so the tools
+  are unchanged. That covers commodity prices too, which were a live client-to-UEX call before.
+- The cache lifetimes for those rows are in place (`price_cache.CACHE_TTL`).
+- `UEXCORP_*` is gone from the client `.env-template`.
+
+**Still open:**
+- The reference bundle's 7 d + game-version refresh, and the client's bundle version check
+  (below).
+
 
 Reference data and the overlay's price lookups already go through the server
 (`uex_cache_client`). But the agent's own tool calls still hit UEX **directly from the client**

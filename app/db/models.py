@@ -125,6 +125,14 @@ class UexCacheKind(enum.StrEnum):
     # Every route out of one terminal, any commodity — what best_route wants, since a
     # pilot asking "best route from Orison" usually names no commodity.
     ROUTE_BY_ORIGIN = "route_by_origin"
+    # Prices that only change with game versions (docs/llm-gateway.md, cache lifetimes) —
+    # cached for days, not minutes, unlike the player-driven commodity rows above.
+    ITEM = "item"
+    VEHICLE_PURCHASE = "vehicle_purchase"
+    VEHICLE_RENTAL = "vehicle_rental"
+    # Distances from one origin orbit to every other; static game-world data. entity_id
+    # is the origin orbit's id (unique across star systems).
+    ORBIT_DISTANCES = "orbit_distances"
 
 
 class UexPriceCache(Base):

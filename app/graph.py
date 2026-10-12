@@ -74,10 +74,7 @@ PERSONA_TEMPLATE = load_prompt("alice-persona")
 CLASSIFY_TEMPLATE = load_prompt("topic-classification")
 REJECT_TEMPLATE = load_prompt("topic-reject-voice")
 
-uex_client = UEXCorpClient(
-    api_key=os.getenv("UEXCORP_API_KEY"),
-    bearer_token=os.getenv("UEXCORP_BEARER_TOKEN"),
-)
+uex_client = UEXCorpClient(via_server=True)  # no UEX key on the client; lookups go through the server cache
 scw_client = StarCitizenWikiClient()
 
 # UEX Backed Tools

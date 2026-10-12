@@ -36,3 +36,23 @@ async def get_cached_routes_from_terminal(terminal_id: int, user: User = Depends
 @router.post("/routes-from-terminal/{terminal_id}/fetch", response_model=list[dict])
 async def fetch_routes_from_terminal(terminal_id: int, user: User = Depends(get_current_user)):
     return await uex_cache_service.fetch_routes_from_terminal(terminal_id)
+
+
+@router.get("/item-prices/{item_id}", response_model=list[dict])
+async def get_item_prices(item_id: int, user: User = Depends(get_current_user)):
+    return await uex_cache_service.get_item_price_rows(item_id)
+
+
+@router.get("/vehicle-purchase-prices/{vehicle_id}", response_model=list[dict])
+async def get_vehicle_purchase_prices(vehicle_id: int, user: User = Depends(get_current_user)):
+    return await uex_cache_service.get_vehicle_purchase_price_rows(vehicle_id)
+
+
+@router.get("/vehicle-rental-prices/{vehicle_id}", response_model=list[dict])
+async def get_vehicle_rental_prices(vehicle_id: int, user: User = Depends(get_current_user)):
+    return await uex_cache_service.get_vehicle_rental_price_rows(vehicle_id)
+
+
+@router.get("/orbit-distances/{orbit_id}", response_model=list[dict])
+async def get_orbit_distances(orbit_id: int, star_system_id: int, user: User = Depends(get_current_user)):
+    return await uex_cache_service.get_orbit_distance_rows(orbit_id, star_system_id)

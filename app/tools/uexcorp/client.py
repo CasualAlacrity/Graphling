@@ -24,9 +24,22 @@ from tools.uexcorp.reference_cache import (
 
 
 class UEXCorpClient(BaseModel):
+    """One class, two places it runs:
+
+    - On the server (server/uex_cache_service.py), with the UEX keys, it calls UEX
+      directly. The server's Postgres cache sits in front of it.
+    - In the desktop client, with via_server=True and no keys, every price and
+      distance lookup goes to the server's cache routes instead (uex_cache_client), so
+      a shipped client never holds a UEX key and every pilot shares one cache and one
+      rate limit (docs/llm-gateway.md, "UEX: all calls server-side").
+
+    Same method names either way, so the tools (and the eval harness's fakes, which
+    patch these methods on the class) don't change."""
+
     API_BASE_URL: str = "https://api.uexcorp.uk/2.0/"
-    api_key: str
-    bearer_token: str
+    api_key: str = ""
+    bearer_token: str = ""
+    via_server: bool = False
     _uex_cache: UexReferenceCache | None = PrivateAttr(default=None)
     _cache_lock: asyncio.Lock = PrivateAttr(default_factory=asyncio.Lock)
     # Orbit distances are static game-world data (no freshness window needed, unlike
@@ -167,6 +180,13 @@ class UEXCorpClient(BaseModel):
         if investment is not None:
             params["investment"] = investment
 
+        if self.via_server:
+            # The server caches routes per commodity (and per origin, for best_route via
+            # uex_cache_client directly); other filter shapes have no route there.
+            if commodity_id is None or origin_terminal_id or destination_terminal_id or investment:
+                raise NotImplementedError("via the server, routes are fetched per commodity only")
+            return await uex_cache_client.get_commodity_route_rows(commodity_id)
+
         response = await asyncio.to_thread(
             requests.get,
             self.API_BASE_URL + 'commodities_routes',
@@ -179,6 +199,8 @@ class UEXCorpClient(BaseModel):
 
     @traceable(name="uex_get_commodity_prices")
     async def get_commodity_prices(self, commodity_id: int) -> list[dict]:
+        if self.via_server:
+            return await uex_cache_client.get_commodity_price_rows(commodity_id)
         response = await asyncio.to_thread(
             requests.get,
             self.API_BASE_URL + 'commodities_prices',
@@ -191,6 +213,8 @@ class UEXCorpClient(BaseModel):
 
     @traceable(name="uex_get_terminal_prices")
     async def get_terminal_prices(self, terminal_id: int) -> list[dict]:
+        if self.via_server:
+            return await uex_cache_client.get_terminal_price_rows(terminal_id)
         response = await asyncio.to_thread(
             requests.get,
             self.API_BASE_URL + 'commodities_prices',
@@ -203,6 +227,8 @@ class UEXCorpClient(BaseModel):
 
     @traceable(name="uex_get_item_prices")
     async def get_item_prices(self, item_id: int) -> list[dict]:
+        if self.via_server:
+            return await uex_cache_client.get_item_price_rows(item_id)
         response = await asyncio.to_thread(
             requests.get,
             self.API_BASE_URL + 'items_prices',
@@ -215,6 +241,8 @@ class UEXCorpClient(BaseModel):
 
     @traceable(name="uex_get_vehicle_purchase_prices")
     async def get_vehicle_purchase_prices(self, vehicle_id: int) -> list[dict]:
+        if self.via_server:
+            return await uex_cache_client.get_vehicle_purchase_price_rows(vehicle_id)
         response = await asyncio.to_thread(
             requests.get,
             self.API_BASE_URL + 'vehicles_purchases_prices',
@@ -227,6 +255,8 @@ class UEXCorpClient(BaseModel):
 
     @traceable(name="uex_get_vehicle_rental_prices")
     async def get_vehicle_rental_prices(self, vehicle_id: int) -> list[dict]:
+        if self.via_server:
+            return await uex_cache_client.get_vehicle_rental_price_rows(vehicle_id)
         response = await asyncio.to_thread(
             requests.get,
             self.API_BASE_URL + 'vehicles_rentals_prices',
@@ -253,6 +283,8 @@ class UEXCorpClient(BaseModel):
 
     @traceable(name="uex_fetch_orbit_distances")
     async def _fetch_orbit_distances(self, origin_orbit_id: int, origin_star_system_id: int) -> list[dict]:
+        if self.via_server:
+            return await uex_cache_client.get_orbit_distance_rows(origin_orbit_id, origin_star_system_id)
         response = await asyncio.to_thread(
             requests.get,
             self.API_BASE_URL + 'orbits_distances',
