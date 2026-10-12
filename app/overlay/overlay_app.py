@@ -1,18 +1,36 @@
 import asyncio
 import os
+import sys
 import threading
 
+import httpx
 import qasync
 from pynput import keyboard
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import QApplication
 
+from api_client import api_url
 from overlay import theme, uex_lookup
 
 
 def main():
     print("Loading reference data from UEX...", flush=True)
-    uex_lookup.init()
+    try:
+        uex_lookup.init()
+    except httpx.TransportError as exc:
+        # The first thing ALICE does is ask her server for reference data, so a wrong
+        # ALICE_API_URL or a server that's down shows up here. Say so plainly instead
+        # of a traceback.
+        _exit_with(
+            f"ALICE couldn't reach her server at {api_url()} ({type(exc).__name__}).",
+            "Check your internet connection, and that ALICE_API_URL in your .env is "
+            "https://api.heyalice.help (an old developer .env may still point at localhost).",
+        )
+    except httpx.HTTPStatusError as exc:
+        _exit_with(
+            f"ALICE's server at {api_url()} answered {exc.response.status_code} at startup.",
+            "It may be restarting; try again in a minute.",
+        )
     print("Reference data loaded. Building overlay windows...", flush=True)
 
     # Imported after uex_lookup.init() rather than at module top — panels read
@@ -99,3 +117,10 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def _exit_with(problem: str, advice: str) -> None:
+    print()
+    print(f"[ALICE] {problem}")
+    print(f"[ALICE] {advice}")
+    sys.exit(1)
