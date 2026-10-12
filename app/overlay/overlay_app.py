@@ -127,13 +127,13 @@ def main():
         event_loop.run_forever()
 
 
-if __name__ == "__main__":
-    main()
-
-
 def _exit_with(problem: str, advice: str | None = None) -> None:
     print()
     print(f"[ALICE] {problem}")
     if advice:
         print(f"[ALICE] {advice}")
     sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
