@@ -1,0 +1,1937 @@
+{
+  "summary": {
+    "dimensions": {
+      "on_topic_correct": {
+        "passed": 33,
+        "total": 34
+      },
+      "tool_correct": {
+        "passed": 25,
+        "total": 33
+      },
+      "args_correct": {
+        "passed": 23,
+        "total": 31
+      },
+      "location_correct": {
+        "passed": 9,
+        "total": 9
+      },
+      "price_correct": {
+        "passed": 9,
+        "total": 9
+      },
+      "unit_correct": {
+        "passed": 6,
+        "total": 6
+      },
+      "claims_supported": {
+        "passed": 8,
+        "total": 9
+      }
+    },
+    "model_provider": "ollama",
+    "model_name": "qwen3.8:27b",
+    "timestamp": "2026-10-11T18:55:31.826828+00:00",
+    "total_cases": 34,
+    "passed": 24,
+    "pass_rate": 0.706,
+    "total_cost_usd": 0.153218,
+    "cost_per_turn_usd": 0.004506,
+    "total_tokens": 610984,
+    "cache_hit_rate": 0.0,
+    "unpriced_calls": 0,
+    "config": {
+      "judge_provider": "anthropic",
+      "judge_model": "claude-haiku-5-5",
+      "history_turns": 6,
+      "history_full_tool_result_turns": 2,
+      "classify_history_turns": 2,
+      "anthropic_cache_mode": "off",
+      "anthropic_cache_ttl": "5m"
+    },
+    "avg_latency_ms": 113748.6
+  },
+  "records": [
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "What's the cheapest place to buy Laranite?",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, on ArcCorp, is selling Laranite for 3.15 aUEC per SCU.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 159119.5,
+      "tokens_in": 21685,
+      "tokens_out": 421,
+      "tokens_total": 22106,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.006311,
+      "cost_by_node": {
+        "classify_topic": 0.000226,
+        "respond": 0.006085
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 5698.1,
+      "decline_ms": null,
+      "respond_ms": [
+        22427.4,
+        130974.0
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "Where can I get Laranite for less?",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp, is selling Laranite for 3.15 aUEC per SCU. Port Tressler, in orbit around microTech, is the other listed option at 3.42.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": false,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [
+        "Laranite is priced per SCU"
+      ],
+      "latency_ms": 134739.0,
+      "tokens_in": 21673,
+      "tokens_out": 441,
+      "tokens_total": 22114,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.005344,
+      "cost_by_node": {
+        "classify_topic": 0.000328,
+        "respond": 0.005016
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 8275.8,
+      "decline_ms": null,
+      "respond_ms": [
+        16070.2,
+        110376.2
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.8
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest",
+      "phrasing": "I need to buy some Laranite, where's it cheap?",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Laranite"
+      },
+      "actual_args": {
+        "commodity": "Laranite"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp, is selling Laranite for 3.15 aUEC per SCU \u2014 that's your cheapest option right now. Port Tressler on microTech is next at 3.42, so there's a small spread between the two.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 3.15,
+      "unsupported_claims": [],
+      "latency_ms": 64604.6,
+      "tokens_in": 21699,
+      "tokens_out": 238,
+      "tokens_total": 21937,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.002562,
+      "cost_by_node": {
+        "classify_topic": 0.000345,
+        "respond": 0.002217
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 8700.3,
+      "decline_ms": null,
+      "respond_ms": [
+        22903.8,
+        32982.5
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "What's the cheapest place to buy Agricium?",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on microTech, is selling Agricium for 26.1 aUEC per SCU \u2014 the cheapest in-stock option.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 85715.6,
+      "tokens_in": 21675,
+      "tokens_out": 272,
+      "tokens_total": 21947,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.003399,
+      "cost_by_node": {
+        "classify_topic": 0.000284,
+        "respond": 0.003116
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 7156.1,
+      "decline_ms": null,
+      "respond_ms": [
+        17911.3,
+        60631.1
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "Where can I get Agricium for less?",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on microTech, is the only terminal currently in stock \u2014 it's selling Agricium for 26.1 aUEC per SCU. Baijini Point on ArcCorp lists a lower price at 25.4, but it's out of stock, so there's nothing to pick up there right now.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 100549.3,
+      "tokens_in": 21683,
+      "tokens_out": 398,
+      "tokens_total": 22081,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.003988,
+      "cost_by_node": {
+        "classify_topic": 0.000251,
+        "respond": 0.003736
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 6338.5,
+      "decline_ms": null,
+      "respond_ms": [
+        18835.0,
+        75357.2
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "commodity_price_cheapest_skips_out_of_stock",
+      "phrasing": "I need to buy some Agricium, where's it cheap?",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "commodity_price_lookup",
+      "actual_tool": "commodity_price_lookup",
+      "expected_args": {
+        "commodity": "Agricium"
+      },
+      "actual_args": {
+        "commodity": "Agricium"
+      },
+      "final_response": "Port Tressler, on microTech in Stanton, is selling Agricium for 26.1 aUEC per SCU. That's the cheapest available right now.\n\nBaijini Point on ArcCorp shows a lower price, 25.4, but it's out of stock, so you can't actually buy there.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": true,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Port Tressler",
+      "stated_price": 26.1,
+      "unsupported_claims": [],
+      "latency_ms": 55947.1,
+      "tokens_in": 21680,
+      "tokens_out": 216,
+      "tokens_total": 21896,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.002219,
+      "cost_by_node": {
+        "classify_topic": 0.000316,
+        "respond": 0.001902
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 7971.4,
+      "decline_ms": null,
+      "respond_ms": [
+        14299.9,
+        33658.8
+      ],
+      "tool_ms": [
+        [
+          "commodity_price_lookup",
+          0.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Where's the cheapest place to buy a Cutlass Black?",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp, is selling Cutlass Blacks for 1.19 million aUEC. Port Tressler on microTech is the next option at 1.225 million.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 51186.5,
+      "tokens_in": 21541,
+      "tokens_out": 224,
+      "tokens_total": 21765,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.00203,
+      "cost_by_node": {
+        "classify_topic": 0.0003,
+        "respond": 0.00173
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 7558.4,
+      "decline_ms": null,
+      "respond_ms": [
+        15928.6,
+        27680.4
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "I want to buy a Cutlass Black, what's the best price?",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp, is selling the Cutlass Black for 1.19 million aUEC. Port Tressler on microTech is next at 1.225 million, so the ArcCorp station saves you 35k.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 64815.4,
+      "tokens_in": 21572,
+      "tokens_out": 268,
+      "tokens_total": 21840,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.00257,
+      "cost_by_node": {
+        "classify_topic": 0.000316,
+        "respond": 0.002254
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 7974.5,
+      "decline_ms": null,
+      "respond_ms": [
+        21174.1,
+        35648.2
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "vehicle_purchase_cheapest",
+      "phrasing": "Find me a good deal on a Cutlass Black.",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "vehicle_purchase_lookup",
+      "actual_tool": "vehicle_purchase_lookup",
+      "expected_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "actual_args": {
+        "vehicle": "Cutlass Black"
+      },
+      "final_response": "Baijini Point, in orbit around ArcCorp in Stanton, is selling a Cutlass Black for 1,190,000 aUEC. Port Tressler on microTech is next at 1,225,000 aUEC.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": true,
+      "price_correct": true,
+      "unit_correct": null,
+      "claims_supported": true,
+      "response_correct": null,
+      "recommended_terminal": "Baijini Point",
+      "stated_price": 1190000.0,
+      "unsupported_claims": [],
+      "latency_ms": 98138.8,
+      "tokens_in": 21540,
+      "tokens_out": 325,
+      "tokens_total": 21865,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.003892,
+      "cost_by_node": {
+        "classify_topic": 0.000273,
+        "respond": 0.00362
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 6871.3,
+      "decline_ms": null,
+      "respond_ms": [
+        21511.7,
+        69738.7
+      ],
+      "tool_ms": [
+        [
+          "vehicle_purchase_lookup",
+          0.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "off_topic_greeting",
+      "phrasing": "Good morning.",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": false,
+      "actual_on_topic": true,
+      "expected_tool": null,
+      "actual_tool": null,
+      "expected_args": null,
+      "actual_args": null,
+      "final_response": "Morning. What do you need done?",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": null,
+      "args_correct": null,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 56100.8,
+      "tokens_in": 10747,
+      "tokens_out": 173,
+      "tokens_total": 10920,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.002225,
+      "cost_by_node": {
+        "classify_topic": 0.000275,
+        "respond": 0.00195
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 6923.2,
+      "decline_ms": null,
+      "respond_ms": [
+        49165.9
+      ],
+      "tool_ms": [],
+      "on_topic_correct": false,
+      "overall_pass": false,
+      "sample": 1
+    },
+    {
+      "case_id": "off_topic_greeting",
+      "phrasing": "Hey, how are you?",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": false,
+      "actual_on_topic": false,
+      "expected_tool": null,
+      "actual_tool": null,
+      "expected_args": null,
+      "actual_args": null,
+      "final_response": "I don't do small talk. What's on the manifest?",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": null,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 12200.8,
+      "tokens_in": 502,
+      "tokens_out": 51,
+      "tokens_total": 553,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000483,
+      "cost_by_node": {
+        "classify_topic": 0.000263,
+        "decline": 0.000221
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 6619.1,
+      "decline_ms": 5569.4,
+      "respond_ms": [],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "off_topic_greeting",
+      "phrasing": "Morning, hope you're doing well.",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": false,
+      "actual_on_topic": false,
+      "expected_tool": null,
+      "actual_tool": null,
+      "expected_args": null,
+      "actual_args": null,
+      "final_response": "I'm fine. What's in the manifest?",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": null,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 12393.7,
+      "tokens_in": 510,
+      "tokens_out": 52,
+      "tokens_total": 562,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.000491,
+      "cost_by_node": {
+        "classify_topic": 0.000254,
+        "decline": 0.000238
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 6394.4,
+      "decline_ms": 5988.9,
+      "respond_ms": [],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_explicit",
+      "phrasing": "Best route from Seraphim, sell at an NQA terminal",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact",
+        "sell_at_nqa_only": true
+      },
+      "final_response": "Which ship are you flying out of Seraphim?",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 171509.2,
+      "tokens_in": 21927,
+      "tokens_out": 705,
+      "tokens_total": 22632,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.006789,
+      "cost_by_node": {
+        "classify_topic": 0.000205,
+        "respond": 0.006584
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 5165.7,
+      "decline_ms": null,
+      "respond_ms": [
+        156307.2,
+        9679.5
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          339.3
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_explicit",
+      "phrasing": "Find me a route that ends at a no-questions-asked station out of Seraphim",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact",
+        "sell_at_nqa_only": true
+      },
+      "final_response": "What ship are you flying? I need that to size the load and work out travel times.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 74536.1,
+      "tokens_in": 21527,
+      "tokens_out": 294,
+      "tokens_total": 21821,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.002943,
+      "cost_by_node": {
+        "classify_topic": 0.000276,
+        "respond": 0.002667
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 6967.4,
+      "decline_ms": null,
+      "respond_ms": [
+        52524.6,
+        14706.3
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          320.0
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_explicit",
+      "phrasing": "Best route out of Grim Hex, but only NQA",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": null,
+      "expected_args": {
+        "origin": "Grim Hex",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": null,
+      "final_response": "GrimHEX, got it. What ship are you flying?",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": false,
+      "args_correct": false,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 108568.3,
+      "tokens_in": 10763,
+      "tokens_out": 451,
+      "tokens_total": 11214,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.004306,
+      "cost_by_node": {
+        "classify_topic": 0.000356,
+        "respond": 0.00395
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 8967.8,
+      "decline_ms": null,
+      "respond_ms": [
+        99589.2
+      ],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_slang",
+      "phrasing": "I need to dump some hot cargo, route from Grim Hex",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": null,
+      "expected_args": {
+        "origin": "Grim Hex",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": null,
+      "final_response": "Grim Hex it is, hot cargo flagged \u2014 I'll route you to a buyer that doesn't ask questions about paperwork.\n\nWhat ship are you flying? I need that to price the run.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": false,
+      "args_correct": false,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 74800.3,
+      "tokens_in": 10765,
+      "tokens_out": 253,
+      "tokens_total": 11018,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.002967,
+      "cost_by_node": {
+        "classify_topic": 0.000369,
+        "respond": 0.002598
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 9303.3,
+      "decline_ms": null,
+      "respond_ms": [
+        65485.7
+      ],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_slang",
+      "phrasing": "Where can I fence stuff? Route out of Seraphim",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "sell_at_nqa_only": true
+      },
+      "final_response": "What ship are you flying out of Seraphim? I need that to calculate travel time and hold capacity for the route.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 178946.4,
+      "tokens_in": 21851,
+      "tokens_out": 660,
+      "tokens_total": 22511,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.007085,
+      "cost_by_node": {
+        "classify_topic": 0.000355,
+        "respond": 0.00673
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 8954.2,
+      "decline_ms": null,
+      "respond_ms": [
+        149241.9,
+        20412.0
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          320.1
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_slang",
+      "phrasing": "Best haul out of Seraphim that ends somewhere shady",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact",
+        "sell_at_nqa_only": true
+      },
+      "final_response": "Which ship are you flying out of Seraphim?",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 251301.9,
+      "tokens_in": 22204,
+      "tokens_out": 997,
+      "tokens_total": 23201,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.009956,
+      "cost_by_node": {
+        "classify_topic": 0.000362,
+        "respond": 0.009594
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 9128.8,
+      "decline_ms": null,
+      "respond_ms": [
+        231810.6,
+        10054.6
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          289.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_slang",
+      "phrasing": "Boosted cargo, route out of Grim Hex",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": null,
+      "expected_args": {
+        "origin": "Grim Hex",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": null,
+      "final_response": "Grim Hex works as the origin. What ship are you flying? I need that to size the cargo capacity before I can rank routes by profit per hour.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": false,
+      "args_correct": false,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 63442.0,
+      "tokens_in": 10759,
+      "tokens_out": 199,
+      "tokens_total": 10958,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.002516,
+      "cost_by_node": {
+        "classify_topic": 0.000275,
+        "respond": 0.002241
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 6937.5,
+      "decline_ms": null,
+      "respond_ms": [
+        56493.3
+      ],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_slang",
+      "phrasing": "Best black market run from Seraphim",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": null,
+      "expected_args": {
+        "origin": "Seraphim",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": null,
+      "final_response": "What ship are you flying?",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": false,
+      "args_correct": false,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 81976.4,
+      "tokens_in": 10757,
+      "tokens_out": 323,
+      "tokens_total": 11080,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.003251,
+      "cost_by_node": {
+        "classify_topic": 0.000264,
+        "respond": 0.002988
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 6646.8,
+      "decline_ms": null,
+      "respond_ms": [
+        75318.4
+      ],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_slang",
+      "phrasing": "Something off the books, best route from Seraphim",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "sell_at_nqa_only": true
+      },
+      "final_response": "What ship's flying? Need a cargo capacity to size the route.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 112419.1,
+      "tokens_in": 21552,
+      "tokens_out": 373,
+      "tokens_total": 21925,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.004445,
+      "cost_by_node": {
+        "classify_topic": 0.000265,
+        "respond": 0.004179
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 6692.6,
+      "decline_ms": null,
+      "respond_ms": [
+        78066.3,
+        27289.0
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          353.3
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_oblique",
+      "phrasing": "I've got goods of questionable provenance, find me a route from Seraphim",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact",
+        "sell_at_nqa_only": true
+      },
+      "final_response": "What are you flying? I need a ship to size the hold and route the numbers.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 210738.1,
+      "tokens_in": 22040,
+      "tokens_out": 818,
+      "tokens_total": 22858,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.008347,
+      "cost_by_node": {
+        "classify_topic": 0.000276,
+        "respond": 0.008071
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 6955.3,
+      "decline_ms": null,
+      "respond_ms": [
+        189034.0,
+        14440.6
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          288.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_oblique",
+      "phrasing": "Route from Seraphim to somewhere that won't ask where I got the cargo",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "sell_at_nqa_only": true
+      },
+      "final_response": "What ship are you flying in? I need that to size the run and rank it by profit per hour.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 191979.4,
+      "tokens_in": 21802,
+      "tokens_out": 616,
+      "tokens_total": 22418,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.007604,
+      "cost_by_node": {
+        "classify_topic": 0.000349,
+        "respond": 0.007255
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 8799.4,
+      "decline_ms": null,
+      "respond_ms": [
+        151245.8,
+        31657.2
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          260.1
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_oblique",
+      "phrasing": "I've got a hold full of stuff that fell off a truck, best route from Grim Hex",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": null,
+      "expected_args": {
+        "origin": "Grim Hex",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": null,
+      "final_response": "Grim Hex, got it. What are you flying?",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": false,
+      "args_correct": false,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 134475.8,
+      "tokens_in": 10779,
+      "tokens_out": 472,
+      "tokens_total": 11251,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.005334,
+      "cost_by_node": {
+        "classify_topic": 0.000346,
+        "respond": 0.004988
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 8719.8,
+      "decline_ms": null,
+      "respond_ms": [
+        125744.7
+      ],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_oblique",
+      "phrasing": "Cargo I'd rather not explain, find me a route out of Seraphim",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact",
+        "sell_at_nqa_only": true
+      },
+      "final_response": "I hear \"wouldn't explain\" as \"I'd rather not explain,\" so I'll only look at terminals that don't ask questions about provenance. What ship are you flying?",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 157798.3,
+      "tokens_in": 21797,
+      "tokens_out": 607,
+      "tokens_total": 22404,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.006247,
+      "cost_by_node": {
+        "classify_topic": 0.000282,
+        "respond": 0.005965
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 7119.4,
+      "decline_ms": null,
+      "respond_ms": [
+        124454.1,
+        25913.5
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          293.3
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_oblique",
+      "phrasing": "Who buys without checking the manifest? Route from Seraphim",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim",
+        "sell_at_nqa_only": true
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact",
+        "sell_at_nqa_only": true
+      },
+      "final_response": "Need a ship for that one \u2014 profit per hour depends on hold capacity and transfer speed. What are you flying out of Seraphim?",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 73317.1,
+      "tokens_in": 21489,
+      "tokens_out": 295,
+      "tokens_total": 21784,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.002895,
+      "cost_by_node": {
+        "classify_topic": 0.00031,
+        "respond": 0.002585
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 7826.7,
+      "decline_ms": null,
+      "respond_ms": [
+        48857.5,
+        16304.4
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          310.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_must_not_set",
+      "phrasing": "Best route from Seraphim",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim"
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact"
+      },
+      "final_response": "Which ship are you flying?",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 104665.8,
+      "tokens_in": 21616,
+      "tokens_out": 413,
+      "tokens_total": 22029,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.004139,
+      "cost_by_node": {
+        "classify_topic": 0.000285,
+        "respond": 0.003853
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 7187.6,
+      "decline_ms": null,
+      "respond_ms": [
+        87115.2,
+        10029.8
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          315.0
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_must_not_set",
+      "phrasing": "Best route from Seraphim, autoload only",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim",
+        "require_autoload": true
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact",
+        "require_autoload": true
+      },
+      "final_response": "Which ship are you flying?",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 83959.6,
+      "tokens_in": 21531,
+      "tokens_out": 329,
+      "tokens_total": 21860,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.003318,
+      "cost_by_node": {
+        "classify_topic": 0.000343,
+        "respond": 0.002975
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 8642.3,
+      "decline_ms": null,
+      "respond_ms": [
+        67418.5,
+        7583.8
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          295.7
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_must_not_set",
+      "phrasing": "Best route out of Seraphim, space stations only",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim",
+        "exclude_ground_stations": true
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact",
+        "exclude_ground_stations": true
+      },
+      "final_response": "Which ship are you flying? Hold capacity changes the math.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 137478.4,
+      "tokens_in": 21750,
+      "tokens_out": 553,
+      "tokens_total": 22303,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.005441,
+      "cost_by_node": {
+        "classify_topic": 0.000394,
+        "respond": 0.005047
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 9925.2,
+      "decline_ms": null,
+      "respond_ms": [
+        113954.7,
+        13292.0
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          286.8
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_must_not_set",
+      "phrasing": "Best route from Seraphim, avoid any no-questions-asked terminals",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim"
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact"
+      },
+      "final_response": "Which ship are you flying from Seraphim? I need that to rank the route.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 226419.5,
+      "tokens_in": 21719,
+      "tokens_out": 542,
+      "tokens_total": 22261,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.00897,
+      "cost_by_node": {
+        "classify_topic": 0.000444,
+        "respond": 0.008526
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 11199.5,
+      "decline_ms": null,
+      "respond_ms": [
+        182267.6,
+        32675.0
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          260.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_must_not_set",
+      "phrasing": "I got pirated at Seraphim, what's the best route out of here?",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": null,
+      "expected_args": {
+        "origin": "Seraphim"
+      },
+      "actual_args": null,
+      "final_response": "Seraphim's a rough spot to lose cargo. Where are you flying out of \u2014 what ship are you in?",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": false,
+      "args_correct": false,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 113905.8,
+      "tokens_in": 10777,
+      "tokens_out": 421,
+      "tokens_total": 11198,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.004518,
+      "cost_by_node": {
+        "classify_topic": 0.00033,
+        "respond": 0.004188
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 8323.3,
+      "decline_ms": null,
+      "respond_ms": [
+        105572.1
+      ],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_must_not_set",
+      "phrasing": "Best legit route from Seraphim, somewhere reputable",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": null,
+      "expected_args": {
+        "origin": "Seraphim"
+      },
+      "actual_args": null,
+      "final_response": "What ship are you hauling in? Route depends on the hold and cargo transfer.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": false,
+      "args_correct": false,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 129432.5,
+      "tokens_in": 10761,
+      "tokens_out": 312,
+      "tokens_total": 11073,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.005134,
+      "cost_by_node": {
+        "classify_topic": 0.000285,
+        "respond": 0.004849
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 7186.7,
+      "decline_ms": null,
+      "respond_ms": [
+        122233.4
+      ],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_must_not_set",
+      "phrasing": "My last haul got stolen, best route from Seraphim",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": null,
+      "expected_args": {
+        "origin": "Seraphim"
+      },
+      "actual_args": null,
+      "final_response": "Sorry about the haul. What ship are you in? I need that to find you a route out of Seraphim.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": false,
+      "args_correct": false,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 133224.2,
+      "tokens_in": 10765,
+      "tokens_out": 484,
+      "tokens_total": 11249,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.005284,
+      "cost_by_node": {
+        "classify_topic": 0.000321,
+        "respond": 0.004964
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 8082.3,
+      "decline_ms": null,
+      "respond_ms": [
+        125131.1
+      ],
+      "tool_ms": [],
+      "on_topic_correct": true,
+      "overall_pass": false,
+      "sample": 1
+    },
+    {
+      "case_id": "best_route_nqa_must_not_set",
+      "phrasing": "I got looted out by Grim Hex, what's the best route from Seraphim?",
+      "model_provider": "ollama",
+      "model_name": "qwen3.8:27b",
+      "expected_on_topic": true,
+      "actual_on_topic": true,
+      "expected_tool": "best_route",
+      "actual_tool": "best_route",
+      "expected_args": {
+        "origin": "Seraphim"
+      },
+      "actual_args": {
+        "origin": "Seraphim",
+        "origin_mode": "exact"
+      },
+      "final_response": "Which ship are you flying? Once I know the hold, I can run the numbers.",
+      "judge_reasoning": null,
+      "timed_out": false,
+      "tool_correct": true,
+      "args_correct": true,
+      "location_correct": null,
+      "price_correct": null,
+      "unit_correct": null,
+      "claims_supported": null,
+      "response_correct": null,
+      "recommended_terminal": null,
+      "stated_price": null,
+      "unsupported_claims": null,
+      "latency_ms": 157047.2,
+      "tokens_in": 21785,
+      "tokens_out": 565,
+      "tokens_total": 22350,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
+      "cache_hit_rate": 0.0,
+      "cost_usd": 0.006215,
+      "cost_by_node": {
+        "classify_topic": 0.000321,
+        "respond": 0.005895
+      },
+      "unpriced_calls": 0,
+      "classify_ms": 8081.7,
+      "decline_ms": null,
+      "respond_ms": [
+        134960.5,
+        13643.8
+      ],
+      "tool_ms": [
+        [
+          "best_route",
+          344.6
+        ]
+      ],
+      "on_topic_correct": true,
+      "overall_pass": true,
+      "sample": 1
+    }
+  ]
+}

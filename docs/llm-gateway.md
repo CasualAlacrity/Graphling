@@ -1,6 +1,8 @@
 # LLM gateway — self-hosted models behind the ledger server
 
 **Status:** LLM gateway built 2026-10-09 (server + client + tests, verified end to end against frankencompute). TTS proxy, UEX move, limits, and deploy still to do.
+**Measured costs and choices** (power, local model shoot-out, local TTS = Kokoro `bf_isabella`,
+3 parallel slots): [frankencompute-bench.md](frankencompute-bench.md).
 **Goal:** the client ships as a whole product. 10 new pilots using ALICE within 2 weeks (by
 ~2026-10-23), with nobody added by hand. Discord login is the only onboarding step.
 
