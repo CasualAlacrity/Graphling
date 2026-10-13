@@ -21,14 +21,16 @@
     <text x="70" y="110" font-size="20" font-weight="600" letter-spacing="6" fill="#F2650C">STAR CITIZEN  ·  VOICE COPILOT</text>
     <text x="64" y="240" font-size="150" font-weight="800" letter-spacing="8" fill="#EDEAE4">ALICE</text>
     <rect x="70" y="266" width="120" height="6" fill="#F2650C"/>
-    <text x="70" y="330" font-size="34" font-weight="500" fill="#EDEAE4">Ask for the best route.</text>
-    <text x="70" y="376" font-size="34" font-weight="500" fill="#9AA0A6">Keep your eyes on the cockpit.</text>
-    <text x="70" y="540" font-size="20" fill="#9AA0A6">LangGraph · LangChain · Pydantic · LangSmith · PySide6</text>
-    <text x="70" y="574" font-size="20" fill="#5C6266">Python · PostgreSQL · voice push-to-talk · overlay UI</text>
+    <!-- what ALICE stands for, initials in the accent (same as the launcher and login pages) -->
+    <text x="70" y="306" font-size="15" font-weight="600" letter-spacing="1.2" fill="#9AA0A6"><tspan fill="#F2650C">A</tspan>CCIDENTAL <tspan fill="#F2650C">L</tspan>OGISTICS <tspan fill="#F2650C">I</tspan>NTELLIGENCE <tspan fill="#F2650C">C</tspan>OORDINATION <tspan fill="#F2650C">E</tspan>NGINE</text>
+    <text x="70" y="358" font-size="34" font-weight="500" fill="#EDEAE4">Ask for the best route.</text>
+    <text x="70" y="402" font-size="34" font-weight="500" fill="#9AA0A6">Keep your eyes on the cockpit.</text>
+    <text x="70" y="558" font-size="20" fill="#9AA0A6">LangGraph · LangChain · Pydantic · LangSmith · PySide6</text>
+    <text x="70" y="590" font-size="20" fill="#5C6266">Python · PostgreSQL · voice push-to-talk · overlay UI</text>
   </g>
 
   <!-- waveform -->
-  <g fill="url(#bar)" transform="translate(0,48)">
+  <g fill="url(#bar)" transform="translate(0,60)">
     <rect x="70"  y="415" width="8" height="30" rx="4" transform="translate(0,-15)"/>
     <rect x="92"  y="415" width="8" height="50" rx="4" transform="translate(0,-25)"/>
     <rect x="114" y="415" width="8" height="80" rx="4" transform="translate(0,-40)"/>

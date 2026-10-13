@@ -173,9 +173,10 @@ _PAGE = """<!doctype html>
   .bar {{ display: block; width: 52px; height: 4px; margin-top: 12px; background: var(--accent); }}
   .tagline {{
     display: block; margin-top: 14px;
-    font-size: 12px; font-weight: 600; letter-spacing: 0.3em; text-transform: uppercase;
-    color: var(--accent);
+    font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--text-2);
   }}
+  .tagline b {{ font-weight: 600; color: var(--accent); }}
   .card {{
     background: var(--surface);
     border: 1px solid var(--border);
@@ -222,7 +223,7 @@ _PAGE = """<!doctype html>
   <header class="brand" aria-label="ALICE">
     <span class="wordmark">ALICE</span>
     <span class="bar"></span>
-    <span class="tagline">Star Citizen · Voice copilot</span>
+    <span class="tagline"><b>A</b>ccidental <b>L</b>ogistics <b>I</b>ntelligence <b>C</b>oordination <b>E</b>ngine</span>
   </header>
   <section class="card {tone}">
     <p class="eyebrow"><span class="dot"></span>{eyebrow}</p>
