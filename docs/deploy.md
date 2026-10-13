@@ -128,6 +128,52 @@ autoload status against the *current* reference cache at query time regardless o
 sitting in a stale route row. See `server/refresh_static_caches.py`'s own docstring and
 `docs/todo.md`'s Phase 2 cache section for the full reasoning.
 
+## Installer downloads
+
+Pilots download the Windows installer from the landing page's own domain:
+
+- `https://heyalice.help/download/ALICE-Setup.exe` — always the newest; the link to share
+- `https://heyalice.help/download/ALICE-Setup-<version>.exe` — a specific build
+
+Built on the Windows PC (`scripts\windows\build-installer.bat`, README "Build the
+installer"), then uploaded from there with:
+
+```bat
+scripts\windows\publish-installer.bat
+```
+
+It needs the same SSH key `deploy_server.sh` uses, copied to `%USERPROFILE%\.ssh\flockt`
+on the PC (Windows' built-in OpenSSH does the upload). The installer is far too big for
+Discord attachments, which is why it's served from here.
+
+**One-time setup on the box.** A folder outside the landing page's own web root, so a
+redeploy of the landing page can't wipe the installers, served at `/download/`:
+
+```bash
+mkdir -p /var/www/alice-downloads
+```
+
+Then add this inside the `server { ... }` block for `heyalice.help` (the 443 one certbot
+manages) in its `/etc/nginx/sites-available/` file:
+
+```nginx
+location /download/ {
+    alias /var/www/alice-downloads/;
+    # Never list the folder; only exact file links work.
+    autoindex off;
+    # Always download, never try to display; and re-check the "latest" file every time
+    # so a new upload is picked up immediately.
+    add_header Content-Disposition "attachment";
+    add_header Cache-Control "no-cache";
+}
+```
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Old versioned installers stay until deleted by hand (`ls -lh /var/www/alice-downloads`).
+
 ## Rollback
 
 The previous image is still on Docker Hub under its own SHA tag:
