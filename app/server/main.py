@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from server import llm_gateway_service
+from server import llm_gateway_service, prompt_service
 from server.routes.auth import router as auth_router
 from server.routes.ledger import router as ledger_router
 from server.routes.llm import router as llm_router
@@ -19,10 +19,15 @@ async def lifespan(app: FastAPI):
     # rather than up to PROBE_INTERVAL_S later, then keep probing in the background.
     await llm_gateway_service.probe_once()
     probe_task = asyncio.create_task(llm_gateway_service.probe_forever())
+    # Prompts before the first request too: the gateway can't expand a placeholder
+    # until they're loaded (Hub, else the snapshot baked into the image).
+    await prompt_service.refresh()
+    prompt_task = asyncio.create_task(prompt_service.refresh_forever())
     yield
-    probe_task.cancel()
-    with contextlib.suppress(asyncio.CancelledError):
-        await probe_task
+    for task in (probe_task, prompt_task):
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
 
 
 app = FastAPI(title="ALICE Ledger API", lifespan=lifespan)

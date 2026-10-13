@@ -46,7 +46,7 @@ def test_persona_untouched_when_caching_off(monkeypatch):
 def test_persona_gets_breakpoint_when_caching_on(monkeypatch):
     monkeypatch.setattr(graph, "CACHE_MODE", "system")
     monkeypatch.delenv("ANTHROPIC_CACHE_TTL", raising=False)
-    plain = graph.PERSONA_TEMPLATE.invoke({}).to_messages()[-1].content
+    plain = graph.PERSONA_MESSAGES[-1].content
     last = graph._persona_messages()[-1]
     assert isinstance(last, SystemMessage)
     assert last.content == [{"type": "text", "text": plain, "cache_control": {"type": "ephemeral", "ttl": "5m"}}]

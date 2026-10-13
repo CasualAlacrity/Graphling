@@ -21,12 +21,12 @@ class _RecordingModel:
 
 def _fake_targets(**models):
     """Builds a _PREWARM_TARGETS-shaped list from name->fake-model kwargs, paired with
-    the real (cheap, local, no-network) templates — only the model .ainvoke() call is
-    ever faked here, never template rendering."""
-    templates = {
-        "persona": graph.PERSONA_TEMPLATE, "classifier": graph.CLASSIFY_TEMPLATE, "reject": graph.REJECT_TEMPLATE,
+    the real (cheap, local, no-network) prompt messages — only the model .ainvoke()
+    call is ever faked here, never prompt loading."""
+    prompts = {
+        "persona": graph.PERSONA_MESSAGES, "classifier": graph.CLASSIFY_MESSAGES, "reject": graph.REJECT_MESSAGES,
     }
-    return [(name, model, templates[name]) for name, model in models.items()]
+    return [(name, model, prompts[name]) for name, model in models.items()]
 
 
 async def test_prewarm_is_a_noop_for_a_non_ollama_provider(monkeypatch):

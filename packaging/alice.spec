@@ -15,8 +15,9 @@ datas = [
     # Assets found via their module's own __file__ — same relative spot in the bundle.
     (os.path.join(APP, "overlay", "assets"), os.path.join("overlay", "assets")),
     (os.path.join(APP, "launcher", "assets"), os.path.join("launcher", "assets")),
-    # Repo-root files, found via bundle.root() (app/bundle.py).
-    (os.path.join(REPO, "prompts", ".prompt_cache.json"), "prompts"),
+    # Repo-root file, found via bundle.root() (app/bundle.py). Deliberately NOT the
+    # prompt snapshot: pilots go through ALICE's gateway, which swaps the prompts in
+    # server-side (server/prompt_service.py), so their text never ships in the installer.
     (os.path.join(REPO, ".env-pilot"), "."),
 ]
 # faster-whisper ships its voice-activity model (Silero VAD, ONNX) as package data.

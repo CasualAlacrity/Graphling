@@ -16,6 +16,9 @@ RUN pip install --no-cache-dir -r server-requirements.txt
 
 COPY alembic.ini .
 COPY app ./app
+# The committed prompt snapshot -- server/prompt_service.py's fallback when the
+# LangSmith Hub isn't configured or can't be reached.
+COPY prompts/.prompt_cache.json ./prompts/.prompt_cache.json
 
 ENV PYTHONPATH=/srv/app
 

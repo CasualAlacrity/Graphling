@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from db.models import LegType
 from llm import anthropic_cache_control, anthropic_cache_mode, get_chat_llm, get_classification_llm
-from prompt_loader import load_prompt
+from prompt_loader import prompt_messages
 from tools.best_route_tool import BestRouteTool
 from tools.starcitizenwiki.client import StarCitizenWikiClient
 from tools.trade_run import resolver
@@ -70,9 +70,11 @@ class RejectLine(BaseModel):
 
 load_dotenv()
 
-PERSONA_TEMPLATE = load_prompt("alice-persona")
-CLASSIFY_TEMPLATE = load_prompt("topic-classification")
-REJECT_TEMPLATE = load_prompt("topic-reject-voice")
+# Static (no template variables), so each renders once here. Through ALICE's gateway
+# these are placeholders the server expands -- see prompt_loader.prompt_messages.
+PERSONA_MESSAGES = prompt_messages("alice-persona")
+CLASSIFY_MESSAGES = prompt_messages("topic-classification")
+REJECT_MESSAGES = prompt_messages("topic-reject-voice")
 
 uex_client = UEXCorpClient(via_server=True)  # no UEX key on the client; lookups go through the server cache
 scw_client = StarCitizenWikiClient()
@@ -130,15 +132,15 @@ if CACHE_MODE == "full":
 classifier_llm = get_classification_llm().with_structured_output(TopicClassification)
 reject_llm = get_classification_llm().with_structured_output(RejectLine)
 
-# name -> (llm instance, its static system-prompt template). Only a content-invariant
+# name -> (llm instance, its static system-prompt messages). Only a content-invariant
 # system prompt is worth prewarming at all: Ollama's cache is keyed on exact prompt
 # text, so a template that interpolates per-turn variables into the system message
 # (unlike these three) would never match a real call's prompt anyway — see
-# decline_topic's own note on why REJECT_TEMPLATE stays variable-free for this reason.
+# decline_topic's own note on why the reject prompt stays variable-free for this reason.
 _PREWARM_TARGETS = [
-    ("persona", llm, PERSONA_TEMPLATE),
-    ("classifier", classifier_llm, CLASSIFY_TEMPLATE),
-    ("reject", reject_llm, REJECT_TEMPLATE),
+    ("persona", llm, PERSONA_MESSAGES),
+    ("classifier", classifier_llm, CLASSIFY_MESSAGES),
+    ("reject", reject_llm, REJECT_MESSAGES),
 ]
 
 _warmed: set[str] = set()
@@ -170,23 +172,23 @@ async def prewarm() -> None:
     if os.getenv("PREWARM_OLLAMA", "true").strip().lower() == "false":
         return
 
-    to_warm = [(name, model, tmpl) for name, model, tmpl in _PREWARM_TARGETS if name not in _warmed]
+    to_warm = [(name, model, prompt) for name, model, prompt in _PREWARM_TARGETS if name not in _warmed]
     if not to_warm:
         return
 
     warmup_turn = [HumanMessage(content="(warmup)")]
 
-    async def _warm_one(name: str, model, template) -> None:
+    async def _warm_one(name: str, model, prompt: list[BaseMessage]) -> None:
         try:
             await model.ainvoke(
-                template.invoke({}).to_messages() + warmup_turn,
+                prompt + warmup_turn,
                 config={"run_name": f"prewarm-{name}", "tags": ["warmup"]},
             )
             _warmed.add(name)
         except Exception as exc:
             print(f"[ALICE] Prewarm failed for {name!r} ({exc}) — its first real call will be slow instead.")
 
-    await asyncio.gather(*[_warm_one(name, model, tmpl) for name, model, tmpl in to_warm])
+    await asyncio.gather(*[_warm_one(name, model, prompt) for name, model, prompt in to_warm])
 
 
 # Tools whose result is a spoken readback of a stated number (docs/intent/voice-latency.md)
@@ -312,7 +314,7 @@ def _persona_messages() -> list[BaseMessage]:
     Anthropic caching is on. Tools render before system in Anthropic's request, so this
     one breakpoint caches every tool schema plus the persona -- the stable prefix,
     unlike the windowed history after it."""
-    messages = PERSONA_TEMPLATE.invoke({}).to_messages()
+    messages = list(PERSONA_MESSAGES)
     if CACHE_MODE == "off" or not isinstance(messages[-1], SystemMessage):
         return messages
     block = {"type": "text", "text": messages[-1].content, "cache_control": anthropic_cache_control()}
@@ -349,7 +351,7 @@ async def respond(state: State) -> dict:
 
 
 async def classify_topic(state: State) -> dict:
-    messages = CLASSIFY_TEMPLATE.invoke({}).to_messages()
+    messages = list(CLASSIFY_MESSAGES)
     # full_result_turns=1: classify runs before this turn's tools, so every tool result
     # it sees is a previous turn's -- all stubbed, none needed to judge topic.
     history = _windowed_history(state.messages, CLASSIFY_HISTORY_TURNS, 1)
@@ -358,7 +360,7 @@ async def classify_topic(state: State) -> dict:
 
 
 async def decline_topic(state: State) -> dict:
-    # REJECT_TEMPLATE.invoke({}) takes no variables on purpose — utterance/reason are
+    # The reject prompt takes no variables on purpose — utterance/reason are
     # appended as a separate HumanMessage instead of interpolated into the system
     # prompt, so the system prompt stays content-invariant and prewarm() can actually
     # warm it (a template with per-turn variables baked into its system message would
@@ -367,7 +369,7 @@ async def decline_topic(state: State) -> dict:
     context = HumanMessage(
         content=f"Pilot said: {state.messages[-1].content}\nWhy it's off-topic: {state.reason}"
     )
-    messages = REJECT_TEMPLATE.invoke({}).to_messages() + [context]
+    messages = REJECT_MESSAGES + [context]
     response = await reject_llm.ainvoke(messages)
     return {"messages": [AIMessage(response.line)]}
 

@@ -90,6 +90,16 @@ class Settings(BaseSettings):
     # queues instead of overflowing. 0 = no cap.
     fallback_daily_usd_cap: float = 5.0
 
+    # ALICE's prompts (server/prompt_service.py) -- the gateway swaps them in, so pilots
+    # never receive the text. Pulled from the LangSmith Hub when LANGSMITH_API_KEY is
+    # set (plus LANGSMITH_ENDPOINT for this account's EU tenant), else the committed
+    # snapshot baked into the image. A tag (e.g. "prod") makes a release deliberate:
+    # only the commit carrying that tag in the Hub goes live; empty = latest commit.
+    prompt_hub_tag: str = ""
+    # How often the running server re-pulls, so a release reaches pilots without a
+    # redeploy or restart. 0 = only at startup.
+    prompt_refresh_s: int = 300
+
 
 @lru_cache
 def get_settings() -> Settings:

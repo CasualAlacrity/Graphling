@@ -47,6 +47,13 @@ services:
       # ElevenLabs is the optional fallback (a different voice); leave its key empty to
       # have ALICE stay quiet instead while frankencompute is down.
       FRANKENCOMPUTE_TTS_URL: ${FRANKENCOMPUTE_TTS_URL}
+      # ALICE's prompts (server/prompt_service.py). With a LangSmith key the server pulls
+      # them from the Hub (EU tenant) and re-pulls every PROMPT_REFRESH_S; without one it
+      # serves the snapshot baked into the image. PROMPT_HUB_TAG (e.g. "prod") = only the
+      # tagged commit goes live -- moving the tag in the Hub is the release.
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      LANGSMITH_ENDPOINT: ${LANGSMITH_ENDPOINT:-https://eu.api.smith.langchain.com}
+      PROMPT_HUB_TAG: ${PROMPT_HUB_TAG:-}
       ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
       ELEVENLABS_VOICE_ID: ${ELEVENLABS_VOICE_ID:-}
       ELEVENLABS_USD_PER_1K_CHARS: ${ELEVENLABS_USD_PER_1K_CHARS:-0}

@@ -199,6 +199,29 @@ These are runaway guards, not rationing. Every threshold sits well above a real 
 `fallback_chat_model` (`gpt-4o-mini`), `fallback_classify_model` (`gpt-4o-mini`),
 `llm_max_inflight` (2), `fallback_daily_usd_cap` (5.0).
 
+## Prompts (added 2026-10-13)
+
+The gateway owns ALICE's prompts; pilots never receive them. Through the gateway
+(`LLM_PROVIDER=alice`) the client sends a placeholder system message,
+`{{alice-prompt:<name>}}` (`prompt_loader.prompt_messages`), and `routes/llm.py` expands it
+(`server/prompt_service.py`) before routing, so frankencompute and both fallbacks see the
+real text. The installer no longer bundles `prompts/.prompt_cache.json`. Development
+against Ollama/OpenAI/Anthropic directly still loads the text client-side, as before.
+
+Sources: the LangSmith Hub when the server has `LANGSMITH_API_KEY` (+ the EU
+`LANGSMITH_ENDPOINT`), else the committed snapshot copied into the image. Pulled at
+startup and every `PROMPT_REFRESH_S` (300); a failed pull keeps what's loaded.
+
+**Releasing a prompt:** with `PROMPT_HUB_TAG=prod` set on the server, edit the prompt in
+the Hub (pilots unaffected), test it from a dev client, then move the `prod` tag to that
+commit — every pilot gets it within five minutes, no redeploy, no new installer. Without a
+key on the server, a release is: pull the new prompt on a dev machine (which refreshes the
+committed snapshot), commit, redeploy.
+
+**Order matters once:** the server must have this before any client that sends
+placeholders — an older server would hand the model the literal placeholder text.
+Clients from before the change still send full prompts and keep working.
+
 ## frankencompute
 
 Already done 2026-10-09: `OLLAMA_KEEP_ALIVE=-1`, `OLLAMA_CONTEXT_LENGTH=32768` (systemd override),

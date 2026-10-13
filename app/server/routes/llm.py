@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from db.models import User
-from server import llm_gateway_service
+from server import llm_gateway_service, prompt_service
 from server.config import settings
 from server.dependencies import get_current_user
 from server.limits import RateLimiter
@@ -35,6 +35,12 @@ async def chat(request: Request, user: User = Depends(get_current_user)):
         payload = json.loads(raw)
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=400, detail="Body is not valid JSON") from exc
+
+    # Before routing, so whichever backend answers sees the real prompt text.
+    try:
+        payload = prompt_service.expand(payload)
+    except prompt_service.UnknownPrompt as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     try:
         relay = await llm_gateway_service.open_chat(payload, user.id)

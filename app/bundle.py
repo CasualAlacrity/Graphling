@@ -3,8 +3,9 @@ PyInstaller bundle when running as the packaged ALICE.exe (packaging/alice.spec)
 
 Only for files outside the Python packages themselves: assets that sit next to a module
 (overlay/assets, launcher/assets) are found via that module's own __file__, which
-PyInstaller keeps pointing inside the bundle. These are the repo-root files a module
-reached with Path(__file__).parent.parent, which leaves the bundle once frozen.
+PyInstaller keeps pointing inside the bundle. These are repo-root files (.env-pilot,
+and the prompt snapshot when running from source), which Path(__file__).parent.parent
+would miss once frozen.
 """
 import sys
 from pathlib import Path
