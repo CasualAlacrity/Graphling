@@ -4,8 +4,8 @@ REM   https://heyalice.help/download/ALICE-Setup.exe          (always the newest
 REM   https://heyalice.help/download/ALICE-Setup-<version>.exe (that exact build)
 REM
 REM Run scripts\windows\build-installer.bat first. Needs, once:
-REM   - the Hetzner SSH key on this PC at SSH_KEY below (the same key
-REM     scripts/deploy_server.sh uses on the Mac)
+REM   - an SSH key on this PC at SSH_KEY below whose public half is in the box's
+REM     authorized_keys (docs/deploy.md, "Installer downloads")
 REM   - the one-time nginx setup in docs/deploy.md, "Installer downloads"
 REM
 REM Uses Windows' built-in OpenSSH (ssh/scp), nothing to install.
@@ -15,7 +15,7 @@ cd /d "%~dp0..\.."
 REM -- Edit these once --------------------------------------------------------
 set PROD_HOST=168.119.234.226
 set PROD_USER=root
-set SSH_KEY=%USERPROFILE%\.ssh\flockt
+set SSH_KEY=%USERPROFILE%\.ssh\alice_publish
 set DOWNLOAD_DIR=/var/www/alice-downloads
 REM ---------------------------------------------------------------------------
 
@@ -39,6 +39,8 @@ echo Uploading ALICE %APP_VERSION% to %PROD_HOST%...
 REM Uploaded under a temporary name and renamed once complete, so nobody downloads a
 REM half-uploaded installer. ALICE-Setup.exe is then replaced in one step (cp to a temp
 REM name, then mv), which is the stable link to share.
+ssh -i "%SSH_KEY%" %PROD_USER%@%PROD_HOST% "mkdir -p %DOWNLOAD_DIR%"
+if errorlevel 1 goto failed
 scp -i "%SSH_KEY%" "%INSTALLER%" %PROD_USER%@%PROD_HOST%:%DOWNLOAD_DIR%/ALICE-Setup-%APP_VERSION%.exe.part
 if errorlevel 1 goto failed
 

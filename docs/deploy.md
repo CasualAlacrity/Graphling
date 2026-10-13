@@ -142,18 +142,17 @@ installer"), then uploaded from there with:
 scripts\windows\publish-installer.bat
 ```
 
-It needs the same SSH key `deploy_server.sh` uses, copied to `%USERPROFILE%\.ssh\flockt`
-on the PC (Windows' built-in OpenSSH does the upload). The installer is far too big for
+It needs the PC's own SSH key at `%USERPROFILE%\.ssh\alice_publish` (Windows' built-in
+OpenSSH does the upload) — made there with `ssh-keygen -t ed25519 -f
+%USERPROFILE%\.ssh\alice_publish`, its `.pub` line appended to the box's
+`~/.ssh/authorized_keys`. Its own key rather than a copy of the Mac's `flockt`: a copied key
+failed to load on Windows ("Operation not supported on socket"), and this way the Mac's
+private key never leaves the Mac. The installer is far too big for
 Discord attachments, which is why it's served from here.
 
-**One-time setup on the box.** A folder outside the landing page's own web root, so a
-redeploy of the landing page can't wipe the installers, served at `/download/`:
-
-```bash
-mkdir -p /var/www/alice-downloads
-```
-
-Then add this inside the `server { ... }` block for `heyalice.help` (the 443 one certbot
+**One-time setup on the box.** Installers go in `/var/www/alice-downloads` (the publish
+script creates it), a folder outside the landing page's own web root so a redeploy of the
+landing page can't wipe them. Serve it at `/download/` by adding this inside the `server { ... }` block for `heyalice.help` (the 443 one certbot
 manages) in its `/etc/nginx/sites-available/` file:
 
 ```nginx
