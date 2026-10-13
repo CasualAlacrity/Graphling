@@ -116,6 +116,23 @@ def cached_session_token() -> str | None:
     return session.token if session is not None else None
 
 
+def cached_session() -> PilotSession | None:
+    """The cached session if it has more than REFRESH_WITHIN_S left — no network call,
+    so the launcher can show "signed in as" instantly on open. Whether the server still
+    accepts it is checked at Start (get_pilot_session), same as before."""
+    session = _load_cached_session()
+    if session is None or token_expires_within(session.token, REFRESH_WITHIN_S):
+        return None
+    return session
+
+
+def sign_out() -> None:
+    """Forget the cached session — the launcher's "switch account", for a pilot signed
+    in with the wrong Discord account (the likeliest reason a real beta pilot gets
+    refused; see LoginFailed)."""
+    IDENTITY_CACHE_PATH.unlink(missing_ok=True)
+
+
 def _save_cached_session(session: PilotSession) -> None:
     IDENTITY_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
     IDENTITY_CACHE_PATH.write_text(json.dumps({"token": session.token, "username": session.username}))

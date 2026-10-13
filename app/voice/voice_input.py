@@ -66,7 +66,11 @@ def load_whisper(model_size: str | None = None) -> None:
 
 
 def _parse_hotkey(hotkey_str: str) -> keyboard.Key | keyboard.KeyCode:
-    """Convert a config string like 'shift_r' to a pynput Key."""
+    """Convert a config string like 'shift_r' to a pynput Key. "<123>" is a raw virtual
+    key code — what the launcher's key capture stores for a key with no name or
+    character (launcher/key_capture.py)."""
+    if hotkey_str.startswith("<") and hotkey_str.endswith(">") and hotkey_str[1:-1].isdigit():
+        return keyboard.KeyCode.from_vk(int(hotkey_str[1:-1]))
     try:
         return keyboard.Key[hotkey_str]
     except KeyError:
@@ -103,6 +107,21 @@ def _ensure_listener() -> None:
         _listener.start()
 
 
+def _input_device() -> str | None:
+    """The pilot's chosen microphone (ALICE_MIC_DEVICE, set from the launcher), or None
+    for the system default. Falls back to the default when the saved device is gone
+    (unplugged headset) rather than failing every capture."""
+    name = os.getenv("ALICE_MIC_DEVICE")
+    if not name:
+        return None
+    try:
+        sd.query_devices(name, "input")
+    except ValueError:
+        print(f"[Voice] Microphone '{name}' not found; using the system default.")
+        return None
+    return name
+
+
 def record_until_release(hotkey: str | None = None) -> np.ndarray:
     """
     Blocks until the PTT key is pressed, records while held, stops on release.
@@ -123,7 +142,7 @@ def record_until_release(hotkey: str | None = None) -> np.ndarray:
     _pressed.wait()
     print("[Voice] Recording...")
 
-    with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="float32") as stream:
+    with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="float32", device=_input_device()) as stream:
         while not _released.is_set():
             chunk, _ = stream.read(1024)
             frames.append(chunk)

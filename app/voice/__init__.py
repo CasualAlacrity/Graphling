@@ -51,13 +51,11 @@ async def run() -> None:
             uex_client.get_uex_cache(),
             prewarm(),
         )
-    except LoginFailed as failed:
+    except LoginFailed:
         # Refused (not in the beta), cancelled, or otherwise no token: nothing ALICE can
-        # do without one, so say why and close the whole app, overlay included -- this
-        # thread exiting alone would leave a window that can't do anything.
-        print()
-        print(f"[ALICE] {failed}", flush=True)
-        os._exit(1)
+        # do without one. Raised on rather than exiting here, so the launcher
+        # (overlay_app.start_voice) can show the pilot why in its window.
+        raise
     print(f"[ALICE] Signed in as {session.username}.")
     # Ledger ownership is resolved server-side per-request from this session's token now
     # (server/dependencies.get_current_user) — nothing to set up client-side for it.
@@ -157,6 +155,8 @@ async def _run_turn(
 def main() -> None:
     try:
         asyncio.run(run())
+    except LoginFailed as failed:
+        print(f"\n[ALICE] {failed}")
     except KeyboardInterrupt:
         print("\n[ALICE] Shutting down.")
 
