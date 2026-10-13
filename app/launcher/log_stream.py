@@ -69,6 +69,7 @@ def install() -> None:
     # to send after a crash, and they'll usually have restarted ALICE by then.
     log_file = open(log_dir / LOG_FILENAME, "a", encoding="utf-8")  # noqa: SIM115 -- lives as long as the app
     log_file.write(f"\n===== ALICE started {datetime.now():%Y-%m-%d %H:%M:%S} =====\n")
+    log_file.flush()
     lock = threading.Lock()
     sys.stdout = _Tee(sys.stdout, log_file, lock)
     sys.stderr = _Tee(sys.stderr, log_file, lock)

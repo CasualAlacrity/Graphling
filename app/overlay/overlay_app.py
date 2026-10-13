@@ -10,6 +10,7 @@ from pynput import keyboard
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import QApplication
 
+import bundle
 from api_client import api_url
 from auth.discord_identity import LoginFailed
 from overlay import theme, uex_lookup
@@ -32,6 +33,7 @@ def main():
     # that — always using the built-in ALICE_API_URL default (localhost). Invisible on a
     # dev machine, broken for every pilot (first Windows test, 2026-10-12).
     load_dotenv()
+    bundle.load_pilot_defaults()
 
     app = QApplication(sys.argv)
     app.setApplicationName("ALICE")

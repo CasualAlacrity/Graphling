@@ -118,14 +118,22 @@ the overlay._
 
 ## Setup
 
-**Requirements — pilot**
+**Pilots (Windows)** — download and run `ALICE-Setup-<version>.exe`. No Python, no git: it
+installs per-user (no admin prompt), adds a Start menu shortcut, and opens the ALICE launcher —
+sign in with Discord, set your push-to-talk key, Start. It isn't code-signed yet, so Windows
+SmartScreen warns on first run: **More info → Run anyway**. Settings and logs live in
+`%APPDATA%\ALICE` (the launcher's **Open logs** button), untouched by upgrades or uninstall.
+
+To build the installer yourself, see **Build the installer** below (Windows only).
+
+**Requirements — running from source**
 
 - Python 3.11
-- A Discord account — the first thing ALICE does is open a browser for you to log in with it;
-  there's no separate app-level password
+- A Discord account — the launcher opens a browser for you to log in with it; there's no
+  separate app-level password
 
-That's all. The setup script points ALICE at the deployed server, which handles the LLM, the
-voice, and market data; no API keys live on the pilot's machine.
+The setup script points ALICE at the deployed server, which handles the LLM, the voice, and
+market data; no API keys live on the pilot's machine.
 
 **Requirements — development** (local models, your own keys, or your own server)
 
@@ -181,19 +189,35 @@ cd app && ../.venv/bin/uvicorn server.main:app --reload
 
 **Run**
 
-One package, one command — voice and the overlay always run together:
+One package, one command — it opens the launcher (sign in, keys, mic, speech model, Start),
+and Start runs voice and the overlay together:
 
 | macOS | Windows |
 |---|---|
 | `./scripts/mac/run-alice.sh` | `scripts\windows\run-alice.bat` |
 
-Hold `PTT_HOTKEY` (default `shift_r`) to talk, and `OVERLAY_HOTKEY` (default `F3`) to
-toggle the trade-run overlay. macOS needs Microphone and Accessibility permissions
+Hold the push-to-talk key (default Right Shift) to talk, and the overlay key (default `F3`)
+to toggle the trade-run overlay — both set in the launcher, which saves them to
+`settings.json` in ALICE's data folder (overriding `PTT_HOTKEY`/`OVERLAY_HOTKEY` in `.env`). macOS needs Microphone and Accessibility permissions
 granted to whichever terminal app runs the script on first use — see the comments at the
 top of `run-alice.sh` if a hotkey doesn't respond. No mic set up yet? Set
 `PTT_MODE=text` in `.env` and type instead; everything downstream, including spoken
 replies, runs identically. (`alice-voice` runs the voice loop without the overlay — quick
 debugging only, not a supported run mode.)
+
+**Build the installer**
+
+On a Windows machine with source setup done (`scripts\windows\setup.bat`) and
+[Inno Setup 6](https://jrsoftware.org/isdl.php) installed:
+
+```bat
+scripts\windows\build-installer.bat
+```
+
+It runs PyInstaller (`packaging/alice.spec`) into `packaging\dist\ALICE\` (run `ALICE.exe`
+there for a quick test), then Inno Setup (`packaging/alice.iss`) to produce
+`packaging\dist\ALICE-Setup-<version>.exe`. The version comes from `pyproject.toml`; bump it
+there for each release so the installer upgrades in place.
 
 **Tests**
 

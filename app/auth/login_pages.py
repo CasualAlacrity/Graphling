@@ -223,7 +223,8 @@ _PAGE = """<!doctype html>
   <header class="brand" aria-label="ALICE">
     <span class="wordmark">ALICE</span>
     <span class="bar"></span>
-    <span class="tagline"><b>A</b>ccidental <b>L</b>ogistics <b>I</b>ntelligence <b>C</b>oordination <b>E</b>ngine</span>
+    <span class="tagline"><b>A</b>ccidental <b>L</b>ogistics <b>I</b>ntelligence
+      <b>C</b>oordination <b>E</b>ngine</span>
   </header>
   <section class="card {tone}">
     <p class="eyebrow"><span class="dot"></span>{eyebrow}</p>
