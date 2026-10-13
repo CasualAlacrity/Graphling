@@ -21,7 +21,7 @@ REM ---------------------------------------------------------------------------
 
 if not exist "%SSH_KEY%" (
     echo SSH key not found at %SSH_KEY%
-    echo Make one there (docs/deploy.md, "Installer downloads"), or edit SSH_KEY above.
+    echo Make one there - see docs/deploy.md, "Installer downloads" - or edit SSH_KEY above.
     pause
     exit /b 1
 )
