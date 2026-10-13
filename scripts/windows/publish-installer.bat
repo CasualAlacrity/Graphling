@@ -21,7 +21,7 @@ REM ---------------------------------------------------------------------------
 
 if not exist "%SSH_KEY%" (
     echo SSH key not found at %SSH_KEY%
-    echo Copy the Hetzner key there, or edit SSH_KEY at the top of this script.
+    echo Make one there (docs/deploy.md, "Installer downloads"), or edit SSH_KEY above.
     pause
     exit /b 1
 )
