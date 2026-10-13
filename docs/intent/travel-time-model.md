@@ -1,7 +1,9 @@
 # Intent — a travel-time model that covers the whole flight
 
-**Status:** not started (2026-09-18). Raised after a measurement showed the current model
-can't distinguish a surface terminal from the station in orbit above it.
+**Status:** partly built (2026-10-13) — quantum cruise, QT drop-out and the sublight
+approach are modelled from game data; atmosphere, surface travel and jump transit are
+not. See "Built 2026-10-13" below. Raised 2026-09-18 after a measurement showed the
+model couldn't distinguish a surface terminal from the station in orbit above it.
 
 ## Problem
 
@@ -48,17 +50,50 @@ There's no point adding that term while the underlying estimate for it is ~0.
 The scaffolding to flag a low-confidence estimate is there. What's missing is the actual
 durations.
 
+## Built 2026-10-13
+
+All in `app/tools/travel_time.py`, data from the star-citizen.wiki API:
+
+- **Quantum cruise with the drive's acceleration stages** (stage one to engage speed,
+  stage two to full speed, mirrored to slow down) — the installed drive's own item stats,
+  fetched alongside the ship. Short hops were the worst undercount: a Railen's 2 Gm moon
+  hop went from ~15s to ~40s.
+- **QT drop-out at the destination's arrival radius** — game data's
+  `quantum_travel.arrival_radius` from the wiki's v2 locations list, joined onto the
+  positions data by uuid. Trusted over hand-kept numbers so new locations come for free:
+  stations 24 km, cities and outposts 20 km, Levski 60 km.
+- **Sublight approach** from drop-out — full thrust to NAV max, cruise, full retro down,
+  from the ship's 0-to-max / max-to-0 times.
+- **Gateways:** pilots QT to the gateway station, not the jump point. Approach is
+  modelled as the station's arrival radius plus station-to-point distance in a straight
+  line (~60–75 km): jump points are the outermost structures in a system, so the drop-out
+  is effectively always on the star side. Not the exact vector, but consistent across
+  routes, which is what ranking needs.
+- **Fuel:** QT fuel as SCU per Gm (capacity / range — cross-checked against the drive's
+  own SCU/Gm figure). Hydrogen burn while thrusting, in SCU — **unit of the wiki's
+  `fuel.usage` figures not confirmed**; `HYDROGEN_USAGE_UNIT_SCU` assumes millionths
+  pending a measured in-game burn.
+
+`estimate_trip` returns the breakdown (`TripEstimate`); `estimate_travel_time` stays the
+`float | str` total every ranking caller uses.
+
+**Not surfaced to the pilot yet, on purpose.** The breakdown and fuel figures exist but
+`estimate_travel_time` the tool still answers only "how long". Answering "how much fuel
+does that burn?" or "why so long?" is a different question, and it's not settled that
+it should be a tool at all (vs. an argument on this one, or some other structure) —
+open question below.
+
 ## Desired outcome
 
 An estimate that accounts for every phase of a real trip, not just the quantum cruise.
 
 Missing phases. Walking one real arrival at Orison, in order:
 
-1. **Quantum cruise** — the only phase modelled today.
+1. **Quantum cruise** — modelled, with acceleration stages (2026-10-13).
 2. **QT drive cooldown, then spool-up** — fixed overhead paid per jump, not per km. A
    route with several hops pays it several times.
-3. **Post-QT sublight approach** — you drop out 25–50 km short and fly the rest on
-   normal thrust. Distance-proportional but at a completely different speed to QT.
+3. **Post-QT sublight approach** — you drop out 20–60 km short and fly the rest on
+   normal thrust. Modelled 2026-10-13 from each location's arrival radius.
 4. **Atmospheric entry and descent** — arriving at Orison puts you above Crusader, and
    the descent is its own phase. Not symmetric with the ascent leaving.
 5. **Surface travel to the dock** — another ~25 km once you're in atmosphere.
@@ -104,3 +139,16 @@ own route planner shows no number for that phase either.
   stay a *caveat* (tell the pilot the number is a floor)? The first improves ranking; the
   second is honest without pretending to precision we haven't measured.
 - Does jump transit vary by gate, or is it effectively constant?
+- **How do fuel, distance and breakdown questions get answered?** "Do I have the fuel to
+  reach Port Tressler?", "how far is it to Port Tressler from Orison?" and "why does that
+  take so long?" — the data exists in `TripEstimate`. (Distance from wherever the pilot is
+  standing is the game UI's job; ALICE only knows their location via an active run.)
+  Note `estimate_travel_time`'s description already lists "how far is Seraphim" as a
+  trigger but answers with a time — a mismatch until this is settled.
+  Candidates: a separate tool, an argument on `estimate_travel_time` that says which
+  part was asked about (like `best_route`'s `rank_by`), or something that isn't a tool.
+  Not decided — evaluate before building. Whatever it is must answer only what was
+  asked; dumping time + breakdown + fuel into one spoken answer is what to avoid.
+- **Hydrogen unit and approach profile need one playtest measurement each** — hydrogen %
+  over five 0→max→0 cycles in a Railen (model expects ~1%), and a stopwatch on a short
+  moon hop (model expects ~0:40 in quantum from CRU-L1 to Seraphim).

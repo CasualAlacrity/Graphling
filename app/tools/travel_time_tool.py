@@ -37,9 +37,9 @@ class TravelTimeTool(UplinkTool):
         "the pilot asks something like 'how long to get to Orison', 'how far is "
         "Seraphim', or 'what's the ETA to Baijini Point'. Not specific to trade runs — "
         "usable for any travel-time question, though it'll use an active trade run's "
-        "ship/location as a default when the pilot doesn't specify one. Only estimates "
-        "travel within a single star system; says so plainly if the route crosses "
-        "systems rather than guessing."
+        "ship/location as a default when the pilot doesn't specify one. For a route that "
+        "crosses star systems, the time covers the flying on either side of the jump "
+        "but not the jump tunnel itself — say so if you report it."
     )
     args_schema: type[BaseModel] = TravelTimeArgs
     progress_label: str = "Estimating travel time."

@@ -554,6 +554,12 @@ outputs stay consistent.
       orbital-to-orbital runs. Also blocks scoring an approach leg. Full write-up and
       what already exists in `docs/intent/travel-time-model.md`. Numbers are measurable
       in-game — worth timing a few legs during an op night.
+      **Progress 2026-10-13:** QT acceleration stages, drop-out at each location's
+      arrival radius, the sublight approach, gateway-to-jump-point legs, and QT/hydrogen
+      fuel are now modelled (needs a server redeploy + `refresh_static_caches` to take
+      effect). Still missing: atmosphere, surface-to-dock, jump transit. Hydrogen unit
+      unconfirmed. Fuel/breakdown answers deliberately not surfaced — tool vs. other
+      structure undecided (open question in the intent doc).
 
 - [ ] **Route search ignores the buy-in.** `get_commodity_routes` accepts an `investment`
       parameter and `find_best_route` never passes it, so ALICE can recommend a run the
