@@ -11,6 +11,7 @@ from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import QApplication
 
 import bundle
+import hotas
 from api_client import api_url
 from auth.discord_identity import LoginFailed
 from overlay import theme, uex_lookup
@@ -133,8 +134,17 @@ class Overlay:
         self.hotkey = os.getenv("OVERLAY_HOTKEY", "<f3>")
         self._bridge = _HotkeyBridge()
         self._bridge.toggle_requested.connect(self._toggle)
-        self._hotkeys = keyboard.GlobalHotKeys({self.hotkey: self._bridge.toggle_requested.emit})
-        self._hotkeys.start()
+        joy_binding = hotas.parse(self.hotkey)
+        if joy_binding is not None:
+            # A stick button (hotas.py): toggle on press only, like a key.
+            def _on_joy(binding, pressed):
+                if pressed and binding == joy_binding:
+                    self._bridge.toggle_requested.emit()
+
+            hotas.watcher().add_listener(_on_joy)
+        else:
+            self._hotkeys = keyboard.GlobalHotKeys({self.hotkey: self._bridge.toggle_requested.emit})
+            self._hotkeys.start()
 
     def _toggle(self):
         showing = not self.canvas.isVisible()

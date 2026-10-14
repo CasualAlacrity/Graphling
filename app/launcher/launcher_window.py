@@ -42,6 +42,8 @@ WHISPER_MODEL_LABELS = {
 }
 
 GRID_COLOR = "#1B1E20"
+# Room for a key/button name inside the launcher's fixed width.
+KEY_BUTTON_TEXT_WIDTH = 220
 
 ACRONYM = "Accidental Logistics Intelligence Coordination Engine"
 
@@ -211,6 +213,7 @@ class LauncherWindow(QWidget):
         self._capturing: str | None = None  # "ptt" / "overlay" while a key capture is open
         self._capture = KeyCapture(self)
         self._capture.captured.connect(self._on_key_captured)
+        self._capture.captured_joystick.connect(self._on_joystick_captured)
         self._capture.cancelled.connect(self._end_capture)
 
         root = QVBoxLayout(self)
@@ -313,7 +316,6 @@ class LauncherWindow(QWidget):
         button = QPushButton()
         button.setObjectName("keyButton")
         button.setCursor(Qt.PointingHandCursor)
-        button.setToolTip("Click, then press the key you want. Esc cancels.")
         button.clicked.connect(lambda: self._begin_capture(which))
         return button
 
@@ -400,18 +402,28 @@ class LauncherWindow(QWidget):
 
     def _refresh_keys(self) -> None:
         if self._capturing != "ptt":
-            self.ptt_button.setText(display_name(self._settings.ptt_hotkey))
+            self._set_key_text(self.ptt_button, display_name(self._settings.ptt_hotkey))
         if self._capturing != "overlay":
-            self.overlay_button.setText(display_name(self._settings.overlay_hotkey))
+            self._set_key_text(self.overlay_button, display_name(self._settings.overlay_hotkey))
         for which, button in (("ptt", self.ptt_button), ("overlay", self.overlay_button)):
             button.setProperty("capturing", self._capturing == which)
             button.style().unpolish(button)
             button.style().polish(button)
 
+    @staticmethod
+    def _set_key_text(button: QPushButton, text: str) -> None:
+        # Stick names run long ("Button 12 · VKB-Sim Gladiator NXT EVO R") and the
+        # window is fixed-width: cut the end (the device name), full text on hover.
+        # ensurePolished first, so the measurement uses the stylesheet's monospace
+        # font rather than the default one the button starts with.
+        button.ensurePolished()
+        button.setText(button.fontMetrics().elidedText(text, Qt.ElideRight, KEY_BUTTON_TEXT_WIDTH))
+        button.setToolTip(f"{text}\n\nClick, then press a key or a joystick/HOTAS button. Esc cancels.")
+
     def _begin_capture(self, which: str) -> None:
         self._capturing = which
         button = self.ptt_button if which == "ptt" else self.overlay_button
-        button.setText("Press a key…")
+        button.setText("Press a key or button…")
         self._refresh_keys()
         self._capture.start()
 
@@ -420,6 +432,16 @@ class LauncherWindow(QWidget):
             self._settings.ptt_hotkey = ptt_name(key)
         elif self._capturing == "overlay":
             self._settings.overlay_hotkey = overlay_name(key)
+        settings.save(self._settings)
+        self._end_capture()
+
+    def _on_joystick_captured(self, binding: str) -> None:
+        # Same string for both: a stick button has no separate PTT/overlay naming the
+        # way pynput keys do (ptt_name vs overlay_name).
+        if self._capturing == "ptt":
+            self._settings.ptt_hotkey = binding
+        elif self._capturing == "overlay":
+            self._settings.overlay_hotkey = binding
         settings.save(self._settings)
         self._end_capture()
 

@@ -26,6 +26,10 @@ soundfile==0.14.0
 faster-whisper==1.2.1
 numpy
 pynput==1.8.2
+# Joystick/HOTAS buttons as PTT/overlay keys (app/hotas.py) -- pynput only sees the
+# keyboard. pysdl2-dll ships the SDL2 binaries, so nothing to install separately.
+pysdl2==0.9.17
+pysdl2-dll==2.32.10
 elevenlabs==2.52.0
 
 # Trade route tracker (Postgres storage)

@@ -24,6 +24,10 @@ datas = [
 datas += collect_data_files("faster_whisper")
 
 binaries = collect_dynamic_libs("ctranslate2")
+# SDL2 for joystick/HOTAS buttons (app/hotas.py): pysdl2 finds the DLLs inside the
+# sdl2dll package's own folder, so they go there in the bundle too.
+binaries += collect_dynamic_libs("sdl2dll")
+datas += collect_data_files("sdl2dll")
 
 hiddenimports = [
     # pynput picks its keyboard/mouse backend by platform at import time, which
@@ -34,6 +38,9 @@ hiddenimports = [
     # tiktoken (via langchain-openai) finds its encodings as a namespace plugin.
     "tiktoken_ext",
     "tiktoken_ext.openai_public",
+    # Imported inside hotas.py's reader thread, not at module top.
+    "sdl2",
+    "sdl2dll",
 ]
 
 a = Analysis(

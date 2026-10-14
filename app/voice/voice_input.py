@@ -33,6 +33,8 @@ os.environ.setdefault("HF_HUB_VERBOSITY", "error")
 from faster_whisper import WhisperModel  # noqa: E402 -- after the env defaults above
 from pynput import keyboard
 
+import hotas
+
 _model: WhisperModel | None = None
 _model_size: str | None = None
 
@@ -78,6 +80,9 @@ def _parse_hotkey(hotkey_str: str) -> keyboard.Key | keyboard.KeyCode:
 
 
 _target_key: keyboard.Key | keyboard.KeyCode | None = None
+# Set instead of _target_key when the PTT key is a joystick button (hotas.py).
+_target_joy: hotas.JoyBinding | None = None
+_joy_listening = False
 _pressed = threading.Event()
 _released = threading.Event()
 _listener: keyboard.Listener | None = None
@@ -91,6 +96,23 @@ def _on_press(k):
 def _on_release(k):
     if k == _target_key:
         _released.set()
+
+
+def _on_joy(binding: hotas.JoyBinding, pressed: bool) -> None:
+    if binding != _target_joy:
+        return
+    if pressed:
+        if not _pressed.is_set():
+            _pressed.set()
+    else:
+        _released.set()
+
+
+def _ensure_joy_listener() -> None:
+    global _joy_listening
+    if not _joy_listening:
+        hotas.watcher().add_listener(_on_joy)
+        _joy_listening = True
 
 
 def _ensure_listener() -> None:
@@ -127,15 +149,21 @@ def record_until_release(hotkey: str | None = None) -> np.ndarray:
     Blocks until the PTT key is pressed, records while held, stops on release.
     Returns raw audio as a float32 numpy array at 16kHz.
     """
-    global _target_key
+    global _target_key, _target_joy
     key_str = hotkey or os.getenv("PTT_HOTKEY", "shift_r")
-    _target_key = _parse_hotkey(key_str)
+    _target_joy = hotas.parse(key_str)
+    _target_key = None if _target_joy is not None else _parse_hotkey(key_str)
     _pressed.clear()
     _released.clear()
 
-    _ensure_listener()
+    if _target_joy is not None:
+        _ensure_joy_listener()
+        key_label = _target_joy.display()
+    else:
+        _ensure_listener()
+        key_label = key_str
 
-    print(f"[Voice] Waiting for PTT key ({key_str})...")
+    print(f"[Voice] Waiting for PTT key ({key_label})...")
 
     frames: list[np.ndarray] = []
 
