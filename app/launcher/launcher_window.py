@@ -10,8 +10,9 @@ and the overlay run, so it doubles as the "ALICE is running" indicator.
 """
 import asyncio
 import os
+import sys
 
-from PySide6.QtCore import QPointF, Qt, QUrl, Signal
+from PySide6.QtCore import QPointF, QProcess, Qt, QUrl, Signal
 from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPen, QRadialGradient
 from PySide6.QtWidgets import (
     QApplication,
@@ -131,10 +132,19 @@ QPushButton#startButton:disabled {{
     background: {theme.SURFACE_ALT};
     color: {theme.TEXT_DISABLED};
 }}
-QPushButton#startButton[live="true"]:disabled {{
+QPushButton#startButton[running="true"] {{
     background: transparent;
+    border: 1px solid {theme.TEXT_SECONDARY};
+    color: {theme.TEXT_PRIMARY};
+}}
+QPushButton#startButton[running="true"][live="true"] {{
     border: 1px solid {theme.SUCCESS};
     color: {theme.SUCCESS};
+}}
+QPushButton#startButton[running="true"]:hover {{
+    background: {theme.ERROR_MUTED};
+    border: 1px solid {theme.ERROR};
+    color: {theme.ERROR};
 }}
 QLabel#statusLine {{
     font-family: {theme.MONO_FONT};
@@ -407,7 +417,7 @@ class LauncherWindow(QWidget):
         self.start_button = QPushButton("START ALICE")
         self.start_button.setObjectName("startButton")
         self.start_button.setCursor(Qt.PointingHandCursor)
-        self.start_button.clicked.connect(self._on_start)
+        self.start_button.clicked.connect(self._on_start_or_stop)
         actions.addWidget(self.start_button)
         return actions
 
@@ -538,19 +548,46 @@ class LauncherWindow(QWidget):
     # ---- start -----------------------------------------------------------------
 
     def _refresh_start(self) -> None:
-        # "live" = running and listening: a disabled button would otherwise read as
-        # greyed-out, i.e. broken, exactly when everything's working.
+        # Running: the button is Stop. Outlined green once ALICE is listening ("live"),
+        # red on hover — the Voice card's dot stays the "she's listening" indicator.
         live = self._running and self._voice_ready
-        self.start_button.setProperty("live", live)
+        for name, value in (("running", self._running), ("live", live)):
+            self.start_button.setProperty(name, value)
         self.start_button.style().unpolish(self.start_button)
         self.start_button.style().polish(self.start_button)
         if self._running:
-            self.start_button.setText("ALICE IS RUNNING" if self._voice_ready else "STARTING…")
-            self.start_button.setEnabled(False)
+            self.start_button.setText("STOP ALICE")
+            self.start_button.setEnabled(True)
+            self.start_button.setToolTip("Stop ALICE and come back here, e.g. to change a setting.")
         else:
             self.start_button.setText("START ALICE")
             self.start_button.setEnabled(self._session is not None)
             self.start_button.setToolTip("" if self._session else "Sign in with Discord first.")
+
+    def _on_start_or_stop(self) -> None:
+        if self._running:
+            self._stop()
+        else:
+            self._on_start()
+
+    def _stop(self) -> None:
+        """Back to the launcher by restarting ALICE, not by unwinding voice + overlay in
+        place: the voice loop blocks on the PTT key on its own thread, and the keyboard,
+        joystick and overlay listeners all live on others — a fresh process is the one
+        stop that's guaranteed complete. Costs a second or two; the speech model is
+        already downloaded, and a half-finished download resumes next Start."""
+        print("[ALICE] Stopping...", flush=True)
+        if getattr(sys, "frozen", False):
+            program, arguments = sys.executable, sys.argv[1:]
+        else:
+            # From source, sys.argv[0] is whatever launched us (a console-script shim,
+            # a run configuration); running the entry module directly works for all.
+            program, arguments = sys.executable, ["-m", "overlay.overlay_app"]
+        if not QProcess.startDetached(program, arguments):
+            self._show_error("Couldn't restart ALICE. Close this window and open ALICE again.")
+            return
+        self._capture.stop()
+        os._exit(0)
 
     @asyncSlot()
     async def _on_start(self):
@@ -560,8 +597,7 @@ class LauncherWindow(QWidget):
         for widget in self._settings_widgets:
             widget.setEnabled(False)
         self._refresh_pilot()
-        self.start_button.setText("STARTING…")
-        self.start_button.setEnabled(False)
+        self._refresh_start()
         self._set_voice_state(theme.WARNING, "Connecting to ALICE's server…", (0, 0))
 
         settings.apply_to_env(self._settings)
@@ -607,11 +643,12 @@ class LauncherWindow(QWidget):
             self._refresh_start()
 
     def _on_voice_failed(self, message: str) -> None:
-        self._show_error(message + "\nClose ALICE and start her again.")
+        self._show_error(message + "\nPress Restart ALICE to try again.")
         self._set_voice_state(theme.ERROR, "ALICE's voice stopped — see the message below.")
         self._voice_ready = False
         self._refresh_start()
-        self.start_button.setText("ALICE STOPPED")
+        # Same button, same restart as Stop — just named for what it does here.
+        self.start_button.setText("RESTART ALICE")
 
     def _reset_after_failure(self) -> None:
         self._running = False
