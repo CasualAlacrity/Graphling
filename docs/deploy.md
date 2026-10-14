@@ -152,16 +152,24 @@ Discord attachments, which is why it's served from here.
 
 **One-time setup on the box.** Installers go in `/var/www/alice-downloads` (the publish
 script creates it), a folder outside the landing page's own web root so a redeploy of the
-landing page can't wipe them. Serve it at `/download/` by adding this inside the `server { ... }` block for `heyalice.help` (the 443 one certbot
-manages) in its `/etc/nginx/sites-available/` file:
+landing page can't wipe them. Serve it at `/download/` by adding this inside the
+`server { ... }` block for `heyalice.help` (the 443 one certbot manages) in its
+`/etc/nginx/sites-available/` file:
 
 ```nginx
+# The stable link redirects to the newest versioned file, so a browser saves it as
+# ALICE-Setup-<version>.exe instead of piling up "ALICE-Setup (7).exe". The publish
+# script rewrites this one-line snippet and reloads nginx on every publish.
+location = /download/ALICE-Setup.exe {
+    include /etc/nginx/snippets/alice-latest.conf;
+}
+
 location /download/ {
     alias /var/www/alice-downloads/;
     # Never list the folder; only exact file links work.
     autoindex off;
-    # Always download, never try to display; and re-check the "latest" file every time
-    # so a new upload is picked up immediately.
+    # Always download, never try to display; and never cache, so a re-upload of the
+    # same version is picked up immediately.
     add_header Content-Disposition "attachment";
     add_header Cache-Control "no-cache";
 }
@@ -170,6 +178,10 @@ location /download/ {
 ```bash
 sudo nginx -t && sudo systemctl reload nginx
 ```
+
+Run `publish-installer.bat` once **before** adding the `location = /download/ALICE-Setup.exe`
+block: it creates `/etc/nginx/snippets/alice-latest.conf`, and `nginx -t` fails on an
+`include` of a file that doesn't exist yet.
 
 Old versioned installers stay until deleted by hand (`ls -lh /var/www/alice-downloads`).
 

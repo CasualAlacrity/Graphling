@@ -17,6 +17,7 @@ set PROD_HOST=168.119.234.226
 set PROD_USER=root
 set SSH_KEY=%USERPROFILE%\.ssh\alice_publish
 set DOWNLOAD_DIR=/var/www/alice-downloads
+set LATEST_SNIPPET=/etc/nginx/snippets/alice-latest.conf
 REM ---------------------------------------------------------------------------
 
 if not exist "%SSH_KEY%" (
@@ -37,14 +38,15 @@ if not exist "%INSTALLER%" (
 
 echo Uploading ALICE %APP_VERSION% to %PROD_HOST%...
 REM Uploaded under a temporary name and renamed once complete, so nobody downloads a
-REM half-uploaded installer. ALICE-Setup.exe is then replaced in one step (cp to a temp
-REM name, then mv), which is the stable link to share.
-ssh -i "%SSH_KEY%" %PROD_USER%@%PROD_HOST% "mkdir -p %DOWNLOAD_DIR%"
+REM half-uploaded installer. The stable link, ALICE-Setup.exe, is then pointed at it: a
+REM one-line nginx snippet redirecting to the versioned file, so browsers save it as
+REM ALICE-Setup-<version>.exe rather than piling up "ALICE-Setup (7).exe" in Downloads.
+ssh -i "%SSH_KEY%" %PROD_USER%@%PROD_HOST% "mkdir -p %DOWNLOAD_DIR% /etc/nginx/snippets"
 if errorlevel 1 goto failed
 scp -i "%SSH_KEY%" "%INSTALLER%" %PROD_USER%@%PROD_HOST%:%DOWNLOAD_DIR%/ALICE-Setup-%APP_VERSION%.exe.part
 if errorlevel 1 goto failed
 
-ssh -i "%SSH_KEY%" %PROD_USER%@%PROD_HOST% "cd %DOWNLOAD_DIR% && mv ALICE-Setup-%APP_VERSION%.exe.part ALICE-Setup-%APP_VERSION%.exe && cp ALICE-Setup-%APP_VERSION%.exe .ALICE-Setup.exe.tmp && mv .ALICE-Setup.exe.tmp ALICE-Setup.exe && ls -lh"
+ssh -i "%SSH_KEY%" %PROD_USER%@%PROD_HOST% "cd %DOWNLOAD_DIR% && mv ALICE-Setup-%APP_VERSION%.exe.part ALICE-Setup-%APP_VERSION%.exe && rm -f ALICE-Setup.exe && echo 'return 302 /download/ALICE-Setup-%APP_VERSION%.exe;' > %LATEST_SNIPPET% && nginx -t && systemctl reload nginx && ls -lh"
 if errorlevel 1 goto failed
 
 echo.
