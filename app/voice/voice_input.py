@@ -16,9 +16,11 @@ drops PyTorch from the client install. It's slower per utterance (~1-3 s for `sm
 on a CPU, depending on the machine), so WHISPER_MODEL=base is the faster fallback.
 It never uses the GPU, so it takes nothing from the game.
 """
+import fnmatch
 import os
 import threading
 import time
+from pathlib import Path
 
 import numpy as np
 import sounddevice as sd
@@ -29,11 +31,28 @@ import sounddevice as sd
 # Pilots can't act on either, so silence them. Set before huggingface_hub is imported.
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 os.environ.setdefault("HF_HUB_VERBOSITY", "error")
+# Plain HTTP rather than Hugging Face's Xet transfer: Xet assembles the file elsewhere and
+# writes it in one go at the end, so the launcher's download progress (see
+# _download_with_progress) sat at 0% the whole time, then jumped to done. Measured
+# 2026-10-14: HTTP grows the cache file steadily and was no slower (base, ~145 MB, 6 s).
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
-from faster_whisper import WhisperModel  # noqa: E402 -- after the env defaults above
+import huggingface_hub  # noqa: E402 -- after the env defaults above
+from faster_whisper import WhisperModel  # noqa: E402
+from faster_whisper.utils import _MODELS as WHISPER_REPOS  # noqa: E402
+from faster_whisper.utils import download_model  # noqa: E402
+from huggingface_hub import constants as hf_constants  # noqa: E402 -- a lazy submodule, not an attribute
 from pynput import keyboard
 
+import audio_devices
 import hotas
+import startup_status
+from voice import earcons
+
+# The files faster-whisper's download_model fetches (its allow_patterns), for sizing the
+# download up front.
+WHISPER_FILE_PATTERNS = ["config.json", "preprocessor_config.json", "model.bin", "tokenizer.json", "vocabulary.*"]
+PROGRESS_INTERVAL_S = 0.5
 
 _model: WhisperModel | None = None
 _model_size: str | None = None
@@ -62,9 +81,77 @@ def load_whisper(model_size: str | None = None) -> None:
     global _model, _model_size
     model_size = model_size or os.getenv("WHISPER_MODEL", "small")
     _model_size = model_size
-    print(f"[Voice] Loading Whisper '{model_size}' model (the first launch downloads it)...")
-    _model = WhisperModel(model_size, device="cpu", compute_type="int8")
-    print("[Voice] Whisper ready")
+    model_path = _ensure_downloaded(model_size)
+    startup_status.report(startup_status.LOADING_VOICE)
+    print(f"[Voice] Loading the speech model ({model_size})...")
+    _model = WhisperModel(model_path, device="cpu", compute_type="int8")
+    print("[Voice] Speech model ready")
+
+
+def _ensure_downloaded(model_size: str) -> str:
+    """The model's local folder, downloading it first if this machine doesn't have it —
+    with progress reported to the launcher, since on a first launch this is ~0.5 GB and
+    the single biggest wait a new pilot sees."""
+    try:
+        return download_model(model_size, local_files_only=True)
+    except Exception:
+        pass  # not downloaded yet (or only partly — the download below resumes it)
+    return _download_with_progress(model_size)
+
+
+def _download_with_progress(model_size: str) -> str:
+    repo_id = WHISPER_REPOS.get(model_size, model_size)
+    total = _download_size(repo_id)
+    size_text = f"{total / 1e6:.0f} MB" if total else "a few hundred MB"
+    print(f"[Voice] First launch: downloading the speech model ({size_text}). This only happens once.")
+    startup_status.report(startup_status.DOWNLOADING_VOICE, 0, total)
+
+    repo_dir = Path(hf_constants.HF_HUB_CACHE) / f"models--{repo_id.replace('/', '--')}"
+    finished = threading.Event()
+
+    def _report_progress():
+        # Measured from the cache folder's size rather than a progress callback —
+        # faster-whisper turns huggingface_hub's own progress bars off. Kept monotonic
+        # and capped at the expected total: a finished file can briefly exist twice
+        # (download, then its final copy), which would overshoot.
+        highest = 0
+        while not finished.wait(PROGRESS_INTERVAL_S):
+            done = min(_folder_bytes(repo_dir), total) if total else _folder_bytes(repo_dir)
+            highest = max(highest, done)
+            startup_status.report(startup_status.DOWNLOADING_VOICE, highest, total)
+
+    reporter = threading.Thread(target=_report_progress, daemon=True)
+    reporter.start()
+    try:
+        return download_model(model_size)
+    finally:
+        finished.set()
+        reporter.join()
+
+
+def _download_size(repo_id: str) -> int | None:
+    """Bytes the download will fetch — the same files faster-whisper's download_model
+    asks for. None if Hugging Face can't be asked; progress then shows MB only."""
+    try:
+        info = huggingface_hub.HfApi().model_info(repo_id, files_metadata=True)
+    except Exception:
+        return None
+    total = 0
+    for sibling in info.siblings or []:
+        if sibling.size and any(fnmatch.fnmatch(sibling.rfilename, pattern) for pattern in WHISPER_FILE_PATTERNS):
+            total += sibling.size
+    return total or None
+
+
+def _folder_bytes(folder: Path) -> int:
+    total = 0
+    for root, _, files in os.walk(folder):
+        for name in files:
+            try:
+                total += os.path.getsize(os.path.join(root, name))
+            except OSError:
+                pass  # a file renamed or removed between listing and measuring
+    return total
 
 
 def _parse_hotkey(hotkey_str: str) -> keyboard.Key | keyboard.KeyCode:
@@ -129,19 +216,11 @@ def _ensure_listener() -> None:
         _listener.start()
 
 
-def _input_device() -> str | None:
+def _input_device() -> int | None:
     """The pilot's chosen microphone (ALICE_MIC_DEVICE, set from the launcher), or None
-    for the system default. Falls back to the default when the saved device is gone
-    (unplugged headset) rather than failing every capture."""
-    name = os.getenv("ALICE_MIC_DEVICE")
-    if not name:
-        return None
-    try:
-        sd.query_devices(name, "input")
-    except ValueError:
-        print(f"[Voice] Microphone '{name}' not found; using the system default.")
-        return None
-    return name
+    for the system default — see audio_devices.resolve for the Windows duplicate-name
+    handling and the unplugged-device fallback."""
+    return audio_devices.resolve(os.getenv("ALICE_MIC_DEVICE"), "input")
 
 
 def record_until_release(hotkey: str | None = None) -> np.ndarray:
@@ -168,6 +247,7 @@ def record_until_release(hotkey: str | None = None) -> np.ndarray:
     frames: list[np.ndarray] = []
 
     _pressed.wait()
+    earcons.play(earcons.START_CHIRP)
     print("[Voice] Recording...")
 
     with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="float32", device=_input_device()) as stream:
@@ -175,6 +255,7 @@ def record_until_release(hotkey: str | None = None) -> np.ndarray:
             chunk, _ = stream.read(1024)
             frames.append(chunk)
 
+    earcons.play(earcons.STOP_CHIRP)
     print("[Voice] Recording stopped")
     if not frames:
         return np.array([], dtype="float32")

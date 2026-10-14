@@ -1,11 +1,13 @@
-"""The pilot's own launcher settings — PTT key, overlay key, microphone, speech model —
-saved as JSON in ALICE's per-pilot data folder (%APPDATA%\\ALICE on Windows), next to
-the transcript log. Replaces editing .env by hand, which a packaged install won't have.
+"""The pilot's own launcher settings — PTT and overlay keys, microphone, speaker, speech
+model, PTT sounds — saved as JSON in ALICE's per-pilot data folder (%APPDATA%\\ALICE on
+Windows), next to the transcript log. Replaces editing .env by hand, which a packaged
+install won't have.
 
 The rest of ALICE still reads these as environment variables (PTT_HOTKEY,
-OVERLAY_HOTKEY, WHISPER_MODEL, ALICE_MIC_DEVICE), so apply_to_env() is the whole
-hand-off: the launcher sets them just before starting voice + overlay, and nothing
-downstream had to learn about this file. A developer's .env still works — settings
+OVERLAY_HOTKEY, WHISPER_MODEL, ALICE_MIC_DEVICE, ALICE_OUTPUT_DEVICE,
+ALICE_PTT_SOUNDS), so apply_to_env() is the whole hand-off: the launcher sets them
+just before starting voice + overlay, and nothing downstream had to learn about this
+file. A developer's .env still works — settings
 saved here win over it once the pilot has changed them in the launcher.
 """
 import json
@@ -25,9 +27,12 @@ class PilotSettings(BaseModel):
     ptt_hotkey: str = "shift_r"
     # pynput GlobalHotKeys format: "<f3>" for a named key, the bare character otherwise.
     overlay_hotkey: str = "<f3>"
-    # sounddevice input device name; None means the system default.
+    # sounddevice device names; None means the system default.
     mic_device: str | None = None
+    output_device: str | None = None
     whisper_model: str = "small"
+    # The start/stop chirps around push-to-talk recording (voice/earcons.py).
+    ptt_sounds: bool = True
 
 
 def settings_path() -> Path:
@@ -48,6 +53,7 @@ def load() -> PilotSettings:
         ptt_hotkey=os.getenv("PTT_HOTKEY", "shift_r"),
         overlay_hotkey=os.getenv("OVERLAY_HOTKEY", "<f3>"),
         mic_device=os.getenv("ALICE_MIC_DEVICE") or None,
+        output_device=os.getenv("ALICE_OUTPUT_DEVICE") or None,
         whisper_model=os.getenv("WHISPER_MODEL", "small"),
     )
 
@@ -62,7 +68,9 @@ def apply_to_env(settings: PilotSettings) -> None:
     os.environ["PTT_HOTKEY"] = settings.ptt_hotkey
     os.environ["OVERLAY_HOTKEY"] = settings.overlay_hotkey
     os.environ["WHISPER_MODEL"] = settings.whisper_model
-    if settings.mic_device:
-        os.environ["ALICE_MIC_DEVICE"] = settings.mic_device
-    else:
-        os.environ.pop("ALICE_MIC_DEVICE", None)
+    for name, value in (("ALICE_MIC_DEVICE", settings.mic_device), ("ALICE_OUTPUT_DEVICE", settings.output_device)):
+        if value:
+            os.environ[name] = value
+        else:
+            os.environ.pop(name, None)
+    os.environ["ALICE_PTT_SOUNDS"] = "1" if settings.ptt_sounds else "0"

@@ -11,22 +11,25 @@ and the overlay run, so it doubles as the "ALICE is running" indicator.
 import asyncio
 import os
 
-import sounddevice as sd
 from PySide6.QtCore import QPointF, Qt, QUrl, Signal
 from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPen, QRadialGradient
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QComboBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QProgressBar,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
 from qasync import asyncSlot
 
+import audio_devices
+import startup_status
 from auth import discord_identity
 from launcher import log_stream, settings
 from launcher.key_capture import KeyCapture, display_name, overlay_name, ptt_name
@@ -35,7 +38,7 @@ from overlay.overlay_app import Overlay, StartupError, load_reference_data, star
 from turn_metrics import alice_data_dir
 
 ICON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "alice-icon.svg")
-DEFAULT_MIC_LABEL = "System default"
+DEFAULT_DEVICE_LABEL = "System default"
 WHISPER_MODEL_LABELS = {
     "small": "Small — best with names",
     "base": "Base — faster, lighter",
@@ -128,6 +131,11 @@ QPushButton#startButton:disabled {{
     background: {theme.SURFACE_ALT};
     color: {theme.TEXT_DISABLED};
 }}
+QPushButton#startButton[live="true"]:disabled {{
+    background: transparent;
+    border: 1px solid {theme.SUCCESS};
+    color: {theme.SUCCESS};
+}}
 QLabel#statusLine {{
     font-family: {theme.MONO_FONT};
     font-size: 11px;
@@ -138,6 +146,25 @@ QLabel#errorText {{
     font-size: 13px;
     color: {theme.TEXT_PRIMARY};
 }}
+QLabel#voiceText {{
+    font-family: {theme.LABEL_FONT};
+    font-size: 13px;
+    color: {theme.TEXT_PRIMARY};
+}}
+QProgressBar#voiceProgress {{
+    background: {theme.SURFACE_ALT};
+    border: none;
+    max-height: 4px;
+}}
+QProgressBar#voiceProgress::chunk {{
+    background: {theme.ACCENT};
+}}
+QCheckBox {{
+    font-family: {theme.LABEL_FONT};
+    font-size: 13px;
+    color: {theme.TEXT_PRIMARY};
+    spacing: 8px;
+}}
 QFrame#errorCard {{
     background: {theme.ERROR_MUTED};
     border: 1px solid {theme.ERROR};
@@ -147,21 +174,6 @@ QFrame#errorCard {{
 
 def app_icon() -> QIcon:
     return QIcon(ICON_PATH)
-
-
-def _input_device_names() -> list[str]:
-    """Every input-capable device's name. The same physical mic can appear once per
-    host API on Windows (MME, DirectSound, WASAPI); names are de-duplicated, keeping
-    the first."""
-    names = []
-    try:
-        devices = sd.query_devices()
-    except Exception:  # no audio subsystem at all — the picker just offers the default
-        return names
-    for device in devices:
-        if device["max_input_channels"] > 0 and device["name"] not in names:
-            names.append(device["name"])
-    return names
 
 
 class _Card(QFrame):
@@ -195,6 +207,8 @@ class _Card(QFrame):
 
 class LauncherWindow(QWidget):
     voice_failed = Signal(str)
+    # startup_status.report() from the voice thread -> the GUI thread.
+    voice_stage = Signal(str, object, object)
 
     def __init__(self, parent=None):
         log_stream.install()
@@ -210,6 +224,7 @@ class LauncherWindow(QWidget):
         self._session = discord_identity.cached_session()
         self._overlay = None  # held for the app's life once started (see overlay_app.Overlay)
         self._running = False
+        self._voice_ready = False
         self._capturing: str | None = None  # "ptt" / "overlay" while a key capture is open
         self._capture = KeyCapture(self)
         self._capture.captured.connect(self._on_key_captured)
@@ -222,6 +237,7 @@ class LauncherWindow(QWidget):
         root.addLayout(self._build_brand())
         root.addWidget(self._build_pilot_card())
         root.addWidget(self._build_settings_card())
+        root.addWidget(self._build_voice_card())
         root.addWidget(self._build_error_card())
         root.addLayout(self._build_actions())
         self.status_line = QLabel("")
@@ -233,6 +249,8 @@ class LauncherWindow(QWidget):
 
         log_stream.signals.line.connect(self._show_status)
         self.voice_failed.connect(self._on_voice_failed)
+        self.voice_stage.connect(self._on_voice_stage)
+        startup_status.set_listener(self.voice_stage.emit)
         self._refresh_pilot()
         self._refresh_start()
 
@@ -281,13 +299,10 @@ class LauncherWindow(QWidget):
         self.ptt_button = self._key_button("ptt")
         self.overlay_button = self._key_button("overlay")
 
-        self.mic_combo = QComboBox()
-        self.mic_combo.addItem(DEFAULT_MIC_LABEL, None)
-        for name in _input_device_names():
-            self.mic_combo.addItem(name, name)
-        saved_mic = self.mic_combo.findData(self._settings.mic_device)
-        self.mic_combo.setCurrentIndex(saved_mic if saved_mic >= 0 else 0)
+        self.mic_combo = self._device_combo("input", self._settings.mic_device)
         self.mic_combo.currentIndexChanged.connect(self._on_mic_changed)
+        self.speaker_combo = self._device_combo("output", self._settings.output_device)
+        self.speaker_combo.currentIndexChanged.connect(self._on_speaker_changed)
 
         self.model_combo = QComboBox()
         for model in settings.WHISPER_MODELS:
@@ -296,11 +311,18 @@ class LauncherWindow(QWidget):
         self.model_combo.setCurrentIndex(saved_model if saved_model >= 0 else 0)
         self.model_combo.currentIndexChanged.connect(self._on_model_changed)
 
+        self.sounds_check = QCheckBox("Chirp when recording starts and stops")
+        self.sounds_check.setChecked(self._settings.ptt_sounds)
+        self.sounds_check.setCursor(Qt.PointingHandCursor)
+        self.sounds_check.toggled.connect(self._on_sounds_toggled)
+
         rows = [
             ("Push to talk", self.ptt_button),
             ("Overlay", self.overlay_button),
             ("Microphone", self.mic_combo),
+            ("Speaker", self.speaker_combo),
             ("Speech model", self.model_combo),
+            ("PTT sounds", self.sounds_check),
         ]
         for index, (label_text, widget) in enumerate(rows):
             label = QLabel(label_text)
@@ -308,9 +330,51 @@ class LauncherWindow(QWidget):
             grid.addWidget(label, index, 0)
             grid.addWidget(widget, index, 1)
         card.body.addLayout(grid)
-        self._settings_widgets = [self.ptt_button, self.overlay_button, self.mic_combo, self.model_combo]
+        self._settings_widgets = [
+            self.ptt_button, self.overlay_button, self.mic_combo, self.speaker_combo, self.model_combo,
+            self.sounds_check,
+        ]
         self._refresh_keys()
         return card
+
+    @staticmethod
+    def _device_combo(kind: str, saved: str | None) -> QComboBox:
+        combo = QComboBox()
+        combo.addItem(DEFAULT_DEVICE_LABEL, None)
+        for name in audio_devices.device_names(kind):
+            combo.addItem(name, name)
+        index = combo.findData(saved)
+        combo.setCurrentIndex(index if index >= 0 else 0)
+        return combo
+
+    def _build_voice_card(self) -> QFrame:
+        """Hidden until Start. Then the one place that says what ALICE is doing — above
+        all the first launch's speech-model download, the longest wait a new pilot sees
+        — and, finally, that she's ready and which key to press."""
+        self.voice_card = _Card("Voice")
+        self.voice_text = QLabel()
+        self.voice_text.setObjectName("voiceText")
+        self.voice_text.setWordWrap(True)
+        self.voice_card.body.addWidget(self.voice_text)
+        self.voice_progress = QProgressBar()
+        self.voice_progress.setObjectName("voiceProgress")
+        self.voice_progress.setTextVisible(False)
+        self.voice_card.body.addWidget(self.voice_progress)
+        self.voice_card.hide()
+        return self.voice_card
+
+    def _set_voice_state(self, tone: str, text: str, progress: tuple[int, int] | None = None) -> None:
+        """progress: (value, maximum) — (0, 0) is Qt's busy/indeterminate bar; None hides it."""
+        self.voice_card.set_tone(tone)
+        self.voice_text.setText(text)
+        if progress is None:
+            self.voice_progress.hide()
+        else:
+            self.voice_progress.setRange(0, progress[1])
+            self.voice_progress.setValue(progress[0])
+            self.voice_progress.show()
+        self.voice_card.show()
+        self.adjustSize()
 
     def _key_button(self, which: str) -> QPushButton:
         button = QPushButton()
@@ -454,6 +518,14 @@ class LauncherWindow(QWidget):
         self._settings.mic_device = self.mic_combo.currentData()
         settings.save(self._settings)
 
+    def _on_speaker_changed(self, _index: int) -> None:
+        self._settings.output_device = self.speaker_combo.currentData()
+        settings.save(self._settings)
+
+    def _on_sounds_toggled(self, checked: bool) -> None:
+        self._settings.ptt_sounds = checked
+        settings.save(self._settings)
+
     def _on_model_changed(self, _index: int) -> None:
         self._settings.whisper_model = self.model_combo.currentData()
         settings.save(self._settings)
@@ -466,8 +538,14 @@ class LauncherWindow(QWidget):
     # ---- start -----------------------------------------------------------------
 
     def _refresh_start(self) -> None:
+        # "live" = running and listening: a disabled button would otherwise read as
+        # greyed-out, i.e. broken, exactly when everything's working.
+        live = self._running and self._voice_ready
+        self.start_button.setProperty("live", live)
+        self.start_button.style().unpolish(self.start_button)
+        self.start_button.style().polish(self.start_button)
         if self._running:
-            self.start_button.setText("ALICE IS RUNNING")
+            self.start_button.setText("ALICE IS RUNNING" if self._voice_ready else "STARTING…")
             self.start_button.setEnabled(False)
         else:
             self.start_button.setText("START ALICE")
@@ -484,6 +562,7 @@ class LauncherWindow(QWidget):
         self._refresh_pilot()
         self.start_button.setText("STARTING…")
         self.start_button.setEnabled(False)
+        self._set_voice_state(theme.WARNING, "Connecting to ALICE's server…", (0, 0))
 
         settings.apply_to_env(self._settings)
         try:
@@ -494,20 +573,49 @@ class LauncherWindow(QWidget):
             self._reset_after_failure()
             return
 
-        start_voice(self.voice_failed.emit)
-        self._refresh_start()
-        print(
-            f"[ALICE] Running. Hold {display_name(self._settings.ptt_hotkey)} to talk, "
-            f"{display_name(self._settings.overlay_hotkey)} for the overlay.",
-            flush=True,
+        self._set_voice_state(
+            theme.WARNING,
+            f"The overlay is ready ({display_name(self._settings.overlay_hotkey)}). Starting ALICE's voice…",
+            (0, 0),
         )
+        start_voice(self.voice_failed.emit)
+
+    def _on_voice_stage(self, stage: str, done: int | None, total: int | None) -> None:
+        if stage == startup_status.DOWNLOADING_VOICE:
+            done_mb = (done or 0) / 1e6
+            if total:
+                text = f"{done_mb:.0f} / {total / 1e6:.0f} MB"
+                progress = (int(done or 0) // 1024, int(total) // 1024)
+            else:
+                text = f"{done_mb:.0f} MB"
+                progress = (0, 0)
+            self._set_voice_state(
+                theme.WARNING,
+                f"First launch: downloading the speech model ({text}).\n"
+                "This only happens once. ALICE can't hear you until it's done.",
+                progress,
+            )
+        elif stage == startup_status.LOADING_VOICE:
+            self._set_voice_state(theme.WARNING, "Loading the speech model…", (0, 0))
+        elif stage == startup_status.READY:
+            self._voice_ready = True
+            self._set_voice_state(
+                theme.SUCCESS,
+                f"Ready. Hold {display_name(self._settings.ptt_hotkey)} to talk to ALICE; "
+                f"{display_name(self._settings.overlay_hotkey)} opens the overlay.",
+            )
+            self._refresh_start()
 
     def _on_voice_failed(self, message: str) -> None:
         self._show_error(message + "\nClose ALICE and start her again.")
+        self._set_voice_state(theme.ERROR, "ALICE's voice stopped — see the message below.")
+        self._voice_ready = False
+        self._refresh_start()
         self.start_button.setText("ALICE STOPPED")
 
     def _reset_after_failure(self) -> None:
         self._running = False
+        self.voice_card.hide()
         for widget in self._settings_widgets:
             widget.setEnabled(True)
         self._refresh_pilot()

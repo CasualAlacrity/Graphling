@@ -16,6 +16,7 @@ import uuid
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 
+import startup_status
 from auth.discord_identity import LoginFailed, get_pilot_session
 from transcript_log import this_turns_messages, tool_calls_with_results, write_event
 from turn_metrics import TurnMetricsCallback, log_turn_metrics
@@ -80,6 +81,7 @@ async def run() -> None:
     turn = 0
 
     print("[ALICE] Ready. Hold PTT key to speak.")
+    startup_status.report(startup_status.READY)
 
     while True:
         text, whisper_ms = listen_once(initial_prompt=ship_name_prompt)
