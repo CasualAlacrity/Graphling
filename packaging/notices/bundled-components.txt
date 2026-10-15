@@ -1,0 +1,70 @@
+Native components bundled with ALICE
+===================================
+
+Python packages carry their license files in their own metadata, and the section above
+was generated from those files. The components below are native libraries and model files
+that come inside those packages but have no metadata of their own, so they are listed here
+by hand. Full texts of the GPL and LGPL licenses are at the end of this file.
+
+Qt 6 (via PySide6 / Shiboken6)
+  License: GNU Lesser General Public License v3.0 (LGPL-3.0-only)
+  Source:  https://download.qt.io/official_releases/qt/
+           https://code.qt.io/cgit/pyside/pyside-setup.git/
+  ALICE uses Qt and PySide6 unmodified and links to them dynamically. They ship as
+  separate files in the ALICE install folder (Qt6*.dll, PySide6\ and shiboken6\). You
+  may replace them with your own compatible build of the same version.
+
+FFmpeg libraries (avcodec, avformat, avutil, avfilter, avdevice, swresample,
+swscale; via PyAV)
+  License: GNU Lesser General Public License v3.0 or later (built with --enable-version3)
+  Source:  https://ffmpeg.org/download.html
+           Build recipe: https://github.com/PyAV-Org/pyav-ffmpeg
+
+Libraries bundled with FFmpeg by PyAV:
+  x264 (libx264)                 GPL-2.0-or-later      https://code.videolan.org/videolan/x264
+  x265 (libx265)                 GPL-2.0-or-later      https://bitbucket.org/multicoreware/x265_git
+  libiconv                       LGPL-2.1-or-later     https://www.gnu.org/software/libiconv/
+  LAME (libmp3lame)              LGPL-2.0-or-later     https://lame.sourceforge.io/
+  dav1d                          BSD-2-Clause          https://code.videolan.org/videolan/dav1d
+  libvpx                         BSD-3-Clause          https://chromium.googlesource.com/webm/libvpx
+  libwebp                        BSD-3-Clause          https://chromium.googlesource.com/webm/libwebp
+  Opus                           BSD-3-Clause          https://opus-codec.org/
+  SVT-AV1                        BSD-3-Clause-Clear    https://gitlab.com/AOMediaCodec/SVT-AV1
+  libvmaf                        BSD-2-Clause-Patent   https://github.com/Netflix/vmaf
+  oneVPL (libvpl)                MIT                   https://github.com/intel/libvpl
+  zlib                           Zlib                  https://zlib.net/
+  GCC runtime (libgcc_s, libstdc++)
+                                 GPL-3.0-or-later WITH GCC-exception-3.1
+                                                       https://gcc.gnu.org/
+  winpthreads (libwinpthread)    MIT and BSD-3-Clause  https://www.mingw-w64.org/
+
+PortAudio (via sounddevice)
+  License: MIT (text below)
+  Source:  https://github.com/PortAudio/portaudio
+
+Libraries bundled with CTranslate2 (speech recognition engine)
+  Intel OpenMP runtime (libiomp5md)   Intel Simplified Software License
+                                      https://www.intel.com/content/www/us/en/developer/articles/license/onemkl-license-faq.html
+  NVIDIA cuDNN (cudnn64_9)            NVIDIA cuDNN Software License Agreement
+                                      https://docs.nvidia.com/deeplearning/cudnn/latest/reference/eula.html
+  ALICE runs speech recognition on the CPU and does not use cuDNN.
+
+Microsoft Visual C++ Redistributable runtime (via Shiboken6)
+  Redistributed under the Microsoft Visual Studio license terms for distributable code.
+  https://visualstudio.microsoft.com/license-terms/
+
+Silero VAD voice activity model (via faster-whisper)
+  License: MIT (text below)
+  Source:  https://github.com/snakers4/silero-vad
+
+Whisper speech recognition model
+  Not included in the installer. ALICE downloads it from Hugging Face on first launch
+  (Systran/faster-whisper-*, a conversion of OpenAI's Whisper weights).
+  License: MIT (text below)
+  Source:  https://github.com/openai/whisper
+
+Written offer for source code
+  For the components above that are licensed under the GPL or LGPL, you can get the
+  complete corresponding source code from the source links listed. For three years after
+  we last distribute this version of ALICE, we will also provide that source code on
+  request, for no more than the cost of providing it. Contact: privacy@heyalice.help

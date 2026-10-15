@@ -5,6 +5,8 @@
 # on every launch (slow with Qt + Whisper's libraries) and is the shape antivirus tools
 # flag most often. The installer is what makes it feel like one thing to the pilot.
 import os
+import shutil
+import sys
 import tomllib
 
 from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
@@ -31,6 +33,15 @@ os.makedirs(workpath, exist_ok=True)
 with open(VERSION_FILE, "w", encoding="utf-8") as version_file:
     version_file.write(VERSION)
 datas.append((VERSION_FILE, "."))
+
+# License texts of everything bundled below, generated from this venv's installed
+# packages so they can't drift from what ships (packaging/third_party_notices.py).
+# Fails the build if a package has no license text on record. Copied next to ALICE.exe
+# after COLLECT (below), not added to datas, which PyInstaller tucks into _internal\.
+sys.path.insert(0, SPECPATH)
+import third_party_notices  # noqa: E402
+
+NOTICES_FILE = third_party_notices.write_notices(os.path.join(workpath, "THIRD_PARTY_NOTICES.txt"))
 
 # faster-whisper ships its voice-activity model (Silero VAD, ONNX) as package data.
 datas += collect_data_files("faster_whisper")
@@ -89,3 +100,7 @@ coll = COLLECT(
     name="ALICE",
     upx=False,
 )
+
+# Next to ALICE.exe, so it lands in the pilot's install folder. publish-installer.bat
+# also uploads this file to https://heyalice.help/download/THIRD_PARTY_NOTICES.txt.
+shutil.copy(NOTICES_FILE, os.path.join(DISTPATH, "ALICE", "THIRD_PARTY_NOTICES.txt"))

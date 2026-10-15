@@ -35,6 +35,11 @@ if not exist "%INSTALLER%" (
     pause
     exit /b 1
 )
+if not exist packaging\dist\ALICE\THIRD_PARTY_NOTICES.txt (
+    echo packaging\dist\ALICE\THIRD_PARTY_NOTICES.txt not found. Rebuild with scripts\windows\build-installer.bat.
+    pause
+    exit /b 1
+)
 
 echo Uploading ALICE %APP_VERSION% to %PROD_HOST%...
 REM Uploaded under a temporary name and renamed once complete, so nobody downloads a
@@ -44,6 +49,9 @@ REM ALICE-Setup-<version>.exe rather than piling up "ALICE-Setup (7).exe" in Dow
 ssh -i "%SSH_KEY%" %PROD_USER%@%PROD_HOST% "mkdir -p %DOWNLOAD_DIR% /etc/nginx/snippets"
 if errorlevel 1 goto failed
 scp -i "%SSH_KEY%" "%INSTALLER%" %PROD_USER%@%PROD_HOST%:%DOWNLOAD_DIR%/ALICE-Setup-%APP_VERSION%.exe.part
+if errorlevel 1 goto failed
+REM The open-source license notices for this build, linked from heyalice.help/privacy.html.
+scp -i "%SSH_KEY%" packaging\dist\ALICE\THIRD_PARTY_NOTICES.txt %PROD_USER%@%PROD_HOST%:%DOWNLOAD_DIR%/THIRD_PARTY_NOTICES.txt
 if errorlevel 1 goto failed
 
 ssh -i "%SSH_KEY%" %PROD_USER%@%PROD_HOST% "cd %DOWNLOAD_DIR% && mv ALICE-Setup-%APP_VERSION%.exe.part ALICE-Setup-%APP_VERSION%.exe && rm -f ALICE-Setup.exe && echo 'return 302 /download/ALICE-Setup-%APP_VERSION%.exe;' > %LATEST_SNIPPET% && nginx -t && systemctl reload nginx && ls -lh"
