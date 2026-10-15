@@ -12,7 +12,7 @@ import asyncio
 import os
 import sys
 
-from PySide6.QtCore import QPointF, QProcess, Qt, QUrl, Signal
+from PySide6.QtCore import QPointF, QProcess, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPen, QRadialGradient
 from PySide6.QtWidgets import (
     QApplication,
@@ -30,7 +30,9 @@ from PySide6.QtWidgets import (
 from qasync import asyncSlot
 
 import audio_devices
+import bundle
 import startup_status
+import update_check
 from auth import discord_identity
 from launcher import log_stream, settings
 from launcher.key_capture import KeyCapture, display_name, overlay_name, ptt_name
@@ -175,6 +177,20 @@ QCheckBox {{
     color: {theme.TEXT_PRIMARY};
     spacing: 8px;
 }}
+QFrame#updateBanner {{
+    background: {theme.ACCENT_MUTED};
+    border: 1px solid {theme.ACCENT};
+}}
+QLabel#updateText {{
+    font-family: {theme.LABEL_FONT};
+    font-size: 13px;
+    color: {theme.TEXT_PRIMARY};
+}}
+QLabel#versionLabel {{
+    font-family: {theme.MONO_FONT};
+    font-size: 11px;
+    color: {theme.TEXT_DISABLED};
+}}
 QFrame#errorCard {{
     background: {theme.ERROR_MUTED};
     border: 1px solid {theme.ERROR};
@@ -231,6 +247,7 @@ class LauncherWindow(QWidget):
         self.setFixedWidth(480)
 
         self._settings = settings.load()
+        self._version = bundle.app_version()
         self._session = discord_identity.cached_session()
         self._overlay = None  # held for the app's life once started (see overlay_app.Overlay)
         self._running = False
@@ -245,6 +262,7 @@ class LauncherWindow(QWidget):
         root.setContentsMargins(32, 30, 32, 22)
         root.setSpacing(18)
         root.addLayout(self._build_brand())
+        root.addWidget(self._build_update_banner())
         root.addWidget(self._build_pilot_card())
         root.addWidget(self._build_settings_card())
         root.addWidget(self._build_voice_card())
@@ -255,7 +273,13 @@ class LauncherWindow(QWidget):
         # One line, elided by width rather than wrapping or scrolling — the full history
         # is alice.log, one click away on "Open logs".
         self.status_line.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        root.addWidget(self.status_line)
+        footer = QHBoxLayout()
+        footer.addWidget(self.status_line, 1)
+        # Shown so a tester can say which build they're on when reporting a problem.
+        version_label = QLabel(f"v{self._version}" if self._version else "")
+        version_label.setObjectName("versionLabel")
+        footer.addWidget(version_label)
+        root.addLayout(footer)
 
         log_stream.signals.line.connect(self._show_status)
         self.voice_failed.connect(self._on_voice_failed)
@@ -265,6 +289,41 @@ class LauncherWindow(QWidget):
         self._refresh_start()
 
     # ---- layout ----------------------------------------------------------------
+
+    def _build_update_banner(self) -> QFrame:
+        """Hidden unless a newer ALICE has been published. Notify-only by design: the
+        button opens the download in the pilot's browser, and ALICE never downloads or
+        installs anything herself (update_check.py)."""
+        self.update_banner = QFrame()
+        self.update_banner.setObjectName("updateBanner")
+        row = QHBoxLayout(self.update_banner)
+        row.setContentsMargins(14, 10, 10, 10)
+        self.update_text = QLabel()
+        self.update_text.setObjectName("updateText")
+        self.update_text.setWordWrap(True)
+        row.addWidget(self.update_text, 1)
+        download = QPushButton("Download")
+        download.setObjectName("primaryButton")
+        download.setCursor(Qt.PointingHandCursor)
+        download.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(update_check.STABLE_DOWNLOAD_URL)))
+        row.addWidget(download)
+        self.update_banner.hide()
+        # After the window is up and the event loop is running: never delays opening.
+        QTimer.singleShot(0, self._check_for_update)
+        return self.update_banner
+
+    @asyncSlot()
+    async def _check_for_update(self):
+        newer = await update_check.available_update(self._version)
+        if newer is None:
+            return
+        print(f"[ALICE] Update available: {newer} (this is {self._version}).", flush=True)
+        self.update_text.setText(
+            f"ALICE {newer} is available — you have {self._version}. "
+            "Install it over this one; your settings and logs stay."
+        )
+        self.update_banner.show()
+        self.adjustSize()
 
     def _build_brand(self) -> QVBoxLayout:
         brand = QVBoxLayout()

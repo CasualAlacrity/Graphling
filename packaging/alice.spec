@@ -5,6 +5,7 @@
 # on every launch (slow with Qt + Whisper's libraries) and is the shape antivirus tools
 # flag most often. The installer is what makes it feel like one thing to the pilot.
 import os
+import tomllib
 
 from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
 
@@ -20,6 +21,17 @@ datas = [
     # server-side (server/prompt_service.py), so their text never ships in the installer.
     (os.path.join(REPO, ".env-pilot"), "."),
 ]
+# ALICE's version, from pyproject.toml — read back by bundle.app_version() for the
+# launcher's version label and update check. Written fresh on every build so it can't
+# go stale the way an editable install's package metadata does.
+with open(os.path.join(REPO, "pyproject.toml"), "rb") as pyproject:
+    VERSION = tomllib.load(pyproject)["project"]["version"]
+VERSION_FILE = os.path.join(workpath, "VERSION")
+os.makedirs(workpath, exist_ok=True)
+with open(VERSION_FILE, "w", encoding="utf-8") as version_file:
+    version_file.write(VERSION)
+datas.append((VERSION_FILE, "."))
+
 # faster-whisper ships its voice-activity model (Silero VAD, ONNX) as package data.
 datas += collect_data_files("faster_whisper")
 

@@ -8,11 +8,14 @@ and the prompt snapshot when running from source), which Path(__file__).parent.p
 would miss once frozen.
 """
 import sys
+import tomllib
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 PILOT_ENV_FILENAME = ".env-pilot"
+# Written into the bundle by packaging/alice.spec from pyproject.toml's version.
+VERSION_FILENAME = "VERSION"
 
 
 def is_frozen() -> bool:
@@ -32,3 +35,19 @@ def load_pilot_defaults() -> None:
     in the environment still win."""
     if is_frozen():
         load_dotenv(root() / PILOT_ENV_FILENAME, override=False)
+
+
+def app_version() -> str | None:
+    """ALICE's own version, always from pyproject.toml — the same number the build and
+    the installer's file name use. Not importlib.metadata: an editable dev install
+    records its version once, at install time, and goes stale on the next bump (it said
+    0.1.0 here at 0.2.2), which would make a dev copy, or a build made without re-running
+    setup.bat, report the wrong version and nag about phantom updates. The packaged app
+    has no pyproject.toml, so the build bakes the number into a VERSION file instead."""
+    try:
+        if is_frozen():
+            return (root() / VERSION_FILENAME).read_text(encoding="utf-8").strip() or None
+        with open(root() / "pyproject.toml", "rb") as pyproject:
+            return tomllib.load(pyproject)["project"]["version"]
+    except (OSError, KeyError, ValueError):
+        return None
