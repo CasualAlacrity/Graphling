@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "alice"
-version = "0.2.3"
+version = "0.2.4"
 description = "ALICE — a voice copilot and trade route tracker for Star Citizen, built on LangChain/LangGraph."
 requires-python = ">=3.11"
 dynamic = ["dependencies"]
