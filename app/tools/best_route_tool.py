@@ -10,7 +10,7 @@ from tools.trade_run.resolver import AmbiguousRunError
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.matching import (
     DEFAULT_NEAR_DISTANCE,
-    cargo_capable_vehicles,
+    resolve_cargo_ship,
     resolve_or_hedge,
     terminals_near,
     terminals_within,
@@ -220,9 +220,7 @@ class BestRouteTool(UplinkTool):
 
         # Hauling: only ships that can carry cargo are candidates. See
         # cargo_capable_vehicles() for why this is here and not in resolve_or_hedge.
-        vehicle, error = resolve_or_hedge(
-            ship, cargo_capable_vehicles(cache), "ship", scorer=fuzz.token_sort_ratio
-        )
+        vehicle, error = resolve_cargo_ship(ship, cache)
         if error:
             return error
 

@@ -102,6 +102,59 @@ def test_route_start_goes_to_classify_topic_normally():
     assert route_start(state) == "classify_topic"
 
 
+# --- answers to ALICE's own question skip classify_topic (2026-10-15) ---------
+
+def test_route_start_skips_classify_when_alice_just_asked_a_question():
+    """"Uh, I'll take my railing" answered ALICE's ship question and was declined."""
+    state = State(messages=[
+        HumanMessage("Give me a route from Orison"),
+        AIMessage("Which ship are you flying?"),
+        HumanMessage("Uh, I'll take my railing."),
+    ])
+    assert route_start(state) == "respond"
+
+
+def test_route_start_skips_classify_when_a_tool_asked_and_alice_paraphrased():
+    state = State(messages=[
+        HumanMessage("Give me a route from Orison"),
+        _tool_call_ai_message("best_route"),
+        ToolMessage(content="Which ship are you flying?", tool_call_id="call_1"),
+        AIMessage("I need to know which ship you are flying to find a route."),
+        HumanMessage("Railen"),
+    ])
+    assert route_start(state) == "respond"
+
+
+def test_route_start_still_classifies_after_a_decline_that_ends_in_a_question():
+    state = State(messages=[
+        HumanMessage("Tell me a joke"),
+        AIMessage("Focus on the manifest. What are we actually moving?"),
+        HumanMessage("Tell me another joke"),
+    ], on_topic=False)
+    assert route_start(state) == "classify_topic"
+
+
+def test_route_start_classifies_when_alice_made_a_statement():
+    state = State(messages=[
+        HumanMessage("Where's Iron selling best?"),
+        AIMessage("Orison is paying 3,400 aUEC per SCU for Iron."),
+        HumanMessage("Tell me a joke"),
+    ])
+    assert route_start(state) == "classify_topic"
+
+
+def test_only_the_previous_turn_counts():
+    """A question two turns back doesn't make today's utterance an answer."""
+    state = State(messages=[
+        HumanMessage("Give me a route"),
+        AIMessage("Which ship are you flying?"),
+        HumanMessage("Railen"),
+        AIMessage("The best route is RMC to Seer's Canyon."),
+        HumanMessage("Tell me a joke"),
+    ])
+    assert route_start(state) == "classify_topic"
+
+
 # --- _confirmation_tool_call -------------------------------------------------
 
 def test_confirmation_tool_call_returns_the_triggering_call():

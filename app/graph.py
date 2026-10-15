@@ -388,11 +388,52 @@ def route_topic(state: State) -> str:
     return "respond" if state.on_topic else "decline"
 
 
+def _text_of(message: BaseMessage) -> str:
+    if isinstance(message.content, str):
+        return message.content
+    parts = []
+    for block in message.content:
+        if isinstance(block, dict) and block.get("type") == "text":
+            parts.append(block.get("text", ""))
+        elif isinstance(block, str):
+            parts.append(block)
+    return " ".join(parts)
+
+
+def _alice_just_asked(messages: list[BaseMessage], last_turn_on_topic: bool) -> bool:
+    """True if ALICE's previous turn asked the pilot something, so the utterance now at
+    the end of `messages` is most likely the answer.
+
+    Short answers have nothing on-topic to recognise: on 2026-10-15 ALICE asked which
+    ship, the pilot said "Uh, I'll take my railing" (Railen, misheard) and then "U-Pick",
+    and classify_topic declined both. The question can be ALICE's own words or a tool's
+    ("Which ship are you flying?", a hedge listing candidates) that she relayed in other
+    words ("I need to know which ship..."), so any "?" in the previous turn's replies or
+    tool results counts.
+
+    Never after a decline (`last_turn_on_topic` False): a decline often ends in a
+    question too ("What are we actually moving?"), and skipping the check there would
+    let off-topic chat through on the second try."""
+    if not last_turn_on_topic:
+        return False
+    if len(messages) < 2 or not isinstance(messages[-1], HumanMessage):
+        return False
+
+    for message in reversed(messages[:-1]):
+        if isinstance(message, HumanMessage):
+            return False
+        if isinstance(message, (AIMessage, ToolMessage)) and "?" in _text_of(message):
+            return True
+    return False
+
+
 def route_start(state: State) -> str:
     # Skips classify_topic entirely (not just overriding its verdict) when the pilot's
-    # utterance is a reply to ALICE's own immediately preceding readback -- a real
-    # classifier call saved, not just a wasted one ignored.
-    return "respond" if state.pending_confirmation else "classify_topic"
+    # utterance is a reply to ALICE's own immediately preceding readback or question --
+    # a real classifier call saved, not just a wasted one ignored.
+    if state.pending_confirmation or _alice_just_asked(state.messages, state.on_topic):
+        return "respond"
+    return "classify_topic"
 
 
 graph_builder = StateGraph(State)

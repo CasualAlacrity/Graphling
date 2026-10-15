@@ -40,12 +40,20 @@ def _run(ship, legs):
     })
 
 
+VEHICLES = [
+    SimpleNamespace(name="Railen", name_full="Gatac Railen", code=None),
+    SimpleNamespace(name="Caterpillar", name_full="Drake Caterpillar", code=None),
+    SimpleNamespace(name="Constellation Mk IV Taurus", name_full="RSI Constellation Mk IV Taurus", code=None),
+]
+
+
 @pytest.fixture(autouse=True)
 def fake_uex_cache(monkeypatch):
     # resolve_leg only needs cache.commodities/terminals when a commodity/terminal hint
     # was actually passed — every test here uses leg_type alone, so empty pools are fine.
+    # resolve_run resolves a ship hint against the vehicles first.
     async def fake_get_uex_cache(self):
-        return SimpleNamespace(commodities=[], terminals=[])
+        return SimpleNamespace(commodities=[], terminals=[], vehicles=VEHICLES)
 
     monkeypatch.setattr(UEXCorpClient, "get_uex_cache", fake_get_uex_cache)
 
@@ -118,6 +126,29 @@ async def test_resolve_run_ship_hint_narrows_to_the_matching_run(monkeypatch):
     monkeypatch.setattr(resolver.ledger_client, "get_in_progress_runs", lambda: _async([run_a, run_b]))
 
     result = await resolver.resolve_run(ship="Railen")
+
+    assert result is run_a
+
+
+async def test_resolve_run_finds_the_run_for_a_misheard_ship(monkeypatch):
+    """Whisper writes "railing" for Railen; the run is stored under the catalog name."""
+    run_a = _run("Railen", [_leg(LegType.ACQUISITION, "Seraphim", "Copper")])
+    run_b = _run("Caterpillar", [_leg(LegType.ACQUISITION, "Baijini Point", "Laranite")])
+    monkeypatch.setattr(resolver.ledger_client, "get_in_progress_runs", lambda: _async([run_a, run_b]))
+
+    result = await resolver.resolve_run(ship="railing")
+
+    assert result is run_a
+
+
+async def test_resolve_run_still_finds_a_run_logged_under_a_ships_old_name(monkeypatch):
+    """UEX renamed the Constellations in 2026-10; a run logged before that keeps the old
+    name, so the exact catalog comparison misses it and the loose match must catch it."""
+    run_a = _run("Constellation Taurus", [_leg(LegType.ACQUISITION, "Seraphim", "Copper")])
+    run_b = _run("Caterpillar", [_leg(LegType.ACQUISITION, "Baijini Point", "Laranite")])
+    monkeypatch.setattr(resolver.ledger_client, "get_in_progress_runs", lambda: _async([run_a, run_b]))
+
+    result = await resolver.resolve_run(ship="Taurus")
 
     assert result is run_a
 

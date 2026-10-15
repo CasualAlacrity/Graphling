@@ -1,7 +1,6 @@
 from typing import Any
 
 from pydantic import BaseModel, Field
-from rapidfuzz import fuzz
 
 from db import trade_run_store
 from db.models import LegType
@@ -12,7 +11,7 @@ from tools.trade_run import resolver
 from tools.trade_run.resolver import AmbiguousRunError
 from tools.travel_time import estimate_travel_time
 from tools.uexcorp.client import UEXCorpClient
-from tools.uexcorp.matching import cargo_capable_vehicles, resolve_or_hedge
+from tools.uexcorp.matching import resolve_cargo_ship, resolve_or_hedge
 from tools.uplink_tool import UplinkTool
 
 
@@ -83,9 +82,7 @@ class TradeAdvisorTool(UplinkTool):
         if error:
             return error
 
-        matched_vehicle, error = resolve_or_hedge(
-            ship, cargo_capable_vehicles(cache), "ship", scorer=fuzz.token_sort_ratio
-        )
+        matched_vehicle, error = resolve_cargo_ship(ship, cache)
         if error:
             return error
 

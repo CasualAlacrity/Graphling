@@ -17,11 +17,14 @@ from rapidfuzz import fuzz
 
 from tools.uexcorp.matching import (
     cargo_capable_vehicles,
+    filter_by_match,
+    resolve_cargo_ship,
     resolve_or_hedge,
     terminals_within,
     trade_terminals,
 )
 from tools.uexcorp.reference_cache import TerminalType
+from tools.uplink_tool import UnresolvedName, UplinkTool
 
 
 def _item(name, code=None):
@@ -252,3 +255,106 @@ def test_substring_credit_does_not_confidently_match_an_unrelated_place():
 
     assert item is None, "a misheard city must not commit to an unrelated outpost"
     assert error is not None
+
+
+# --- word containment, candidate lists, mishearings (2026-10-15) --------------
+#
+# UEX renamed the Constellations to "Constellation Mk IV <variant>" and added the Mk V
+# Centaurus as a concept with no cargo data, the same week a live session showed
+# "railing"/"Raven" for Railen and an unhelpful "say it again" for the new ship.
+
+def _vehicle(name, scu=100.0, is_concept=0, name_full=None):
+    return SimpleNamespace(name=name, code=None, scu=scu, is_concept=is_concept, name_full=name_full or name)
+
+
+FLEET = [
+    _vehicle("Railen", scu=640.0, name_full="Gatac Railen"),
+    _vehicle("Caterpillar", scu=576.0),
+    _vehicle("Constellation Mk IV Andromeda", scu=96.0),
+    _vehicle("Constellation Mk IV Taurus", scu=174.0),
+    _vehicle("Constellation Mk V Centaurus", scu=0.0, is_concept=1),
+    _vehicle("Sabre Raven", scu=0.0),
+    _vehicle("Gladius", scu=0.0),
+]
+FLEET_CACHE = SimpleNamespace(vehicles=FLEET)
+
+
+def test_one_distinctive_word_resolves_the_only_ship_containing_it():
+    item, error = resolve_or_hedge("Taurus", FLEET, "ship", scorer=fuzz.token_sort_ratio)
+    assert error is None
+    assert item.name == "Constellation Mk IV Taurus"
+
+
+def test_a_word_shared_by_several_ships_lists_them_as_a_question():
+    item, error = resolve_or_hedge("Constellation", cargo_capable_vehicles(FLEET_CACHE), "ship",
+                                   scorer=fuzz.token_sort_ratio)
+    assert item is None
+    assert "Constellation Mk IV Andromeda" in error
+    assert "Constellation Mk IV Taurus" in error
+    # A question, so graph.route_start skips the topic check on the pilot's answer.
+    assert error.rstrip().endswith("?")
+
+
+def test_a_known_mishearing_resolves_within_a_cargo_search():
+    for heard in ("railing", "Raven"):
+        item, error = resolve_or_hedge(heard, cargo_capable_vehicles(FLEET_CACHE), "ship",
+                                       scorer=fuzz.token_sort_ratio)
+        assert error is None
+        assert item.name == "Railen"
+
+
+def test_a_mishearing_never_overrides_a_real_ship_with_that_name():
+    """"Raven" means Railen only where the Sabre Raven can't be meant. Asked against the
+    whole catalog (travel time, rentals), it must not jump to Railen."""
+    item, error = resolve_or_hedge("Raven", FLEET, "ship", scorer=fuzz.token_sort_ratio)
+    assert item is not None
+    assert item.name == "Sabre Raven"
+
+
+def test_a_concept_ship_says_why_it_cant_haul():
+    item, error = resolve_cargo_ship("Constellation Mk V", FLEET_CACHE)
+    assert item is None
+    assert "Constellation Mk V Centaurus" in error
+    assert "concept" in error
+
+
+def test_a_ship_with_no_cargo_capacity_says_so():
+    item, error = resolve_cargo_ship("Gladius", FLEET_CACHE)
+    assert item is None
+    assert "no cargo capacity" in error
+
+
+def test_cargo_ship_resolves_normally():
+    item, error = resolve_cargo_ship("Caterpillar", FLEET_CACHE)
+    assert error is None
+    assert item.name == "Caterpillar"
+
+
+# --- location filters go through the resolver ---------------------------------
+
+def test_an_unresolvable_location_filter_raises_instead_of_ignoring_itself():
+    """It used to return every row, answering a question about one place with data
+    from everywhere."""
+    rows = [SimpleNamespace(orbit_name="Crusader"), SimpleNamespace(orbit_name="Hurston")]
+    orbits = [_item("Crusader"), _item("Hurston")]
+    with pytest.raises(UnresolvedName):
+        filter_by_match(rows, "banana", orbits, "orbit_name")
+
+
+def test_a_location_filter_keeps_only_the_named_place():
+    rows = [SimpleNamespace(orbit_name="Crusader"), SimpleNamespace(orbit_name="Hurston")]
+    orbits = [_item("Crusader"), _item("Hurston")]
+    kept = filter_by_match(rows, "crusader", orbits, "orbit_name")
+    assert len(kept) == 1
+    assert kept[0].orbit_name == "Crusader"
+
+
+async def test_safe_run_returns_an_unresolved_name_as_its_message():
+    class _Tool:
+        name = "test_tool"
+        _safe_run = UplinkTool._safe_run
+
+    async def _lookup():
+        raise UnresolvedName("Couldn't find a location matching 'banana'.")
+
+    assert await _Tool()._safe_run(_lookup()) == "Couldn't find a location matching 'banana'."

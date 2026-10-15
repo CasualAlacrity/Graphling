@@ -51,6 +51,35 @@ ALIASES: dict[str, dict[str, str]] = {
 }
 
 
+# Speech-to-text mishearings -> the catalog name the pilot actually said. The same
+# "custom lexicon" idea speech platforms use (Alexa slot synonyms, Dialogflow entity
+# synonyms): a closed list of known-bad transcriptions, grown from real transcripts.
+#
+# Unlike ALIASES, a mishearing can collide with a real name: "Raven" is what Whisper
+# writes for Railen, but the Sabre Raven is also a real ship. So resolve_or_hedge only
+# consults this after nothing in the pool already contains the heard words, and only
+# when the target is in the pool being searched. In a cargo search "Raven" means Railen
+# (the Sabre Raven can't haul); asking for the Sabre Raven's travel time still works.
+#
+# Add an entry only after seeing the mishearing in a real transcript (alice.log or
+# %APPDATA%\ALICE\transcripts), not on a guess.
+MISHEARINGS: dict[str, dict[str, str]] = {
+    "ship": {
+        "railing": "Railen",  # alice.log 2026-10-15, and the original Whisper-hint bug
+        "raven": "Railen",  # seen in testing, 2026-10-15
+    },
+}
+
+
+def heard_as(query: str, label: str) -> str | None:
+    """The catalog name a known mishearing stands for, or None. Whole-string and
+    case-insensitive, like canonicalize."""
+    table = MISHEARINGS.get(label)
+    if not table:
+        return None
+    return table.get(query.strip().lower())
+
+
 def canonicalize(query: str, label: str) -> str:
     """Rewrites pilot slang to a catalog-shaped name, leaving anything unrecognised
     untouched. Matching is whole-string and case-insensitive — a substring rule would

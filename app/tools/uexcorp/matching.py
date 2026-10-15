@@ -6,8 +6,9 @@ from pydantic import BaseModel
 from rapidfuzz import fuzz, process
 from rapidfuzz.utils import default_process
 
-from tools.uexcorp.aliases import canonicalize
+from tools.uexcorp.aliases import canonicalize, heard_as
 from tools.uexcorp.reference_cache import TerminalType
+from tools.uplink_tool import UnresolvedName
 
 _HasNameAndCode = TypeVar("_HasNameAndCode")
 
@@ -22,6 +23,10 @@ LOW_CONFIDENCE_MAX = 80
 # How close two phonetic encodings must be before the fallback will commit. Measured
 # against real mishearings: "railing" -> Railen scores 86 here, "Raelin" -> Railen 100.
 PHONETIC_MIN = 85
+
+# How many candidates a hedge names before it stops listing. Spoken aloud, a longer list
+# is noise; the pilot only needs enough to see which word tells the options apart.
+MAX_LISTED_CANDIDATES = 5
 
 
 class OrbitDistance(BaseModel):
@@ -150,6 +155,47 @@ def _exact_name_matches(query: str, items: list[_HasNameAndCode]) -> list[_HasNa
     return hits
 
 
+def _words(text: str) -> set[str]:
+    return set(default_process(text).split())
+
+
+def _contained_matches(query: str, items: list[_HasNameAndCode]) -> list[_HasNameAndCode]:
+    """Every distinct item with a name that contains all of the query's words.
+
+    Catches what string distance scores badly: a pilot naming a ship by the part that
+    matters. UEX renamed the Constellations to "Constellation Mk IV Taurus" (2026-10), so
+    "Taurus" scores low against the whole name even though it's the only Taurus. Word
+    containment finds exactly that one; "Constellation" contains in several, which the
+    caller lists instead of guessing."""
+    wanted = _words(query)
+    if not wanted:
+        return []
+
+    choices, lookup = _choices_and_lookup(items)
+    hits = []
+    for index, choice in enumerate(choices):
+        if not wanted <= _words(choice):
+            continue
+        item = lookup[index]
+        if item not in hits:
+            hits.append(item)
+    return hits
+
+
+def _candidates_message(spoken: str, label: str, candidates: list[_HasNameAndCode]) -> str:
+    """Names the options when the pilot's words fit several. Not a guess: every option
+    is listed, so the model has nothing to pick on the pilot's behalf. It just asks."""
+    names = []
+    for item in candidates[:MAX_LISTED_CANDIDATES]:
+        names.append(item.name)
+    listed = ", ".join(names[:-1]) + " or " + names[-1]
+    more = len(candidates) - len(names)
+    if more > 0:
+        listed = ", ".join(names) + f", and {more} more"
+    # Ends in a question so graph.route_start knows ALICE is waiting on the pilot's pick.
+    return f"'{spoken}' could be more than one {label}: {listed}. Which one does the pilot mean?"
+
+
 def _phonetic_key(text: str) -> str:
     """Metaphone encoding, per word. Encodes how a name *sounds* rather than how it's
     spelled, which is the right question for speech input: "Railen" and "Raelin" both
@@ -208,15 +254,23 @@ def resolve_or_hedge(
     Returns (item, None) on a confident match, or (None, message) otherwise — callers
     should `return` the message directly on failure, same as every other tool error.
 
-    Three layers, each only reached when the previous one didn't settle it:
+    Layers, each only reached when the previous one didn't settle it:
 
     1. Alias rewrite for known pilot slang ("connie" -> Constellation). A closed set, so
        a lookup is correct by construction — see tools/uexcorp/aliases.py.
     2. Fuzzy string match, which must land on a single best candidate. A tie is treated as
        not knowing: several names scoring identically means the query didn't contain
        whatever distinguishes them, and picking one would be inventing that detail.
-    3. Phonetic fallback, for mishearings string distance can't see. This only ever
+    3. Word containment: the one name that contains every word the pilot said ("Taurus"
+       -> Constellation Mk IV Taurus). Several such names are listed back, not guessed.
+    4. Known mishearings ("railing" -> Railen), from aliases.MISHEARINGS — only when
+       the target is in this pool and nothing in it already contains the heard words.
+    5. Phonetic fallback, for mishearings string distance can't see. This only ever
        converts a hedge into a match, and abstains on ties for the same reason.
+
+    When the pilot's words fit several items equally, the hedge names all of them (up
+    to MAX_LISTED_CANDIDATES) so ALICE can ask which. A single low-confidence guess is
+    still never named.
     """
     # Messages always quote what the pilot actually said, never the alias-rewritten form —
     # being told ALICE didn't catch "Constellation" when you said "connie" is baffling.
@@ -237,6 +291,18 @@ def resolve_or_hedge(
     if len(winners) == 1 and score >= LOW_CONFIDENCE_MAX:
         return winners[0], None
 
+    contained = _contained_matches(query, items)
+    if len(contained) == 1:
+        return contained[0], None
+    if len(contained) > 1:
+        return None, _candidates_message(spoken, label, contained)
+
+    misheard = heard_as(spoken, label)
+    if misheard is not None:
+        targets = _exact_name_matches(misheard, items)
+        if targets:
+            return targets[0], None
+
     sounds_like = _phonetic_match(query, items)
     if sounds_like is not None:
         return sounds_like, None
@@ -244,17 +310,26 @@ def resolve_or_hedge(
     if not winners:
         return None, f"Couldn't find a {label} matching '{spoken}'."
 
+    if len(winners) > 1:
+        return None, _candidates_message(spoken, label, winners)
+
     message = f"Didn't catch which {label} you meant by '{spoken}' clearly enough to be sure — can you say it again?"
     return None, message
 
 
 def filter_by_match(rows, query, candidates, attr):
+    """Keeps the rows whose `attr` is the location the pilot named.
+
+    Resolves through resolve_or_hedge, so aliases, mishearings and the ambiguity check
+    all apply. A name that doesn't resolve raises UnresolvedName (the tool's _safe_run
+    turns it into the hedge message) instead of the old behavior of silently returning
+    every row, which answered a question about one place with data from everywhere."""
     if not query:
         return rows
 
-    match = match_by_name_or_code(query, candidates)
-    if not match:
-        return rows
+    match, error = resolve_or_hedge(query, candidates, "location")
+    if error:
+        raise UnresolvedName(error)
 
     result = []
     for r in rows:
@@ -306,6 +381,23 @@ def resolve_near_anchor(near: str, cache) -> tuple[int, int, str] | None:
     tracker.md's "Known gaps" — best_route was the one location-taking tool that hadn't
     adopted this resolution order) — this is the exact chain both need, extracted so
     there's one copy of it, not two drifting independently."""
+    # The resolver first, per pool, so aliases and mishearings apply and a confident
+    # answer wins. It hedges on anything ambiguous ("Orison" is in many terminal names),
+    # so the looser single-best match below stays as the fallback: for a radius anchor,
+    # any of those terminals gives the same orbit.
+    orbit, _ = resolve_or_hedge(near, cache.orbits, "location")
+    if orbit:
+        return orbit.id, orbit.id_star_system, orbit.name
+    moon, _ = resolve_or_hedge(near, cache.moons, "location")
+    if moon:
+        return moon.id_orbit, moon.id_star_system, moon.orbit_name
+    terminal, _ = resolve_or_hedge(near, cache.terminals, "location")
+    if terminal and terminal.orbit_name:
+        matched_orbit = _find_orbit_by_name(cache, terminal.orbit_name)
+        if matched_orbit:
+            return matched_orbit.id, matched_orbit.id_star_system, matched_orbit.name
+
+    near = canonicalize(near, "location")
     orbit = match_by_name_or_code(near, cache.orbits)
     if orbit:
         return orbit.id, orbit.id_star_system, orbit.name
@@ -326,7 +418,7 @@ def resolve_near_anchor(near: str, cache) -> tuple[int, int, str] | None:
 async def filter_by_distance(rows, near, max_distance, cache, client):
     anchor = resolve_near_anchor(near, cache)
     if anchor is None:
-        return rows
+        raise UnresolvedName(f"Couldn't find a location matching '{near}'.")
     origin_id, origin_system_id, origin_name = anchor
 
     distances = await client.get_orbit_distances(origin_id, origin_system_id)
@@ -398,6 +490,31 @@ def cargo_capable_vehicles(cache) -> list:
             continue
         result.append(vehicle)
     return result
+
+
+def resolve_cargo_ship(query: str, cache) -> tuple[object | None, str | None]:
+    """resolve_or_hedge over cargo_capable_vehicles, plus a straight answer when the
+    pilot named a real ship that isn't in that pool.
+
+    Without this, a ship UEX lists with no cargo capacity just "wasn't caught": the
+    Constellation Mk V Centaurus was added to UEX on 2026-10-13 as a concept with scu=0,
+    so pilots flying it were asked to repeat themselves forever. Now ALICE says why."""
+    pool = cargo_capable_vehicles(cache)
+    vehicle, error = resolve_or_hedge(query, pool, "ship", scorer=fuzz.token_sort_ratio)
+    if vehicle is not None:
+        return vehicle, None
+
+    known, _ = resolve_or_hedge(query, cache.vehicles, "ship", scorer=fuzz.token_sort_ratio)
+    if known is None or known in pool:
+        return None, error
+    # Worded as what UEX says, not as fact about the game: UEX lags new releases (the
+    # Centaurus was still is_concept=1 the week it launched).
+    if known.is_concept:
+        return None, (
+            f"UEX still lists the {known.name} as a concept ship with no cargo data, so ALICE "
+            f"can't plan cargo with it yet. If it has just launched, UEX hasn't caught up."
+        )
+    return None, f"UEX lists no cargo capacity for the {known.name}, so ALICE can't plan cargo with it."
 
 
 async def terminals_near(

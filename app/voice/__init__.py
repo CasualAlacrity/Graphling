@@ -34,6 +34,9 @@ async def run() -> None:
     # execution mid-way through graph.py's initialization, circling back on a
     # not-yet-finished module.
     from graph import graph, prewarm, uex_client
+    from tools.uexcorp.aliases import MISHEARINGS
+    from tools.uexcorp.matching import cargo_capable_vehicles
+    from voice.ship_hint import build_ship_hint
 
     print("=" * 40)
     print("  ALICE — Push to talk")
@@ -71,7 +74,13 @@ async def run() -> None:
     # words — without a hint it renders an unusual proper noun as the nearest common
     # English word instead (e.g. "Railen" -> "railing"). Ship names are the highest-value
     # vocabulary to bias toward: they're short, numerous, and the exact case that broke.
-    ship_name_prompt = ", ".join(vehicle.name for vehicle in cache.vehicles)
+    # Fitted to Whisper's prompt limit; every name no longer fits (voice/ship_hint.py).
+    cargo_ship_names = []
+    for vehicle in cargo_capable_vehicles(cache):
+        cargo_ship_names.append(vehicle.name)
+    ship_name_prompt = build_ship_hint(
+        cargo_ship_names, list(MISHEARINGS["ship"].values()), voice_input.prompt_token_count,
+    )
 
     write_event(
         "session_start", thread_id=thread_id, pilot=session.username,

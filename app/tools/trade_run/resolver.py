@@ -6,7 +6,7 @@ from db import trade_run_store
 from db.models import LegType
 from ledger_schemas import TradeLegOut, TradeRunOut
 from tools.uexcorp.client import UEXCorpClient
-from tools.uexcorp.matching import LOW_CONFIDENCE_MAX, match_by_name_or_code_with_score
+from tools.uexcorp.matching import resolve_or_hedge
 
 uex_client = UEXCorpClient(via_server=True)  # no UEX key on the client; lookups go through the server cache
 
@@ -50,19 +50,17 @@ class AmbiguousRunError(Exception):
         )
 
 
-def _confident_match(query, items):
-    # A low-confidence canonicalization here is treated the same as no match at all,
-    # rather than trusted — the caller falls back to matching on leg_type alone, which
-    # is still fully safe (more than one candidate raises AmbiguousLegError rather than
-    # silently picking one). Better than confidently filtering against a wrong
-    # commodity/terminal a garbled hint happened to score just above the cutoff for.
+def _confident_match(query, items, label):
+    # A hedge here is treated the same as no match at all, rather than trusted — the
+    # caller falls back to matching on leg_type alone, which is still fully safe (more
+    # than one candidate raises AmbiguousLegError rather than silently picking one).
+    # Better than confidently filtering against a wrong commodity/terminal a garbled
+    # hint happened to score just above the cutoff for. resolve_or_hedge, so aliases
+    # ("rmc", "grim hex") and known mishearings resolve here too.
     if query is None:
         return None
-    matched = match_by_name_or_code_with_score(query, items)
-    if matched is None:
-        return None
-    item, score = matched
-    return item if score >= LOW_CONFIDENCE_MAX else None
+    item, _ = resolve_or_hedge(query, items, label)
+    return item
 
 
 async def resolve_leg(
@@ -71,8 +69,8 @@ async def resolve_leg(
     cache = await uex_client.get_uex_cache()
     current_runs = await ledger_client.get_in_progress_runs()
 
-    matched_commodity = _confident_match(commodity, cache.commodities)
-    matched_terminal = _confident_match(terminal, cache.terminals)
+    matched_commodity = _confident_match(commodity, cache.commodities, "commodity")
+    matched_terminal = _confident_match(terminal, cache.terminals, "location")
 
     # With no commodity/terminal hint given at all, a leg's leg_type match is treated
     # as sufficient on its own — the pilot referring to "the cargo" with no name usually
@@ -99,14 +97,29 @@ async def resolve_leg(
 
 
 async def resolve_run(ship: str | None = None) -> TradeRunOut:
-    """Resolves to a single active TradeRun — no UEX lookup involved, since ship here is
-    just matched against each run's own stored ship string, not a reference catalog. With
-    no hint, or only one active run regardless of hint, that run is the answer; with more
-    than one candidate this raises AmbiguousRunError instead of guessing."""
+    """Resolves to a single active TradeRun. The spoken ship is first resolved against the
+    vehicle catalog (aliases, mishearings: "railing" is the run on the Railen), then
+    compared with each run's stored ship name; if it doesn't resolve, a loose match on
+    the stored string is the fallback. With no hint, or only one active run regardless of
+    hint, that run is the answer; with more than one candidate this raises
+    AmbiguousRunError instead of guessing."""
     current_runs = await ledger_client.get_in_progress_runs()
 
     if ship:
-        matches = [run for run in current_runs if run.ship and fuzz.partial_ratio(ship.lower(), run.ship.lower()) >= 60]
+        cache = await uex_client.get_uex_cache()
+        vehicle, _ = resolve_or_hedge(ship, cache.vehicles, "ship", scorer=fuzz.token_sort_ratio)
+        matches = []
+        if vehicle is not None:
+            for run in current_runs:
+                if run.ship and run.ship.casefold() in (vehicle.name.casefold(), vehicle.name_full.casefold()):
+                    matches.append(run)
+        # Also the fallback when the catalog name matches no run: a run logged before UEX
+        # renamed its ship (the Constellations gained "Mk IV" in 2026-10) still says
+        # "Constellation Taurus".
+        if not matches:
+            for run in current_runs:
+                if run.ship and fuzz.partial_ratio(ship.lower(), run.ship.lower()) >= 60:
+                    matches.append(run)
     else:
         matches = current_runs
 

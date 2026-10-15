@@ -305,6 +305,14 @@ def transcribe(audio: np.ndarray, initial_prompt: str | None = None) -> tuple[st
     return text, whisper_ms
 
 
+def prompt_token_count(text: str) -> int:
+    """How many tokens the loaded Whisper model's own tokenizer makes of `text`, for
+    fitting the vocabulary hint to faster-whisper's prompt limit (voice/ship_hint.py)."""
+    if _model is None:
+        raise RuntimeError("Whisper model not loaded — call load_whisper() at startup")
+    return len(_model.hf_tokenizer.encode(text, add_special_tokens=False).ids)
+
+
 def listen_once(hotkey: str | None = None, initial_prompt: str | None = None) -> tuple[str, float]:
     """
     Full PTT cycle: wait for key → record → transcribe → return (text, whisper_ms).
