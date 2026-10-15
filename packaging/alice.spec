@@ -46,7 +46,14 @@ NOTICES_FILE = third_party_notices.write_notices(os.path.join(workpath, "THIRD_P
 # faster-whisper ships its voice-activity model (Silero VAD, ONNX) as package data.
 datas += collect_data_files("faster_whisper")
 
-binaries = collect_dynamic_libs("ctranslate2")
+# CTranslate2's DLLs, minus NVIDIA cuDNN: ALICE runs Whisper on the CPU
+# (voice_input.py, device="cpu"), and ctranslate2.dll only loads cuDNN at runtime for
+# CUDA, so it isn't needed — and leaving it out drops NVIDIA's license from the notices.
+binaries = []
+for source, destination in collect_dynamic_libs("ctranslate2"):
+    if os.path.basename(source).lower().startswith("cudnn"):
+        continue
+    binaries.append((source, destination))
 # SDL2 for joystick/HOTAS buttons (app/hotas.py): pysdl2 finds the DLLs inside the
 # sdl2dll package's own folder, so they go there in the bundle too.
 binaries += collect_dynamic_libs("sdl2dll")
@@ -72,10 +79,15 @@ a = Analysis(
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
+    # Stands in for PyAV, excluded below (see the hook's docstring).
+    runtime_hooks=[os.path.join(SPECPATH, "rthook_no_av.py")],
     # Never needed by ALICE, but pulled in whenever a build machine's venv still has
     # them installed: openai-whisper (replaced by faster-whisper) brings PyTorch and
     # numba/llvmlite, ~530 MB of the first trial build.
-    excludes=["tkinter", "torch", "whisper", "numba", "llvmlite", "tensorboard"],
+    # PyAV ("av") is only imported by faster-whisper to decode audio files, which ALICE
+    # never does; its FFmpeg build bundles GPL codecs (x264, x265) we don't want to ship.
+    # Excluding it also keeps hook-av from collecting av.libs.
+    excludes=["tkinter", "torch", "whisper", "numba", "llvmlite", "tensorboard", "av"],
     noarchive=False,
 )
 pyz = PYZ(a.pure)

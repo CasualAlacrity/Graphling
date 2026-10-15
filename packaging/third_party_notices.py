@@ -15,7 +15,7 @@ What goes in:
 3. For packages whose wheels carry no license file, the text kept in notices/packages/
    (fetched from the project's repository). A package with neither stops the build, so a
    new dependency can't ship without its notice.
-4. notices/bundled-components.txt: native libraries inside those packages (Qt, FFmpeg,
+4. notices/bundled-components.txt: native libraries inside those packages (Qt,
    PortAudio, ...) that have no metadata of their own, followed by the GPL/LGPL texts.
 5. The Python runtime's own license.
 """
@@ -35,6 +35,11 @@ DEFAULT_OUTPUT = PACKAGING_DIR / "build" / "THIRD_PARTY_NOTICES.txt"
 
 # Shipped, but not reachable from requirements.txt.
 EXTRA_ROOTS = ["pyinstaller"]
+
+# Reachable from requirements.txt, but kept out of ALICE.exe by alice.spec's excludes, so
+# neither they nor their own dependencies are listed. av (PyAV, with its FFmpeg build):
+# faster-whisper requires it, ALICE never uses it (packaging/rthook_no_av.py).
+NOT_SHIPPED = {"av"}
 
 LICENSE_NAME_HINTS = ("LICENSE", "LICENCE", "COPYING", "NOTICE")
 # Files that match the hints but aren't license text: PySide6's wheels carry the *Qt
@@ -96,7 +101,7 @@ def resolve_installed(roots: list[Requirement]) -> dict[str, importlib.metadata.
     while pending:
         requirement = pending.pop()
         name = canonicalize_name(requirement.name)
-        if name in found:
+        if name in found or name in NOT_SHIPPED:
             continue
         try:
             dist = importlib.metadata.distribution(requirement.name)
