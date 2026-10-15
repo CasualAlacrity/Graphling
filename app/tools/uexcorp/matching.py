@@ -6,9 +6,9 @@ from pydantic import BaseModel
 from rapidfuzz import fuzz, process
 from rapidfuzz.utils import default_process
 
-from tools.uexcorp.aliases import canonicalize, heard_as
 from tools.uexcorp.reference_cache import TerminalType
 from tools.uplink_tool import UnresolvedName
+from vocabulary.aliases import canonicalize, heard_as
 
 _HasNameAndCode = TypeVar("_HasNameAndCode")
 
@@ -257,7 +257,7 @@ def resolve_or_hedge(
     Layers, each only reached when the previous one didn't settle it:
 
     1. Alias rewrite for known pilot slang ("connie" -> Constellation). A closed set, so
-       a lookup is correct by construction — see tools/uexcorp/aliases.py.
+       a lookup is correct by construction — see vocabulary/aliases.py.
     2. Fuzzy string match, which must land on a single best candidate. A tie is treated as
        not knowing: several names scoring identically means the query didn't contain
        whatever distinguishes them, and picking one would be inventing that detail.

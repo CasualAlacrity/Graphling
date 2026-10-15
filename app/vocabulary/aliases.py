@@ -71,6 +71,19 @@ MISHEARINGS: dict[str, dict[str, str]] = {
 }
 
 
+# The subset of mishearings that can't mean anything else anywhere in what a pilot says
+# to ALICE, so they are safe to fix in the raw transcript before the model reads it
+# (vocabulary/transcript.py). Then a general question ("how fast is my railing?") reaches
+# ALICE right too, not just a tool's name lookup.
+#
+# "raven" is deliberately NOT here: the Sabre Raven is a real ship, so only the resolver,
+# which knows whether a Sabre Raven could be meant, may turn it into Railen. Slang
+# ("connie") isn't here either: the model already understands it in conversation.
+TRANSCRIPT_CORRECTIONS: dict[str, str] = {
+    "railing": "Railen",
+}
+
+
 def heard_as(query: str, label: str) -> str | None:
     """The catalog name a known mishearing stands for, or None. Whole-string and
     case-insensitive, like canonicalize."""

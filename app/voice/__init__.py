@@ -34,8 +34,9 @@ async def run() -> None:
     # execution mid-way through graph.py's initialization, circling back on a
     # not-yet-finished module.
     from graph import graph, prewarm, uex_client
-    from tools.uexcorp.aliases import MISHEARINGS
     from tools.uexcorp.matching import cargo_capable_vehicles
+    from vocabulary.aliases import MISHEARINGS
+    from vocabulary.transcript import correct_transcript
     from voice.ship_hint import build_ship_hint
 
     print("=" * 40)
@@ -106,6 +107,15 @@ async def run() -> None:
             print("[ALICE] Nothing transcribed, listening again...")
             write_event("ignored", thread_id=thread_id, reason=heard.pop("ignored", "Whisper heard no words"), **heard)
             continue
+
+        # Known, unambiguous mishearings fixed before the model reads it (vocabulary/
+        # transcript.py). The transcript log keeps what Whisper actually heard as `text`
+        # and the fixed version as `corrected`, so new mishearings stay findable.
+        corrected = correct_transcript(text)
+        if corrected != text:
+            print(f"[Voice] Corrected: {text!r} -> {corrected!r}")
+            heard["corrected"] = corrected
+            text = corrected
 
         print(f"[ALICE] You: {text!r}")
         turn += 1
