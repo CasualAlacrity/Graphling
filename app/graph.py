@@ -145,6 +145,10 @@ _PREWARM_TARGETS = [
 
 _warmed: set[str] = set()
 
+# Providers that end up on an Ollama prefix cache: a local Ollama, or ALICE's gateway,
+# which relays to Ollama on frankencompute. Hosted providers have no such cold start.
+_PREWARM_PROVIDERS = ("ollama", "alice")
+
 
 async def prewarm() -> None:
     """Fires one throwaway call through each not-yet-warmed LLM at the exact prompt
@@ -157,8 +161,14 @@ async def prewarm() -> None:
     load_duration was already ~2ms even on that cold call, so it was never a
     model-loading cost, and Ollama's cache is keyed on the actual prompt content —
     which is why this replays the real prompts rather than sending something
-    arbitrary. Hosted providers don't have this cold-start cost, so this is a no-op
-    for them rather than spending real money on a call that buys nothing.
+    arbitrary. Runs for LLM_PROVIDER=alice too: the gateway relays to Ollama on
+    frankencompute. A pilot's first turn spent ~20s in classify on 2026-10-15, most
+    likely this cold prompt.
+    The box's cache is shared, so one pilot's warm-up also warms it for the others.
+    Hosted providers don't have this cold-start cost, so this is a no-op for them
+    rather than spending real money on a call that buys nothing. (With alice, a warm-up
+    can still land on the hosted fallback while frankencompute is down; that's three
+    small metered calls per launch, accepted for now.)
 
     Idempotent via _warmed — safe to call more than once; only targets not already
     warmed this process do real work. Adding a future model (a tool-family router,
@@ -167,7 +177,7 @@ async def prewarm() -> None:
 
     Best-effort per target: one target failing to warm shouldn't block the others or
     startup — it only means that specific call pays the cold-start cost for real."""
-    if os.getenv("LLM_PROVIDER", "ollama") != "ollama":
+    if os.getenv("LLM_PROVIDER", "ollama") not in _PREWARM_PROVIDERS:
         return
     if os.getenv("PREWARM_OLLAMA", "true").strip().lower() == "false":
         return

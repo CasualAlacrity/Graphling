@@ -37,6 +37,22 @@ async def test_prewarm_is_a_noop_for_a_non_ollama_provider(monkeypatch):
     await graph.prewarm()  # would raise via the fake above if it actually called through
 
 
+async def test_prewarm_runs_for_the_alice_gateway(monkeypatch):
+    """The gateway relays to Ollama on frankencompute, so pilots pay the same cold
+    prompt cost a local Ollama does (the likely cause of a 20s first turn, 2026-10-15)."""
+    monkeypatch.setenv("LLM_PROVIDER", "alice")
+    monkeypatch.delenv("PREWARM_OLLAMA", raising=False)
+    fake_persona = _RecordingModel()
+    fake_classifier = _RecordingModel()
+    monkeypatch.setattr(graph, "_PREWARM_TARGETS", _fake_targets(persona=fake_persona, classifier=fake_classifier))
+    monkeypatch.setattr(graph, "_warmed", set())
+
+    await graph.prewarm()
+
+    assert len(fake_persona.calls) == 1
+    assert len(fake_classifier.calls) == 1
+
+
 async def test_prewarm_is_a_noop_when_disabled(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "ollama")
     monkeypatch.setenv("PREWARM_OLLAMA", "false")
