@@ -123,6 +123,11 @@ class JoystickWatcher:
 
         # instance id -> (handle, guid, ordinal, name)
         devices: dict[int, tuple] = {}
+        # Each button's first press this session is logged, so a pilot's alice.log shows
+        # exactly which button numbers their stick sends — VKB buttons can send more
+        # than one (shift layers, virtual buttons), and a binding that never fires is
+        # otherwise invisible. Bounded: one line per button, ever.
+        seen_buttons: set[JoyBinding] = set()
         event = sdl2.SDL_Event()
         while not self._stop.is_set():
             if not sdl2.SDL_WaitEventTimeout(ctypes.byref(event), POLL_TIMEOUT_MS):
@@ -139,7 +144,11 @@ class JoystickWatcher:
                 if device is not None:
                     _, guid, ordinal, name = device
                     binding = JoyBinding(guid, ordinal, event.jbutton.button, name)
-                    self._emit(binding, event.type == sdl2.SDL_JOYBUTTONDOWN)
+                    pressed = event.type == sdl2.SDL_JOYBUTTONDOWN
+                    if pressed and binding not in seen_buttons:
+                        seen_buttons.add(binding)
+                        print(f"[HOTAS] First press: {binding.display()} ({binding.to_string()})")
+                    self._emit(binding, pressed)
         sdl2.SDL_Quit()
 
     @staticmethod

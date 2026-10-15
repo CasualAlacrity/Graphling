@@ -136,9 +136,13 @@ class Overlay:
         self._bridge.toggle_requested.connect(self._toggle)
         joy_binding = hotas.parse(self.hotkey)
         if joy_binding is not None:
+            print(f"[HOTAS] Overlay key: {joy_binding.display()} ({joy_binding.to_string()})", flush=True)
             # A stick button (hotas.py): toggle on press only, like a key.
             def _on_joy(binding, pressed):
                 if pressed and binding == joy_binding:
+                    # Logged so a pilot's alice.log can tell "the press never matched"
+                    # from "it matched, but the window didn't come up over the game".
+                    print(f"[HOTAS] {binding.display()}: toggling the overlay", flush=True)
                     self._bridge.toggle_requested.emit()
 
             hotas.watcher().add_listener(_on_joy)

@@ -237,7 +237,7 @@ def record_until_release(hotkey: str | None = None) -> np.ndarray:
 
     if _target_joy is not None:
         _ensure_joy_listener()
-        key_label = _target_joy.display()
+        key_label = f"{_target_joy.display()}, {_target_joy.to_string()}"
     else:
         _ensure_listener()
         key_label = key_str
