@@ -7,6 +7,8 @@ best_scu meant the second route was describable but not startable.
 """
 from types import SimpleNamespace
 
+import pytest
+
 from tools.route_ranking import _route_rows_for, find_best_route
 
 FIXED_TRAVEL_SECONDS = 100.0
@@ -160,16 +162,18 @@ def _budget_env(monkeypatch, cached_ids):
 
     monkeypatch.setattr("tools.route_ranking.MAX_LIVE_ROUTE_FETCHES", TEST_BUDGET)
 
-    async def _cached(terminal_id):
-        if terminal_id in cached_ids:
-            return [{"origin": terminal_id, "source": "cache"}]
-        return None
+    async def _cached(terminal_ids):
+        rows_by_origin = {}
+        for terminal_id in terminal_ids:
+            if terminal_id in cached_ids:
+                rows_by_origin[terminal_id] = [{"origin": terminal_id, "source": "cache"}]
+        return rows_by_origin
 
     async def _fetch(terminal_id):
         fetched.append(terminal_id)
         return [{"origin": terminal_id, "source": "live"}]
 
-    monkeypatch.setattr("tools.route_ranking.uex_cache_client.cached_routes_from_terminal", _cached)
+    monkeypatch.setattr("tools.route_ranking.uex_cache_client.cached_routes_from_terminals", _cached)
     monkeypatch.setattr("tools.route_ranking.uex_cache_client.fetch_routes_from_terminal", _fetch)
     return fetched
 
@@ -210,3 +214,31 @@ async def test_everything_is_searched_when_it_fits_in_the_budget(monkeypatch):
 
     assert sorted(fetched) == origins
     assert searched == 3
+
+
+async def test_a_failed_live_fetch_leaves_that_origin_out_instead_of_failing_the_search(monkeypatch):
+    """The server answers 503 once its UEX calls for the day are spent; the cached
+    origins still make a search."""
+    _budget_env(monkeypatch, cached_ids={0, 1})
+
+    async def _fetch(terminal_id):
+        raise RuntimeError("503 from the server")
+
+    monkeypatch.setattr("tools.route_ranking.uex_cache_client.fetch_routes_from_terminal", _fetch)
+
+    rows, searched = await _route_rows_for([0, 1, 2, 3])
+
+    assert searched == 2
+    assert {row["origin"] for row in rows} == {0, 1}
+
+
+async def test_when_nothing_comes_back_the_fetch_failure_is_the_answer(monkeypatch):
+    _budget_env(monkeypatch, cached_ids=set())
+
+    async def _fetch(terminal_id):
+        raise RuntimeError("503 from the server")
+
+    monkeypatch.setattr("tools.route_ranking.uex_cache_client.fetch_routes_from_terminal", _fetch)
+
+    with pytest.raises(RuntimeError):
+        await _route_rows_for([0, 1])

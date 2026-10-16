@@ -28,6 +28,14 @@ async def get_commodity_routes(commodity_id: int, user: User = Depends(get_curre
     return await uex_cache_service.get_commodity_route_rows(commodity_id)
 
 
+# A POST only because the id list can run to 161 terminals; it never calls UEX. JSON
+# object keys are strings, so the client turns them back into ids.
+@router.post("/routes-from-terminals/cached", response_model=dict[int, list[dict]])
+async def get_cached_routes_from_terminals(terminal_ids: list[int], user: User = Depends(get_current_user)):
+    return await uex_cache_service.get_cached_routes_from_terminals(terminal_ids)
+
+
+# Superseded by the batch route above; kept while 0.2.6 and older clients still ask.
 @router.get("/routes-from-terminal/{terminal_id}/cached", response_model=list[dict] | None)
 async def get_cached_routes_from_terminal(terminal_id: int, user: User = Depends(get_current_user)):
     return await uex_cache_service.get_cached_routes_from_terminal(terminal_id)

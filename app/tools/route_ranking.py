@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import math
 import os
 from typing import NamedTuple
@@ -29,6 +30,8 @@ from tools.uexcorp.trade_data import UEXTradeRoute
 # restart, not a deployment. Read at import, so a change needs the process restarted.
 load_dotenv()
 MAX_LIVE_ROUTE_FETCHES = int(os.getenv("MAX_LIVE_ROUTE_FETCHES", "8"))
+
+log = logging.getLogger(__name__)
 
 
 class RouteSearch(NamedTuple):
@@ -62,28 +65,43 @@ async def _route_rows_for(origin_terminal_ids: list[int]) -> tuple[list[dict], i
     Cached origins cost nothing, so they're all used. Whatever's left gets up to
     MAX_LIVE_ROUTE_FETCHES live calls; the remainder is skipped this time and will be
     picked up by a later search, since the ones fetched now are cached for next time.
+    With the server's hourly prefetch (server/uex_route_prefetch.py) nearly every trade
+    terminal is already cached, so the live budget is only a backstop now.
 
     No uex_client parameter — the server owns the one that matters for this (its own
     UEXCorpClient instance, uex_cache_service.py), now that this goes over HTTP instead
     of a direct Postgres session (docs/todo.md Phase 2's cache follow-up).
     """
+    cached_by_origin = await uex_cache_client.cached_routes_from_terminals(origin_terminal_ids)
+
     cached_rows: list[dict] = []
     uncached: list[int] = []
-
     for origin_id in origin_terminal_ids:
-        rows = await uex_cache_client.cached_routes_from_terminal(origin_id)
+        rows = cached_by_origin.get(origin_id)
         if rows is None:
             uncached.append(origin_id)
         else:
             cached_rows.extend(rows)
 
     to_fetch = uncached[:MAX_LIVE_ROUTE_FETCHES]
+    fetches = [uex_cache_client.fetch_routes_from_terminal(origin_id) for origin_id in to_fetch]
+    fetched = await asyncio.gather(*fetches, return_exceptions=True)
 
-    fetched = await asyncio.gather(*[uex_cache_client.fetch_routes_from_terminal(oid) for oid in to_fetch])
-    for rows in fetched:
-        cached_rows.extend(rows)
+    # A failed live fetch (most likely the server's daily UEX calls being spent, a 503)
+    # just leaves that origin out of this search. Only when nothing at all came back is
+    # the failure the answer, rather than a misleading "no routes".
+    searched = len(origin_terminal_ids) - len(uncached)
+    failures: list[BaseException] = []
+    for origin_id, result in zip(to_fetch, fetched, strict=True):
+        if isinstance(result, BaseException):
+            log.warning("live route fetch for terminal %s failed: %s", origin_id, result)
+            failures.append(result)
+            continue
+        cached_rows.extend(result)
+        searched += 1
 
-    searched = len(origin_terminal_ids) - len(uncached) + len(to_fetch)
+    if failures and not cached_rows:
+        raise failures[0]
     return cached_rows, searched
 
 

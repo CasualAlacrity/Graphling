@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
 import requests
@@ -23,6 +24,12 @@ from tools.uexcorp.reference_cache import (
 )
 
 
+class UexCallBudgetExhausted(Exception):
+    """Raised by a before_call hook (server/uex_budget.py) when today's UEX calls are
+    used up. Lives here, not in the server, so the shared cache code in price_cache.py
+    can catch it and serve stale rows instead."""
+
+
 class UEXCorpClient(BaseModel):
     """One class, two places it runs:
 
@@ -40,6 +47,10 @@ class UEXCorpClient(BaseModel):
     api_key: str = ""
     bearer_token: str = ""
     via_server: bool = False
+    # Awaited with the number of UEX requests about to be made, before every live call.
+    # The server's instance counts them against UEX's daily limit (server/uex_budget.py)
+    # and raises UexCallBudgetExhausted to refuse; None = uncounted.
+    before_call: Callable[[int], Awaitable[None]] | None = None
     _uex_cache: UexReferenceCache | None = PrivateAttr(default=None)
     _cache_lock: asyncio.Lock = PrivateAttr(default_factory=asyncio.Lock)
     # Orbit distances are static game-world data (no freshness window needed, unlike
@@ -93,6 +104,7 @@ class UEXCorpClient(BaseModel):
         outside this class now, unlike when get_uex_cache was the only caller."""
         headers = self.get_header()
 
+        await self._spend(10)
         (
             commodities_resp, star_systems_resp, orbits_resp, terminals_resp, moons_resp,
             categories_resp, vehicles_resp, refinery_yields_resp, poi_resp, commodity_status_resp,
@@ -120,13 +132,17 @@ class UEXCorpClient(BaseModel):
         poi_resp.raise_for_status()
         commodity_status_resp.raise_for_status()
 
-        item_tasks = []
+        categories = []
         for category in categories_resp.json()["data"]:
             if category:
-                task = asyncio.to_thread(
-                    get_with_retries, self.API_BASE_URL + 'items', headers, {"id_category": category["id"]}
-                )
-                item_tasks.append(task)
+                categories.append(category)
+        await self._spend(len(categories))
+        item_tasks = []
+        for category in categories:
+            task = asyncio.to_thread(
+                get_with_retries, self.API_BASE_URL + 'items', headers, {"id_category": category["id"]}
+            )
+            item_tasks.append(task)
         item_responses = await asyncio.gather(*item_tasks)
 
         items_data = []
@@ -187,6 +203,7 @@ class UEXCorpClient(BaseModel):
                 raise NotImplementedError("via the server, routes are fetched per commodity only")
             return await uex_cache_client.get_commodity_route_rows(commodity_id)
 
+        await self._spend(1)
         response = await asyncio.to_thread(
             requests.get,
             self.API_BASE_URL + 'commodities_routes',
@@ -201,6 +218,7 @@ class UEXCorpClient(BaseModel):
     async def get_commodity_prices(self, commodity_id: int) -> list[dict]:
         if self.via_server:
             return await uex_cache_client.get_commodity_price_rows(commodity_id)
+        await self._spend(1)
         response = await asyncio.to_thread(
             requests.get,
             self.API_BASE_URL + 'commodities_prices',
@@ -215,6 +233,7 @@ class UEXCorpClient(BaseModel):
     async def get_terminal_prices(self, terminal_id: int) -> list[dict]:
         if self.via_server:
             return await uex_cache_client.get_terminal_price_rows(terminal_id)
+        await self._spend(1)
         response = await asyncio.to_thread(
             requests.get,
             self.API_BASE_URL + 'commodities_prices',
@@ -229,6 +248,7 @@ class UEXCorpClient(BaseModel):
     async def get_item_prices(self, item_id: int) -> list[dict]:
         if self.via_server:
             return await uex_cache_client.get_item_price_rows(item_id)
+        await self._spend(1)
         response = await asyncio.to_thread(
             requests.get,
             self.API_BASE_URL + 'items_prices',
@@ -243,6 +263,7 @@ class UEXCorpClient(BaseModel):
     async def get_vehicle_purchase_prices(self, vehicle_id: int) -> list[dict]:
         if self.via_server:
             return await uex_cache_client.get_vehicle_purchase_price_rows(vehicle_id)
+        await self._spend(1)
         response = await asyncio.to_thread(
             requests.get,
             self.API_BASE_URL + 'vehicles_purchases_prices',
@@ -257,6 +278,7 @@ class UEXCorpClient(BaseModel):
     async def get_vehicle_rental_prices(self, vehicle_id: int) -> list[dict]:
         if self.via_server:
             return await uex_cache_client.get_vehicle_rental_price_rows(vehicle_id)
+        await self._spend(1)
         response = await asyncio.to_thread(
             requests.get,
             self.API_BASE_URL + 'vehicles_rentals_prices',
@@ -285,6 +307,7 @@ class UEXCorpClient(BaseModel):
     async def _fetch_orbit_distances(self, origin_orbit_id: int, origin_star_system_id: int) -> list[dict]:
         if self.via_server:
             return await uex_cache_client.get_orbit_distance_rows(origin_orbit_id, origin_star_system_id)
+        await self._spend(1)
         response = await asyncio.to_thread(
             requests.get,
             self.API_BASE_URL + 'orbits_distances',
@@ -297,6 +320,10 @@ class UEXCorpClient(BaseModel):
         )
         response.raise_for_status()
         return response.json()["data"]
+
+    async def _spend(self, calls: int) -> None:
+        if self.before_call is not None:
+            await self.before_call(calls)
 
     def get_header(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.bearer_token}"}

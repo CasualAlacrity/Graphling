@@ -1,8 +1,8 @@
 import enum
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
-from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Date, DateTime, Enum, Float, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -154,6 +154,18 @@ class UexReferenceCacheRecord(Base):
 
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class UexCallCount(Base):
+    """UEX requests made per UTC day, across every server process (the API and
+    server/refresh_static_caches.py alike) -- the counter server/uex_budget.py checks
+    against UEX's daily limit. In Postgres rather than memory so a restart or redeploy
+    can't reset it mid-day."""
+
+    __tablename__ = "uex_call_count"
+
+    day: Mapped[date] = mapped_column(Date, nullable=False, unique=True)
+    calls: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
 class WikiCacheKind(enum.StrEnum):

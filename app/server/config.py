@@ -40,6 +40,21 @@ class Settings(BaseSettings):
     # uncached lookups) stays client-side and never reads this.
     uexcorp_api_key: str = ""
     uexcorp_bearer_token: str = ""
+    # UEX allows 7,000 requests a day per key (told to Jeff, 2026-10-16). server/uex_budget.py
+    # counts every live call against it, per UTC day: UEX's own reset time isn't known,
+    # which the margin partly covers. Past limit - margin, nothing calls UEX and the
+    # cache serves stale rows where it has them.
+    uex_daily_call_limit: int = 7000
+    uex_call_margin: int = 200
+    # The hourly route prefetch (server/uex_route_prefetch.py) stops once fewer than this
+    # many calls are left today, so pilots' own lookups always have room. 0 = prefetch may
+    # use everything up to the margin.
+    uex_prefetch_reserve: int = 1500
+    # How often every trade terminal's routes are refreshed ahead of any search. 161
+    # terminals hourly is ~3,900 calls a day. 0 = no prefetch (searches fetch on demand,
+    # as before). Must stay below the ROUTE_BY_ORIGIN lifetime in tools/uexcorp/price_cache.py,
+    # or rows expire between runs.
+    uex_route_prefetch_interval_s: int = 3600
 
     # LLM gateway (server/llm_gateway_service.py, docs/llm-gateway.md). frankencompute is
     # the self-hosted Ollama box, reached over Tailscale -- never exposed to pilots.

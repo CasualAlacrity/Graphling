@@ -3,11 +3,12 @@ cache, bypassing their normal TTL-gated read-through. Run by hand after a Star C
 patch, where waiting for the normal 24h-TTL miss to happen on its own means pilots could
 see pre-patch ship stats, terminal data, or vehicle info for up to a day.
 
-Deliberately does NOT touch the UEX price/route cache (UexPriceCache) — that one has a
-30-minute TTL already matched to UEX's own price-data freshness window, so it self-heals
-long before a manual refresh would matter, and force-refreshing it means hundreds of
-throttled live UEX calls (one per cached commodity/terminal) for a problem that mostly
-isn't one. See docs/todo.md's Phase 2 cache section for the full reasoning.
+Deliberately does NOT touch the UEX price/route cache (UexPriceCache) — its rows live 30
+to 75 minutes, and routes by origin are already refreshed hourly by the server
+(server/uex_route_prefetch.py), so it self-heals long before a manual refresh would
+matter. Force-refreshing it would spend hundreds of UEX's 7,000 daily calls
+(server/uex_budget.py) for a problem that mostly isn't one. See docs/todo.md's Phase 2
+cache section for the full reasoning.
 
 Usage (from the server container, e.g. `docker compose exec server`):
     python -m server.refresh_static_caches

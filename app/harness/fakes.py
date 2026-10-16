@@ -37,10 +37,10 @@ def install_fakes():
     async def fake_get_reference_cache() -> UexReferenceCache:
         return world.REFERENCE_CACHE
 
-    async def fake_cached_routes_from_terminal(terminal_id: int) -> list[dict] | None:
-        if terminal_id == world.BAIJINI_POINT.id:
-            return world.LARANITE_ROUTE_ROWS
-        return None
+    async def fake_cached_routes_from_terminals(terminal_ids: list[int]) -> dict[int, list[dict]]:
+        if world.BAIJINI_POINT.id in terminal_ids:
+            return {world.BAIJINI_POINT.id: world.LARANITE_ROUTE_ROWS}
+        return {}
 
     async def fake_fetch_routes_from_terminal(terminal_id: int) -> list[dict]:
         if terminal_id == world.BAIJINI_POINT.id:
@@ -63,7 +63,7 @@ def install_fakes():
         )
         stack.enter_context(patch.object(uex_cache_client, "get_reference_cache", fake_get_reference_cache))
         stack.enter_context(
-            patch.object(uex_cache_client, "cached_routes_from_terminal", fake_cached_routes_from_terminal)
+            patch.object(uex_cache_client, "cached_routes_from_terminals", fake_cached_routes_from_terminals)
         )
         stack.enter_context(
             patch.object(uex_cache_client, "fetch_routes_from_terminal", fake_fetch_routes_from_terminal)

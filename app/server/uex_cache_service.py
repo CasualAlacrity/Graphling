@@ -7,10 +7,14 @@ and tools/uexcorp/price_cache.py functions the client used to call directly — 
 read-through-or-fetch logic didn't need to change at all, only who calls them.
 """
 from db.session import SessionLocal
+from server import uex_budget
 from server.config import settings
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.price_cache import (
     cached_routes_from_terminal as _cached_routes_from_terminal,
+)
+from tools.uexcorp.price_cache import (
+    cached_routes_from_terminals as _cached_routes_from_terminals,
 )
 from tools.uexcorp.price_cache import (
     fetch_routes_from_terminal as _fetch_routes_from_terminal,
@@ -39,7 +43,11 @@ from tools.uexcorp.price_cache import (
 from tools.uexcorp.reference_cache import UexReferenceCache
 from tools.uexcorp.reference_cache_store import load_reference_cache, store_reference_cache
 
-uex_client = UEXCorpClient(api_key=settings.uexcorp_api_key, bearer_token=settings.uexcorp_bearer_token)
+uex_client = UEXCorpClient(
+    api_key=settings.uexcorp_api_key,
+    bearer_token=settings.uexcorp_bearer_token,
+    before_call=uex_budget.spend,
+)
 
 
 async def get_reference_cache() -> UexReferenceCache:
@@ -80,6 +88,11 @@ async def get_commodity_route_rows(commodity_id: int) -> list[dict]:
 async def get_cached_routes_from_terminal(terminal_id: int) -> list[dict] | None:
     async with SessionLocal() as session:
         return await _cached_routes_from_terminal(session, terminal_id)
+
+
+async def get_cached_routes_from_terminals(terminal_ids: list[int]) -> dict[int, list[dict]]:
+    async with SessionLocal() as session:
+        return await _cached_routes_from_terminals(session, terminal_ids)
 
 
 async def fetch_routes_from_terminal(terminal_id: int) -> list[dict]:

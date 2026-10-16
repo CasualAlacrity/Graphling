@@ -10,7 +10,7 @@ import uex_cache_client
 from db.models import UexCacheKind, UexPriceCache
 from tools.uexcorp import client as client_module
 from tools.uexcorp import price_cache
-from tools.uexcorp.client import UEXCorpClient
+from tools.uexcorp.client import UexCallBudgetExhausted, UEXCorpClient
 
 
 @pytest.fixture
@@ -111,7 +111,9 @@ def _row(kind, age):
 @pytest.mark.parametrize(("kind", "age", "fresh"), [
     (UexCacheKind.COMMODITY, timedelta(minutes=20), True),
     (UexCacheKind.COMMODITY, timedelta(hours=1), False),
-    (UexCacheKind.ROUTE_BY_ORIGIN, timedelta(hours=1), False),
+    # Outlives the hourly server prefetch (server/uex_route_prefetch.py).
+    (UexCacheKind.ROUTE_BY_ORIGIN, timedelta(hours=1), True),
+    (UexCacheKind.ROUTE_BY_ORIGIN, timedelta(hours=2), False),
     (UexCacheKind.ITEM, timedelta(days=3), True),
     (UexCacheKind.VEHICLE_PURCHASE, timedelta(days=3), True),
     (UexCacheKind.VEHICLE_RENTAL, timedelta(days=8), False),
@@ -124,3 +126,90 @@ async def test_cache_lifetime_depends_on_how_often_the_data_changes(kind, age, f
 
 def test_every_cache_kind_has_a_lifetime():
     assert set(price_cache.CACHE_TTL) == set(UexCacheKind)
+
+
+async def test_the_server_side_client_reports_each_call_before_making_it(monkeypatch):
+    order = []
+
+    class _Response:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"data": []}
+
+    def fake_get(url, params=None, headers=None, timeout=None):
+        order.append("request")
+        return _Response()
+
+    async def before_call(calls):
+        order.append(("counted", calls))
+
+    monkeypatch.setattr(client_module.requests, "get", fake_get)
+
+    await UEXCorpClient(bearer_token="t", before_call=before_call).get_terminal_prices(2)
+
+    assert order == [("counted", 1), "request"]
+
+
+async def test_a_refused_call_never_reaches_uex(monkeypatch):
+    def fake_get(*args, **kwargs):
+        raise AssertionError("UEX was called past the budget")
+
+    async def refuse(calls):
+        raise UexCallBudgetExhausted("spent")
+
+    monkeypatch.setattr(client_module.requests, "get", fake_get)
+
+    with pytest.raises(UexCallBudgetExhausted):
+        await UEXCorpClient(bearer_token="t", before_call=refuse).get_terminal_prices(2)
+
+
+class _StaleSession:
+    """One cached row, two hours old: stale for any player-driven kind."""
+
+    def __init__(self, kind):
+        self._row = _row(kind, timedelta(hours=2))
+        self.stored = False
+
+    async def execute(self, stmt):
+        row = self._row
+
+        class _Result:
+            def scalar_one_or_none(self):
+                return row
+
+        return _Result()
+
+    async def commit(self):
+        self.stored = True
+
+
+class _RefusingClient:
+    async def get_terminal_prices(self, terminal_id):
+        raise UexCallBudgetExhausted("spent")
+
+    async def get_commodity_routes(self, **kwargs):
+        raise UexCallBudgetExhausted("spent")
+
+
+async def test_with_uex_calls_spent_stale_rows_beat_no_answer():
+    session = _StaleSession(UexCacheKind.TERMINAL)
+
+    rows = await price_cache.get_terminal_price_rows(_RefusingClient(), session, 1)
+
+    assert rows == [{"cached": True}]
+    assert not session.stored
+
+
+async def test_with_uex_calls_spent_a_search_origin_falls_back_to_stale_routes():
+    rows = await price_cache.fetch_routes_from_terminal(
+        _RefusingClient(), _StaleSession(UexCacheKind.ROUTE_BY_ORIGIN), 1
+    )
+
+    assert rows == [{"cached": True}]
+
+
+async def test_with_uex_calls_spent_and_nothing_cached_the_refusal_propagates():
+    with pytest.raises(UexCallBudgetExhausted):
+        await price_cache.get_terminal_price_rows(_RefusingClient(), _Session(None), 1)

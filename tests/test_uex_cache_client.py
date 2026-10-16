@@ -56,14 +56,24 @@ async def test_get_commodity_price_rows_hits_the_right_endpoint(monkeypatch):
     assert result == [{"id_commodity": 5}]
 
 
-async def test_cached_routes_from_terminal_returns_none_on_a_miss(monkeypatch):
-    # httpx.Response(200, json=None) leaves the body empty rather than writing the
-    # literal "null" — content= is what actually puts a JSON null on the wire.
-    _mock_client(monkeypatch, lambda request: httpx.Response(200, content=b"null"))
+async def test_cached_routes_from_terminals_asks_once_and_keys_rows_by_terminal_id(monkeypatch):
+    requested = []
 
-    result = await uex_cache_client.cached_routes_from_terminal(100)
+    def handler(request):
+        requested.append((request.method, str(request.url), request.content))
+        # JSON object keys are always strings on the wire.
+        return httpx.Response(200, json={"100": [{"origin": 100}]})
 
-    assert result is None
+    _mock_client(monkeypatch, handler)
+
+    result = await uex_cache_client.cached_routes_from_terminals([100, 200])
+
+    assert len(requested) == 1
+    method, url, body = requested[0]
+    assert method == "POST"
+    assert "/uex-cache/routes-from-terminals/cached" in url
+    assert body == b"[100,200]"
+    assert result == {100: [{"origin": 100}]}
 
 
 async def test_fetch_routes_from_terminal_posts_and_returns_rows(monkeypatch):

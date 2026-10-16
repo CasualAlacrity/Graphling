@@ -39,13 +39,17 @@ async def get_commodity_route_rows(commodity_id: int) -> list[dict]:
         return response.json()
 
 
-async def cached_routes_from_terminal(terminal_id: int) -> list[dict] | None:
-    """Routes out of this terminal if they're cached and fresh, else None. Never
-    triggers a live UEX fetch server-side — see fetch_routes_from_terminal for that."""
+async def cached_routes_from_terminals(terminal_ids: list[int]) -> dict[int, list[dict]]:
+    """Terminal id -> routes out of it, for every one of these that's cached and fresh;
+    a missing id is a miss. One request for the whole list, and never a live UEX fetch
+    server-side — see fetch_routes_from_terminal for that."""
     async with await authenticated_client() as client:
-        response = await client.get(f"/uex-cache/routes-from-terminal/{terminal_id}/cached")
+        response = await client.post("/uex-cache/routes-from-terminals/cached", json=terminal_ids)
         raise_for_status(response)
-        return response.json()
+        rows_by_origin = {}
+        for terminal_id, rows in response.json().items():
+            rows_by_origin[int(terminal_id)] = rows
+        return rows_by_origin
 
 
 async def fetch_routes_from_terminal(terminal_id: int) -> list[dict]:

@@ -386,6 +386,29 @@ tools don't change. Remove `UEXCORP_*` from the client `.env-template`.
 **Shared UEX rate limit: accepted (2026-10-09).** Caching keeps volume low, and Jeff has a
 direct line to UEX if limits become a problem.
 
+**The limit is 7,000 calls a day (learned 2026-10-16), and it's now spent on purpose.**
+Three pieces, all server-side:
+
+- **Daily counter (`server/uex_budget.py`).** Every live UEX call goes through
+  `UEXCorpClient.before_call`, which counts it in `uex_call_count` (one row per UTC day, in
+  Postgres so restarts don't reset it). Past `UEX_DAILY_CALL_LIMIT - UEX_CALL_MARGIN`
+  (7,000 - 200) nothing calls UEX: cached lookups serve their last rows however old, and
+  only a lookup with nothing cached at all gets a 503. The margin covers UEX resetting on
+  its own clock rather than UTC, and `get_with_retries` retrying a 5xx uncounted.
+- **Hourly route prefetch (`server/uex_route_prefetch.py`).** Every trade terminal's routes
+  (161, `matching.trade_terminals`) are refreshed each hour, ~3,900 calls a day, so
+  `best_route` searches every terminal in a region instead of what's cached plus 8 live
+  fetches. It skips terminals fetched in the last 45 minutes (a redeploy doesn't re-spend a
+  round) and stops once fewer than `UEX_PREFETCH_RESERVE` (1,500) calls are left today, so
+  pilots' own lookups keep room. `UEX_ROUTE_PREFETCH_INTERVAL_S=0` turns it off.
+- **Batch cache check.** `POST /uex-cache/routes-from-terminals/cached` answers for every
+  origin in one request; the client used to ask once per terminal (117 round trips for a
+  Stanton search, the cache check alone taking tens of seconds).
+
+Routes by origin now live 75 minutes instead of 30, to outlast one prefetch interval (see the
+table below). `MAX_LIVE_ROUTE_FETCHES` stays as the backstop for anything the prefetch
+hasn't reached.
+
 ### Cache lifetimes by how often the data actually changes
 
 UEX's own cache times come from each endpoint's `Cache-Control: max-age` header, read live on
@@ -402,7 +425,7 @@ UEX's own cache times come from each endpoint's `Cache-Control: max-age` header,
 | Item prices | none (live per call) | — | 24 h | game versions only (Jeff, 2026-10-09) | **7 d + version refresh** |
 | Vehicle purchase / rental prices | none (live per call) | — | 12 h | game versions only (Jeff, 2026-10-09) | **7 d + version refresh** |
 | Commodity prices (by commodity / by terminal) | server Postgres | 30 min | 30 min | player reports, any second | **30 min (= UEX)** |
-| Commodity routes (by commodity / by origin) | server Postgres | 30 min | 30 min | player reports | **30 min (= UEX)** |
+| Commodity routes (by commodity / by origin) | server Postgres | 30 min / **75 min, prefetched hourly** (2026-10-16) | 30 min | player reports | **30 min (= UEX)**; by origin longer, see above |
 
 **Rule of thumb (2026-10-09):** only commodity prices and routes shift regularly (player-driven
 economy). Everything else changes with game versions, so it gets 7 days plus the version refresh.
