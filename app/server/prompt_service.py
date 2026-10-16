@@ -28,7 +28,7 @@ from server.config import settings
 
 log = logging.getLogger(__name__)
 
-PROMPT_NAMES = ("alice-persona", "topic-classification", "topic-reject-voice")
+PROMPT_NAMES = ("alice-persona", "topic-classification", "topic-reject-voice", "social-reply")
 PLACEHOLDER = re.compile(r"^\{\{alice-prompt:([a-z0-9-]+)\}\}$")
 SNAPSHOT_PATH = Path(__file__).resolve().parents[2] / "prompts" / ".prompt_cache.json"
 

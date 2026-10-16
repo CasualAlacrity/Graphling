@@ -15,6 +15,7 @@ load_dotenv()
 # fallback without a client release.
 ALICE_CHAT_ROLE = "alice-chat"
 ALICE_CLASSIFY_ROLE = "alice-classify"
+ALICE_SMALL_CHAT_ROLE = "alice-chat-small"
 
 
 def _alice_llm(role: str, reasoning: bool) -> ChatOllama:
@@ -51,9 +52,9 @@ def get_chat_llm():
 
 
 def get_classification_llm():
-    """For classify_topic and the reject-voice line -- both a fast binary decision
-    and a short canned-shape line, neither needing get_chat_llm's reasoning or
-    necessarily its model size. Falls back to *_CHAT_MODEL when a dedicated
+    """For classify_topic -- a fast decision, needing neither get_chat_llm's reasoning
+    nor necessarily its model size. Only classifies: ALICE's spoken lines go through
+    get_chat_llm_small(), so this can become a pure decision model. Falls back to *_CHAT_MODEL when a dedicated
     *_CLASSIFICATION_MODEL isn't set, so an unset .env behaves like one model
     everywhere, same as before this split existed. Reasoning defaults off (the
     fast/simple case here); set OLLAMA_CLASSIFICATION_REASONING=true in .env if a
@@ -71,6 +72,32 @@ def get_classification_llm():
         return ChatOpenAI(model=model)
     elif provider == "anthropic":
         model = os.getenv("ANTHROPIC_CLASSIFICATION_MODEL") or os.getenv("ANTHROPIC_CHAT_MODEL")
+        return ChatAnthropic(model=model)
+    else:
+        raise ValueError(f"Unknown LLM_PROVIDER: {provider}")
+
+
+def get_chat_llm_small():
+    """A chat model, as small as will still sound like ALICE -- for the short spoken
+    lines that need her voice but no tools or reasoning: the off-topic decline and the
+    social reply (graph.py). Kept apart from get_classification_llm() so that one can
+    become a pure classifier (a decision model that can't write a sentence) without
+    taking these lines with it. Falls back to *_CHAT_MODEL when *_SMALL_CHAT_MODEL isn't
+    set. Reasoning defaults off: a one-line "Good morning to you." shouldn't wait on
+    thinking. OLLAMA_SMALL_CHAT_REASONING=true turns it on."""
+    provider = os.getenv("LLM_PROVIDER", "ollama")
+
+    if provider == "alice":
+        return _alice_llm(ALICE_SMALL_CHAT_ROLE, reasoning=False)
+    elif provider == "ollama":
+        model = os.getenv("OLLAMA_SMALL_CHAT_MODEL") or os.getenv("OLLAMA_CHAT_MODEL")
+        reasoning = os.getenv("OLLAMA_SMALL_CHAT_REASONING", "false").strip().lower() == "true"
+        return ChatOllama(model=model, reasoning=reasoning)
+    elif provider == "openai":
+        model = os.getenv("OPENAI_SMALL_CHAT_MODEL") or os.getenv("OPENAI_CHAT_MODEL")
+        return ChatOpenAI(model=model)
+    elif provider == "anthropic":
+        model = os.getenv("ANTHROPIC_SMALL_CHAT_MODEL") or os.getenv("ANTHROPIC_CHAT_MODEL")
         return ChatAnthropic(model=model)
     else:
         raise ValueError(f"Unknown LLM_PROVIDER: {provider}")

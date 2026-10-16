@@ -101,6 +101,16 @@ def test_classify_role_has_thinking_off():
     assert gateway.roles()["alice-classify"].think is False
 
 
+def test_small_chat_role_is_the_chat_model_without_thinking_until_one_is_picked(monkeypatch):
+    monkeypatch.setattr(settings, "heket_small_chat_model", "")
+    role = gateway.roles()["alice-chat-small"]
+    assert role.heket_model == settings.heket_chat_model
+    assert role.think is False
+
+    monkeypatch.setattr(settings, "heket_small_chat_model", "gemma4:e4b")
+    assert gateway.roles()["alice-chat-small"].heket_model == "gemma4:e4b"
+
+
 # ---- Ollama -> OpenAI translation ----
 
 def test_openai_request_keeps_tool_call_pairing():

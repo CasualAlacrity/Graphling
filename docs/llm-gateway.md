@@ -78,7 +78,7 @@ CLAUDE.md says. The server only relays model calls; it doesn't run the graph.
 | # | Decision | Recommendation | Why |
 |---|---|---|---|
 | 1 | Wire format | **Ollama-native** `/llm/api/chat` (changed 2026-10-09, was OpenAI-compatible) | Ollama's OpenAI-compatible endpoint silently drops gemma4's thinking: `reasoning_effort: high` produced 0 reasoning tokens in 0.08 s, while native `think: true` produced ~570 characters. The evals showed reasoning helps the default model. So the client keeps `ChatOllama` exactly as evaluated, pointed at `<ALICE_API_URL>/llm`, and the heket path is a pure pass-through. Only the OpenAI fallback translates (Ollama ⇄ OpenAI chat-completions). |
-| 2 | Who picks the model | **The server.** The client sends a *role* (`alice-chat`, `alice-classify`), never a real model name | Lets you swap models, flip reasoning, or change fallback without shipping a client update to 10 people. Also stops a client from asking for an expensive model. |
+| 2 | Who picks the model | **The server.** The client sends a *role* (`alice-chat`, `alice-classify`, `alice-chat-small`), never a real model name | Lets you swap models, flip reasoning, or change fallback without shipping a client update to 10 people. Also stops a client from asking for an expensive model. |
 | 3 | Fallback provider for v1 | **OpenAI only.** Anthropic is v2 | OpenAI is the same format, so fallback is about 10 lines. Anthropic needs request/response translation, and the existing `cache_control` breakpoints (`anthropic_cache_mode`) wouldn't survive an OpenAI-format hop. |
 | 4 | Box ↔ Hetzner link | **Tailscale on exactly two machines** (Hetzner + heket) | See below. Users never touch it; it's machine-to-machine infra you set up once. |
 | 5 | Streaming | **Pass-through stream from heket; fallback replies in one chunk** | `ChatOllama` always streams internally, so the gateway relays the box's NDJSON. Fallback decisions happen before any byte is sent (connect error / timeout / 5xx on the request), so retrying elsewhere stays clean. A mid-stream failure is recorded as an error, not retried. |
@@ -118,6 +118,11 @@ ROLES = {
                        Backend("openai", settings.fallback_chat_model)],
     "alice-classify": [Backend("heket", "gemma4", reasoning=False),
                        Backend("openai", settings.fallback_classify_model)],
+    # Added 2026-10-16: ALICE's short spoken lines (off-topic decline, social reply).
+    # A chat model, not the classifier, so alice-classify can become a pure decision
+    # model. HEKET_SMALL_CHAT_MODEL picks it; empty = the chat model, thinking off.
+    "alice-chat-small": [Backend("heket", "gemma4", reasoning=False),
+                         Backend("openai", settings.fallback_small_chat_model)],
 }
 ```
 

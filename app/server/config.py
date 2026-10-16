@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     heket_classify_model: str = Field(
         "gemma4", validation_alias=AliasChoices("heket_classify_model", "frankencompute_classify_model"),
     )
+    # The alice-chat-small role: short spoken lines (off-topic decline, social reply).
+    # Empty = heket_chat_model, with thinking off.
+    heket_small_chat_model: str = ""
     # The digest the role table was evaluated at. Empty = don't check. When set, a box
     # reporting a different digest for the model is treated as down (falls back) rather
     # than silently serving an unevaluated build.
@@ -90,6 +93,8 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     fallback_chat_model: str = ""
     fallback_classify_model: str = ""
+    # Empty = fallback_chat_model, else the provider's default.
+    fallback_small_chat_model: str = ""
 
     # TTS gateway (server/tts_service.py). Kokoro on heket over Tailscale
     # (heket/kokoro_server.py), e.g. http://100.x.y.z:8880. bf_isabella was

@@ -63,6 +63,27 @@ playtests and cuts a promo video alongside this list.
    > "No, just routes to Pyro." → "The best alternative in Pyro from Orison is to
    > <station>. It is <n> aUEC less than the route I've recommended."
 
+**Blocker for the next installer: classify_topic must tell pure social talk from a
+request (found 2026-10-16).** The social path (graph.py: `TopicClassification.social` →
+`social_reply`) answers greetings, "how are you", thanks and farewells with a short line
+from the `social-reply` prompt. But the classifier marks a greeting *with a request in it*
+as social, and the request is then silently dropped. Local gemma4, draft classifier
+prompt, two runs each, both runs wrong: "Hey ALICE, landed.", "Hey ALICE, bought 640 at
+14.2", "Morning ALICE, what's good to haul?", "Hey ALICE, cheapest Laranite?", "Cheers,
+loaded.", "Evening, I'm at Baijini." ("Thanks. Start the run." wrong once.) Several of
+those were in the prompt as counter-examples. A word-list guard fixed it but was removed
+(Jeff, 2026-10-16) as a patch over the classifier; fix the classification itself.
+   - Likely cause: a single yes/no about the whole message, reasoning off, so "Hey ALICE"
+     wins before the rest is weighed; plus a general chat model doing a classifier's job.
+   - Try first: a field before `social` that extracts "anything the pilot asks for or
+     reports, empty if nothing"; `social` only when it's empty. Extraction is easier than
+     a whole-message judgement and costs a few tokens, not a reasoning pass.
+   - Then, if needed: a dedicated decision model (`project-decision-model-classify-topic`
+     memory, Nimble/Tev1); reasoning on for classify is a last resort (seconds on every turn).
+   - Done = the phrases above routed correctly across several runs, on heket's pinned build
+     through the gateway, not just the Mac's local gemma4; add them to the response matrix.
+   Until then, don't ship a client with the social path.
+
 Other items below still stand, after these. The ordered phases that follow are the
 2026-09 direction, kept for the detail.
 

@@ -114,6 +114,14 @@ def roles() -> dict[str, Role]:
         "alice-classify": Role(
             settings.heket_classify_model, False, settings.fallback_classify_model or default_fallback,
         ),
+        # Short spoken lines in ALICE's voice (graph.py's decline and social reply): a chat
+        # model, not the classifier, so the classifier can be swapped for a pure decision
+        # model. The chat model with thinking off until a smaller one is picked.
+        "alice-chat-small": Role(
+            settings.heket_small_chat_model or settings.heket_chat_model,
+            False,
+            settings.fallback_small_chat_model or settings.fallback_chat_model or default_fallback,
+        ),
     }
 
 
@@ -502,7 +510,8 @@ async def probe_once() -> None:
 
     if settings.heket_model_digest:
         # The pin applies to the chat model, the one the evals measured. A different
-        # classify model would need its own pin (not needed while both are gemma4).
+        # classify or small-chat model would need its own pin (not needed while all three
+        # are gemma4).
         wanted = settings.heket_chat_model
         wanted_tag = wanted if ":" in wanted else f"{wanted}:latest"
         digest = ""

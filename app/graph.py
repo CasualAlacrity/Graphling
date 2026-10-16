@@ -1,6 +1,6 @@
 import asyncio
 import os
-from typing import Annotated, Literal
+from typing import Annotated
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
@@ -11,9 +11,14 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from pydantic import BaseModel, Field
 
 from db.models import LegType
-from llm import anthropic_cache_control, anthropic_cache_mode, get_chat_llm, get_classification_llm
+from llm import (
+    anthropic_cache_control,
+    anthropic_cache_mode,
+    get_chat_llm,
+    get_chat_llm_small,
+    get_classification_llm,
+)
 from prompt_loader import prompt_messages
-from social_lines import is_only_social_talk, social_line
 from tools.best_route_tool import BestRouteTool
 from tools.starcitizenwiki.client import StarCitizenWikiClient
 from tools.trade_run import resolver
@@ -41,9 +46,9 @@ class State(BaseModel):
     messages: Annotated[list[BaseMessage], add_messages]
     on_topic: bool = True
     reason: str | None = None
-    # classify_topic's TopicClassification.social for this turn: pure social talk gets a
-    # line from social_lines.py instead of respond or the off-topic decline.
-    social: str | None = None
+    # classify_topic's TopicClassification.social for this turn: pure social talk gets
+    # social_reply instead of respond or the off-topic decline.
+    social: bool = False
     # Set by respond() whenever a readback-producing tool (mark_cargo_acquired,
     # mark_cargo_sold -- stated numbers are always read back, docs/intent/voice-latency.md)
     # just ran, so the pilot's next utterance (a correction like "no, 614") skips
@@ -63,23 +68,19 @@ class State(BaseModel):
     last_touched_leg_id: int | None = None
 
 
-SocialKind = Literal["none", "greeting", "how_are_you", "thanks", "farewell"]
-
-
 class TopicClassification(BaseModel):
     on_topic: bool
     reason: str
     # Described here as well as in the Hub prompt, so the structured-output schema
-    # carries the rule even before the prompt mentions it. Required, with an explicit
-    # "none": as an optional field the model simply never filled it in (live check,
-    # 2026-10-16, against the gateway's gemma4).
-    social: SocialKind = Field(
+    # carries the rule even before the prompt mentions it. Required: as an optional field
+    # the model simply never filled it in (live check, 2026-10-16, gateway gemma4).
+    social: bool = Field(
         description=(
-            "'none' unless the WHOLE message is social talk addressed to ALICE, with no "
-            "request in it: 'greeting' (good morning, hey ALICE), 'how_are_you' (how are you, "
-            "hope you're doing well; use this when a greeting includes it), 'thanks' (thanks, "
-            "appreciate it), 'farewell' (bye, signing off, fly safe). A greeting plus a request "
-            "('Morning ALICE, what's good to haul?') is 'none'. Social talk is never off-topic."
+            "Set to true only when the WHOLE message is social talk addressed to ALICE, with "
+            "nothing asked or reported: a greeting, asking how she is, thanks, or a farewell. If "
+            "the message has anything else in it as well, it is not social talk: set this to false "
+            "('Morning ALICE, what's good to haul?', 'Hey ALICE, landed.'). Social talk is never "
+            "off-topic."
         ),
     )
 
@@ -95,6 +96,7 @@ load_dotenv()
 PERSONA_MESSAGES = prompt_messages("alice-persona")
 CLASSIFY_MESSAGES = prompt_messages("topic-classification")
 REJECT_MESSAGES = prompt_messages("topic-reject-voice")
+SOCIAL_MESSAGES = prompt_messages("social-reply")
 
 uex_client = UEXCorpClient(via_server=True)  # no UEX key on the client; lookups go through the server cache
 scw_client = StarCitizenWikiClient()
@@ -135,12 +137,13 @@ general_tools = [timer_tool, check_timer_tool, travel_time_tool, best_route_tool
 
 tools = uex_backed_tools + trade_run_tools + general_tools
 
-# get_chat_llm() (respond) and get_classification_llm() (classify_topic + reject) are
-# separately configured in .env (OLLAMA_CHAT_MODEL/OLLAMA_REASONING vs
-# OLLAMA_CLASSIFICATION_MODEL) -- see llm.py. respond is where the missed-tool-call
+# get_chat_llm() (respond), get_classification_llm() (classify_topic) and
+# get_chat_llm_small() (the decline and social lines) are separately configured in .env
+# (OLLAMA_CHAT_MODEL/OLLAMA_REASONING, OLLAMA_CLASSIFICATION_MODEL,
+# OLLAMA_SMALL_CHAT_MODEL) -- see llm.py. respond is where the missed-tool-call
 # failures showed up and where reasoning has measurably helped (evals/agent_eval/
-# results/); classify_topic and the reject line are a fast binary decision and a
-# short in-character line, neither needing reasoning or necessarily respond's model.
+# results/); classify_topic is a fast decision and the decline/social lines are short
+# in-character lines, none needing reasoning or necessarily respond's model.
 # Anthropic prompt caching (llm.anthropic_cache_mode) -- "off" for every other provider.
 # "full"'s rolling breakpoint rides on langchain-anthropic's cache_control kwarg, which
 # marks the last eligible block of each request; the fixed one is _persona_messages().
@@ -150,7 +153,10 @@ llm = get_chat_llm().bind_tools(tools)
 if CACHE_MODE == "full":
     llm = llm.bind(cache_control=anthropic_cache_control())
 classifier_llm = get_classification_llm().with_structured_output(TopicClassification)
-reject_llm = get_classification_llm().with_structured_output(RejectLine)
+# The decline and social reply are ALICE talking, not classifying: a small chat model,
+# so get_classification_llm() can become a pure classifier without breaking them.
+reject_llm = get_chat_llm_small().with_structured_output(RejectLine)
+social_llm = get_chat_llm_small()
 
 # name -> (llm instance, its static system-prompt messages). Only a content-invariant
 # system prompt is worth prewarming at all: Ollama's cache is keyed on exact prompt
@@ -161,6 +167,7 @@ _PREWARM_TARGETS = [
     ("persona", llm, PERSONA_MESSAGES),
     ("classifier", classifier_llm, CLASSIFY_MESSAGES),
     ("reject", reject_llm, REJECT_MESSAGES),
+    ("social", social_llm, SOCIAL_MESSAGES),
 ]
 
 _warmed: set[str] = set()
@@ -386,27 +393,35 @@ async def classify_topic(state: State) -> dict:
     # it sees is a previous turn's -- all stubbed, none needed to judge topic.
     history = _windowed_history(state.messages, CLASSIFY_HISTORY_TURNS, 1)
     response = await classifier_llm.ainvoke(messages + history)
+    social = response.social
     # Social talk is never off-topic, whatever on_topic says: _alice_just_asked reads
     # on_topic as "the last turn wasn't a decline".
-    social = None if response.social == "none" else response.social
-    # Anything said beyond social talk is a request ("Hey ALICE, landed.", "Thanks, now
-    # where do I sell this?"): answering it with a social line would swallow it, the worst
-    # way for this to fail. See social_lines.SOCIAL_WORDS.
-    if social in ("greeting", "thanks", "farewell") and not is_only_social_talk(_text_of(state.messages[-1])):
-        social = None
-    on_topic = response.on_topic or social is not None
+    on_topic = response.on_topic or social
     return {"on_topic": on_topic, "reason": response.reason, "social": social}
 
 
+# A greeting that takes longer than this gets SOCIAL_FALLBACK_LINE instead: it's meant to
+# feel instant, and a slow heket shouldn't leave "Good morning." hanging.
+SOCIAL_REPLY_TIMEOUT_S = 4.0
+SOCIAL_FALLBACK_LINE = "Copy."
+
+
 async def social_reply(state: State) -> dict:
-    """A greeting, "how are you", thanks or farewell: one line from social_lines.py, no
-    model call."""
-    last_line = None
-    for message in reversed(state.messages[:-1]):
-        if isinstance(message, AIMessage):
-            last_line = _text_of(message)
-            break
-    return {"messages": [AIMessage(social_line(state.social, last_line))]}
+    """A greeting, "how are you", thanks or farewell: one short line written by the model
+    from the social-reply prompt, whose multishot examples are Jeff's own lines. Like
+    decline_topic, the pilot's words go in a separate message so the prompt stays static
+    for prewarming."""
+    context = HumanMessage(content=f"Pilot said: {_text_of(state.messages[-1])}")
+    try:
+        response = await asyncio.wait_for(
+            social_llm.ainvoke(SOCIAL_MESSAGES + [context]), timeout=SOCIAL_REPLY_TIMEOUT_S,
+        )
+        line = _text_of(response).strip().strip('"')
+    except Exception:
+        line = ""
+    if not line:
+        line = SOCIAL_FALLBACK_LINE
+    return {"messages": [AIMessage(line)]}
 
 
 async def decline_topic(state: State) -> dict:
@@ -425,7 +440,7 @@ async def decline_topic(state: State) -> dict:
 
 
 def route_topic(state: State) -> str:
-    if state.social is not None:
+    if state.social:
         return "social"
     return "respond" if state.on_topic else "decline"
 
