@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
 from tools.uexcorp.args import LocationArgs
+from tools.uexcorp.location_phrase import LOCATION_GUIDANCE
 from tools.uexcorp.trade_tool import TradePriceTool
 
 
@@ -25,7 +26,7 @@ class VehiclePurchaseTool(TradePriceTool):
         "terminal, for when the user wants alternatives or a specific location instead of the "
         "single best option. Ships have no in-game resale market, so best_to_sell is always null "
         "for this tool — don't mention it."
-    )
+    ) + LOCATION_GUIDANCE
     args_schema: type[BaseModel] = VehiclePurchaseArgs
     progress_label: str = "UEX to check vehicle purchase prices"
 

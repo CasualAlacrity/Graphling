@@ -5,11 +5,13 @@ from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
 from tools.uexcorp.args import LocationArgs
+from tools.uexcorp.location_phrase import LOCATION_GUIDANCE, location_phrase, terminals_by_id
 from tools.uexcorp.matching import filter_by_location, resolve_or_hedge
 from tools.uplink_tool import UEXBackedTool
 
 
 class VehicleRentalData(BaseModel):
+    terminal_id: int | None = Field(default=None, validation_alias="id_terminal")
     terminal_name: str
     star_system_name: str | None
     orbit_name: str | None
@@ -34,7 +36,7 @@ class VehicleRentalTool(UEXBackedTool):
         "it directly for 'cheapest'/'best price' questions rather than scanning all_results "
         "yourself. all_results lists every matching terminal, for when the user wants alternatives "
         "or a specific location instead of the single best option."
-    )
+    ) + LOCATION_GUIDANCE
     args_schema: type[BaseModel] = VehicleRentalArgs
     progress_label: str = "UEX to check vehicle rental price"
 
@@ -59,8 +61,17 @@ class VehicleRentalTool(UEXBackedTool):
         )
 
         cheapest_rental = min(rows, key=attrgetter("price_per_day"), default=None)
+        terminals = terminals_by_id(cache.terminals)
 
+        def row_dict(row: VehicleRentalData) -> dict[str, Any]:
+            data = row.model_dump(exclude_none=True)
+            data["location"] = location_phrase(terminals.get(row.terminal_id), row.terminal_name)
+            return data
+
+        all_results = []
+        for row in rows:
+            all_results.append(row_dict(row))
         return {
-            "cheapest_rental": cheapest_rental.model_dump(exclude_none=True) if cheapest_rental else None,
-            "all_results": [r.model_dump(exclude_none=True) for r in rows],
+            "cheapest_rental": row_dict(cheapest_rental) if cheapest_rental else None,
+            "all_results": all_results,
         }

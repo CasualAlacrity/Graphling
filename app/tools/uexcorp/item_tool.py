@@ -3,6 +3,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from tools.uexcorp.args import LocationArgs
+from tools.uexcorp.location_phrase import LOCATION_GUIDANCE
 from tools.uexcorp.trade_tool import TradePriceTool
 
 
@@ -25,7 +26,7 @@ class ItemPriceTool(TradePriceTool):
         "manually comparing many rows is error-prone. all_results lists every matching terminal, "
         "for when the user wants alternatives or a specific location instead of the single best "
         "option."
-    )
+    ) + LOCATION_GUIDANCE
     args_schema: type[BaseModel] = ItemArgs
     progress_label: str = "UEX to check item price"
 

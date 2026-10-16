@@ -3,6 +3,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from tools.uexcorp.args import LocationArgs
+from tools.uexcorp.location_phrase import LOCATION_GUIDANCE
 from tools.uexcorp.trade_tool import TradePriceTool
 
 
@@ -32,7 +33,7 @@ class CommodityPriceTool(TradePriceTool):
         "instead of the single best option. A broad query with no system/orbit/terminal may return "
         "many rows in all_results — reuse this same result for a follow-up narrowing question "
         "(e.g. 'what about in a specific system') instead of calling this tool again."
-    )
+    ) + LOCATION_GUIDANCE
     args_schema: type[BaseModel] = CommodityPriceArgs
     progress_label: str = "UEX to check commodity price"
 
