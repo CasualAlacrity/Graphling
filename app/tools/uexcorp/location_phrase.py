@@ -7,6 +7,9 @@ so the same station never comes out three different ways (agreed with Jeff 2026-
     gateway station              "Pyro Gateway, in Stanton"
     free-floating station        "People's Service Station Alpha, in Nyx"
 
+Shops (item, vehicle and rental terminals) lead with the shop, since a city or station
+has many: "New Deal at Lorville, on Hurston", "Platinum Bay at Port Olisar, over Crusader".
+
 "near" is deliberately never used: it read as either "orbiting" or "somewhere around",
 and Lagrange points are millions of km from the planet they're named after.
 
@@ -16,7 +19,7 @@ model as `location`, and their descriptions tell it to say that phrase as given.
 """
 import re
 
-from tools.uexcorp.reference_cache import CachedTerminal
+from tools.uexcorp.reference_cache import CachedTerminal, TerminalType
 
 # What the price tools leave out of each row they hand the model: anything it could build
 # its own place description from. Instructions alone didn't stop it (2026-10-16 matrix run:
@@ -77,21 +80,44 @@ def _station_phrase(terminal: CachedTerminal) -> str:
     return name
 
 
+def _shop_name(terminal: CachedTerminal) -> str | None:
+    """The shop in a shop terminal's name: "New Deal - Teasa Spaceport - Lorville" ->
+    "New Deal". Commodity terminals are trade desks ("Admin", "TDD"), not shops."""
+    if terminal.type == TerminalType.COMMODITY:
+        return None
+    shop, separator, _rest = terminal.name.partition(" - ")
+    if not separator:
+        return None
+    return shop.strip()
+
+
 def location_phrase(terminal: CachedTerminal | None, fallback_name: str) -> str:
     """The spoken name-and-place for a terminal. `fallback_name` (the price row's own
     terminal name) is used as-is when the terminal isn't in the reference cache."""
     if terminal is None:
         return fallback_name
 
+    shop = _shop_name(terminal)
+    place = _place_phrase(terminal, shop is not None)
+    if place is None:
+        return terminal.displayname or fallback_name
+    if shop is not None:
+        return f"{shop} at {place}"
+    return place
+
+
+def _place_phrase(terminal: CachedTerminal, is_shop: bool) -> str | None:
     if terminal.space_station_name:
         return _station_phrase(terminal)
 
     if terminal.city_name or terminal.outpost_name:
-        # Cities by nickname: Area 18 alone has three trade terminals with different
-        # prices ("TDD Area 18", "Area 18 IO Tower", "Dumper's Area 18"), and the pilot has
-        # to land at the right one.
-        if terminal.city_name:
+        # Trade desks in a city by nickname: Area 18 alone has three with different prices
+        # ("TDD Area 18", "Area 18 IO Tower", "Dumper's Area 18"), and the pilot has to land
+        # at the right one. A shop's own name already tells them apart, so it gets the city.
+        if terminal.city_name and not is_shop:
             name = terminal.nickname or terminal.city_name
+        elif terminal.city_name:
+            name = terminal.city_name
         else:
             name = terminal.outpost_name
         body = _surface_body(terminal)
@@ -99,7 +125,7 @@ def location_phrase(terminal: CachedTerminal | None, fallback_name: str) -> str:
             return f"{name}, on {body}"
         return name
 
-    return terminal.displayname or fallback_name
+    return None
 
 
 def terminals_by_id(terminals: list[CachedTerminal]) -> dict[int, CachedTerminal]:

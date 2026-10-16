@@ -7,9 +7,9 @@ from tools.uexcorp.reference_cache import CachedTerminal, TerminalType
 
 
 def _terminal(name, *, system="Stanton", orbit=None, moon=None, planet=None, nickname=None,
-              station=None, outpost=None, city=None, displayname=None):
+              station=None, outpost=None, city=None, displayname=None, kind=TerminalType.COMMODITY):
     return CachedTerminal(
-        id=1, name=name, type=TerminalType.COMMODITY, star_system_name=system, orbit_name=orbit,
+        id=1, name=name, type=kind, star_system_name=system, orbit_name=orbit,
         moon_name=moon, planet_name=planet, displayname=displayname or name, nickname=nickname,
         space_station_name=station, outpost_name=outpost, city_name=city, is_auto_load=0, is_nqa=0,
     )
@@ -45,6 +45,22 @@ def _terminal(name, *, system="Stanton", orbit=None, moon=None, planet=None, nic
                station="People's Service Station Alpha"), "People's Service Station Alpha, in Nyx"),
 ])
 def test_each_kind_of_place_gets_its_own_preposition(terminal, expected):
+    assert location_phrase(terminal, terminal.name) == expected
+
+
+@pytest.mark.parametrize(("terminal", "expected"), [
+    (_terminal("New Deal - Teasa Spaceport - Lorville", orbit="Hurston", planet="Hurston", city="Lorville",
+               nickname="New Deal Lorville", kind=TerminalType.VEHICLE_BUY), "New Deal at Lorville, on Hurston"),
+    (_terminal("Platinum Bay - Port Olisar", orbit="Crusader", planet="Crusader", station="Port Olisar",
+               kind=TerminalType.ITEM), "Platinum Bay at Port Olisar, over Crusader"),
+    (_terminal("Vantage Rentals - ARC-L1", orbit="ArcCorp Lagrange Point 1", planet="ArcCorp",
+               station="ARC-L1 Wide Forest Station", kind=TerminalType.VEHICLE_RENT),
+     "Vantage Rentals at ARC-L1, at ArcCorp's L1"),
+    # No " - " in the name: no shop to name, just the place.
+    (_terminal("Frostbite", orbit="MicroTech", planet="MicroTech", outpost="Frostbite", kind=TerminalType.ITEM),
+     "Frostbite, on MicroTech"),
+])
+def test_shops_lead_with_the_shop(terminal, expected):
     assert location_phrase(terminal, terminal.name) == expected
 
 
