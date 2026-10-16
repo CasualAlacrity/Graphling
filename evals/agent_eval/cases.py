@@ -53,7 +53,9 @@ CASES: list[HarnessCase] = [
         id="commodity_price_cheapest",
         phrasings=[
             "What's the cheapest place to buy Laranite?",
-            "Where can I get Laranite for less?",
+            "Where can I get Laranite cheap?",
+            "Where can I get some cheap Laranite?",
+            "What's the best place to get Laranite?",
             "I need to buy some Laranite, where's it cheap?",
         ],
         expected_tool="commodity_price_lookup",
@@ -68,7 +70,9 @@ CASES: list[HarnessCase] = [
         id="commodity_price_cheapest_skips_out_of_stock",
         phrasings=[
             "What's the cheapest place to buy Agricium?",
-            "Where can I get Agricium for less?",
+            "Where can I get Agricium cheap?",
+            "Where can I get some cheap Agricium?",
+            "What's the best place to get Agricium?",
             "I need to buy some Agricium, where's it cheap?",
         ],
         expected_tool="commodity_price_lookup",
