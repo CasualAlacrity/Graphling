@@ -4,6 +4,7 @@ through to heket vs fall back). Outbound HTTP goes through httpx.MockTransport
 via the service's _http_client seam -- no real box, no real OpenAI -- and record_usage
 is swapped for a list, so nothing touches Postgres.
 """
+import asyncio
 import json
 import uuid
 from types import SimpleNamespace
@@ -34,6 +35,7 @@ CHAT_PAYLOAD = {
 @pytest.fixture(autouse=True)
 def fresh_state(monkeypatch):
     monkeypatch.setattr(gateway, "state", gateway.HeketState())
+    monkeypatch.setattr(gateway, "_warmup_task", None)
     # The OpenAI-path tests below mock httpx; the Anthropic path has its own tests at the
     # bottom with a fake SDK client. No test may pick up a real key from .env.
     monkeypatch.setattr(settings, "fallback_provider", "openai")
@@ -308,6 +310,116 @@ async def test_probe_marks_the_pinned_digest_as_up(monkeypatch):
 
     assert gateway.state.down_reason is None
     assert gateway.state.down_until == 0.0
+
+
+class ColdHeket:
+    """A faked Ollama that comes back from a restart with nothing loaded. Loading gemma4
+    takes as long as the test says: the warm-up's /api/chat hangs until release()."""
+
+    def __init__(self):
+        self.loaded = False
+        self.load_finished = None  # an asyncio.Event, made inside the test's loop
+        self.warmups = []
+        self.pilot_chats = 0
+
+    def release(self):
+        self.load_finished.set()
+
+    async def handler(self, request):
+        if self.load_finished is None:
+            self.load_finished = asyncio.Event()
+        if request.url.host == "api.openai.com":
+            return httpx.Response(200, json={"choices": [{"message": {"content": "fallback"}}], "usage": {}})
+        if request.url.path == "/api/tags":
+            return httpx.Response(200, json={"models": [{"name": "gemma4:latest", "digest": "dc35e8d9c606bbbb"}]})
+        if request.url.path == "/api/ps":
+            running = [{"name": "gemma4:latest", "model": "gemma4:latest"}] if self.loaded else []
+            return httpx.Response(200, json={"models": running})
+        body = json.loads(request.content)
+        if body["messages"] == [{"role": "user", "content": "ping"}]:
+            self.warmups.append(body)
+            await self.load_finished.wait()
+            self.loaded = True
+            return httpx.Response(200, json={"done": True})
+        self.pilot_chats += 1
+        return httpx.Response(200, text=ndjson({"message": {"content": "heket"}, "done": True}))
+
+
+async def test_a_cold_heket_is_warmed_by_the_server_while_pilots_fall_back(monkeypatch, usage_rows):
+    monkeypatch.setattr(settings, "heket_chat_model", "gemma4")
+    monkeypatch.setattr(settings, "heket_classify_model", "gemma4")
+    heket = ColdHeket()
+    route_http(monkeypatch, heket.handler)
+
+    await gateway.probe_once()
+
+    # Benched, with one warm-up per distinct model (both roles share gemma4), and it
+    # doesn't send keep_alive -- the box's OLLAMA_KEEP_ALIVE decides.
+    assert gateway.state.down_reason == "warming"
+    await asyncio.sleep(0)
+    assert len(heket.warmups) == 1
+    assert heket.warmups[0]["model"] == "gemma4:latest"
+    assert "keep_alive" not in heket.warmups[0]
+
+    # While the model loads, a pilot is answered at once by the fallback, never sent
+    # to heket to wait out (and then cancel) the load.
+    chunks = await asyncio.wait_for(collect(await gateway.open_chat(CHAT_PAYLOAD, USER_ID)), timeout=1.0)
+    assert chunks[0]["alice_backend"] == "openai"
+    assert usage_rows[0]["fallback_reason"] == "warming"
+    assert heket.pilot_chats == 0
+
+    # A probe round during the load leaves the one warm-up running.
+    await gateway.probe_once()
+    await asyncio.sleep(0)
+    assert len(heket.warmups) == 1
+    assert gateway.state.down_reason == "warming"
+
+    heket.release()
+    await gateway._warmup_task
+    await gateway.probe_once()
+
+    assert gateway.state.down_reason is None
+    chunks = await collect(await gateway.open_chat(CHAT_PAYLOAD, USER_ID))
+    assert chunks[0]["alice_backend"] == "heket"
+    assert heket.pilot_chats == 1
+
+
+async def test_probe_warms_a_cold_role_model_that_differs_from_the_chat_model(monkeypatch):
+    monkeypatch.setattr(settings, "heket_chat_model", "gemma4")
+    monkeypatch.setattr(settings, "heket_classify_model", "tev1:2b")
+    warmed = []
+
+    def handler(request):
+        if request.url.path == "/api/ps":
+            return httpx.Response(200, json={"models": [{"name": "gemma4:latest", "model": "gemma4:latest"}]})
+        if request.url.path == "/api/chat":
+            warmed.append(json.loads(request.content)["model"])
+            return httpx.Response(200, json={"done": True})
+        return httpx.Response(200, json={"models": []})
+
+    route_http(monkeypatch, handler)
+
+    await gateway.probe_once()
+    await gateway._warmup_task
+
+    assert gateway.state.down_reason == "warming"
+    assert warmed == ["tev1:2b"]
+
+
+async def test_probe_trusts_tags_when_ps_cant_be_read(monkeypatch):
+    gateway.state.mark_down("down", until=float("inf"))
+
+    def handler(request):
+        if request.url.path == "/api/ps":
+            return httpx.Response(404, text="not found")
+        return httpx.Response(200, json={"models": []})
+
+    route_http(monkeypatch, handler)
+
+    await gateway.probe_once()
+
+    assert gateway.state.down_reason is None
+    assert gateway._warmup_task is None
 
 
 # ---- HTTP route ----
