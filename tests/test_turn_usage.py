@@ -188,7 +188,7 @@ async def test_gateway_calls_are_priced_by_the_backend_that_answered():
     # LLM_PROVIDER=alice: LangChain only knows the role ("alice-chat" on "ollama"); the
     # gateway's final chunk says what really answered.
     callback = TurnMetricsCallback()
-    for backend, model in [("frankencompute", "gemma4"), ("openai", "gpt-4o-mini")]:
+    for backend, model in [("heket", "gemma4"), ("openai", "gpt-4o-mini")]:
         run_id = uuid.uuid4()
         await callback.on_chat_model_start({}, [], run_id=run_id, metadata=_metadata("respond", "ollama", "alice-chat"))
         await callback.on_llm_end(
@@ -200,3 +200,16 @@ async def test_gateway_calls_are_priced_by_the_backend_that_answered():
     assert (fallback.provider, fallback.model) == ("openai", "gpt-4o-mini")
     assert fallback.cost_usd == pytest.approx((1000 * 0.15 + 10 * 0.60) / 1_000_000)
     assert callback.usage.unpriced_calls == 0
+
+
+async def test_a_pre_rename_server_tag_still_prices_as_local():
+    # Servers before 2026-10-16 tagged local calls with heket's old nickname.
+    callback = TurnMetricsCallback()
+    run_id = uuid.uuid4()
+    await callback.on_chat_model_start({}, [], run_id=run_id, metadata=_metadata("respond", "ollama", "alice-chat"))
+    await callback.on_llm_end(
+        _gateway_result({"input_tokens": 1000, "output_tokens": 10}, "frankencompute", "gemma4"), run_id=run_id,
+    )
+
+    (local,) = callback.usage.calls
+    assert (local.provider, local.model) == ("ollama", "gemma4")

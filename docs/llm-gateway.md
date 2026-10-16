@@ -1,8 +1,12 @@
 # LLM gateway — self-hosted models behind the ledger server
 
-**Status:** LLM gateway built 2026-10-09 and deployed. TTS gateway (Kokoro on frankencompute) built and deployed 2026-10-12. UEX calls moved server-side, runaway limits and client re-login built 2026-10-12 (not yet deployed). Usage analytics: docs/analytics.md.
+**Status:** LLM gateway built 2026-10-09 and deployed. TTS gateway (Kokoro on heket) built and deployed 2026-10-12. UEX calls moved server-side, runaway limits and client re-login built 2026-10-12 (not yet deployed). Usage analytics: docs/analytics.md.
 **Measured costs and choices** (power, local model shoot-out, local TTS = Kokoro `bf_isabella`,
-3 parallel slots): [frankencompute-bench.md](frankencompute-bench.md).
+3 parallel slots): [heket-bench.md](heket-bench.md).
+**Naming:** heket is the compute node's hostname. Until 2026-10-16 it was called
+"frankencompute": the server's settings were `FRANKENCOMPUTE_*` (still read as fallbacks
+for one release, `server/config.py`), and usage rows said `backend='frankencompute'`
+(rewritten to `'heket'` by migration `371e7493e3fa`).
 **Goal:** the client ships as a whole product. 10 new pilots using ALICE within 2 weeks (by
 ~2026-10-23), with nobody added by hand. Discord login is the only onboarding step.
 
@@ -34,7 +38,7 @@ because beta status is never stored.
 - Discord is the identity provider only. Nothing else (tiers, features, names) reads the role.
 
 **Growth model:** grow users slowly and watch cost per active user across every paid or
-self-hosted service: frankencompute (electricity, already estimated in `turn_metrics`), hosted LLM
+self-hosted service: heket (electricity, already estimated in `turn_metrics`), hosted LLM
 fallback, ElevenLabs, and Jev if `classify_topic` moves to it. **ElevenLabs is the expected
 bottleneck.** The point of metering is to find *how many active users* it takes before it hurts,
 not to cap it early. So every server-side metered row records `user_id` + units + cost, and a
@@ -44,7 +48,7 @@ single query answers "cost per active user per day, by service".
 
 Today every pilot's ALICE calls an LLM directly from their own machine (`get_chat_llm()` in
 `app/llm.py`). That means each pilot either runs Ollama locally or holds a hosted API key. Neither
-works for paying users. **frankencompute** (Threadripper 1900X, 64 GB, RTX 4080 16 GB, Ubuntu
+works for paying users. **heket** (Threadripper 1900X, 64 GB, RTX 4080 16 GB, Ubuntu
 Server, built 2026-10-08) can serve gemma4 at about **2.7–3.4 s median per turn**, versus 15.3 s on the
 Mac (eval runs `evals/agent_eval/results/ollama-gemma4__20261009-09*.json` vs `…20261006-092416.json`).
 Caveat: those aren't the same weights. The box pulled a fresh `gemma4:latest` (dc35e8d9c606,
@@ -62,7 +66,7 @@ ALICE client ── HTTPS + JWT ──▶ api.heyalice.help (Hetzner, nginx → 
                                    │  auth · rate limit · usage log · routing
                     ┌──────────────┴───────────────┐
                     ▼ primary                       ▼ fallback
-          frankencompute Ollama               OpenAI (gpt-4o-mini)
+          heket Ollama               OpenAI (gpt-4o-mini)
           (private link, never public)        (key lives only on the server)
 ```
 
@@ -73,21 +77,21 @@ CLAUDE.md says. The server only relays model calls; it doesn't run the graph.
 
 | # | Decision | Recommendation | Why |
 |---|---|---|---|
-| 1 | Wire format | **Ollama-native** `/llm/api/chat` (changed 2026-10-09, was OpenAI-compatible) | Ollama's OpenAI-compatible endpoint silently drops gemma4's thinking: `reasoning_effort: high` produced 0 reasoning tokens in 0.08 s, while native `think: true` produced ~570 characters. The evals showed reasoning helps the default model. So the client keeps `ChatOllama` exactly as evaluated, pointed at `<ALICE_API_URL>/llm`, and the frankencompute path is a pure pass-through. Only the OpenAI fallback translates (Ollama ⇄ OpenAI chat-completions). |
+| 1 | Wire format | **Ollama-native** `/llm/api/chat` (changed 2026-10-09, was OpenAI-compatible) | Ollama's OpenAI-compatible endpoint silently drops gemma4's thinking: `reasoning_effort: high` produced 0 reasoning tokens in 0.08 s, while native `think: true` produced ~570 characters. The evals showed reasoning helps the default model. So the client keeps `ChatOllama` exactly as evaluated, pointed at `<ALICE_API_URL>/llm`, and the heket path is a pure pass-through. Only the OpenAI fallback translates (Ollama ⇄ OpenAI chat-completions). |
 | 2 | Who picks the model | **The server.** The client sends a *role* (`alice-chat`, `alice-classify`), never a real model name | Lets you swap models, flip reasoning, or change fallback without shipping a client update to 10 people. Also stops a client from asking for an expensive model. |
 | 3 | Fallback provider for v1 | **OpenAI only.** Anthropic is v2 | OpenAI is the same format, so fallback is about 10 lines. Anthropic needs request/response translation, and the existing `cache_control` breakpoints (`anthropic_cache_mode`) wouldn't survive an OpenAI-format hop. |
-| 4 | Box ↔ Hetzner link | **Tailscale on exactly two machines** (Hetzner + frankencompute) | See below. Users never touch it; it's machine-to-machine infra you set up once. |
-| 5 | Streaming | **Pass-through stream from frankencompute; fallback replies in one chunk** | `ChatOllama` always streams internally, so the gateway relays the box's NDJSON. Fallback decisions happen before any byte is sent (connect error / timeout / 5xx on the request), so retrying elsewhere stays clean. A mid-stream failure is recorded as an error, not retried. |
+| 4 | Box ↔ Hetzner link | **Tailscale on exactly two machines** (Hetzner + heket) | See below. Users never touch it; it's machine-to-machine infra you set up once. |
+| 5 | Streaming | **Pass-through stream from heket; fallback replies in one chunk** | `ChatOllama` always streams internally, so the gateway relays the box's NDJSON. Fallback decisions happen before any byte is sent (connect error / timeout / 5xx on the request), so retrying elsewhere stays clean. A mid-stream failure is recorded as an error, not retried. |
 | 6 | Reasoning flag | **Server-side, per role** (chat: on, classify: off) | Matches today's `OLLAMA_REASONING` / `OLLAMA_CLASSIFICATION_REASONING` defaults, moved to where the model choice now lives. |
 
 ### Why Tailscale here after all
 
-The earlier idea was a reverse SSH tunnel from frankencompute to Hetzner. The catch is that the
+The earlier idea was a reverse SSH tunnel from heket to Hetzner. The catch is that the
 server runs in Docker. A reverse tunnel binds to the Hetzner host's loopback, which the container
 can't reach without `GatewayPorts` plus `host-gateway` plumbing. With Tailscale on both hosts, the
-container reaches frankencompute's Tailscale IP through the host's normal routing. The objection to
+container reaches heket's Tailscale IP through the host's normal routing. The objection to
 Tailscale was having to add each *user* to it, and that doesn't apply: it's two machines you own,
-added once. Tailscale ACLs can limit it further, to Hetzner → frankencompute:11434 only.
+added once. Tailscale ACLs can limit it further, to Hetzner → heket:11434 only.
 
 ## Server
 
@@ -102,7 +106,7 @@ replaces `model` and `think` per role, drops `keep_alive`, and keeps only harmle
 `num_ctx=131072` or `keep_alive=0` and evict the model for everyone.
 
 Response: Ollama NDJSON. The final (`done: true`) chunk gets **`alice_backend:
-frankencompute|openai`** and the real `model`. `ChatOllama` copies that chunk into
+heket|openai`** and the real `model`. `ChatOllama` copies that chunk into
 `generation_info`, and `turn_metrics._answered_by` uses it to price each call by what
 actually answered.
 
@@ -110,9 +114,9 @@ actually answered.
 
 ```python
 ROLES = {
-    "alice-chat":     [Backend("frankencompute", "gemma4", reasoning=True),
+    "alice-chat":     [Backend("heket", "gemma4", reasoning=True),
                        Backend("openai", settings.fallback_chat_model)],
-    "alice-classify": [Backend("frankencompute", "gemma4", reasoning=False),
+    "alice-classify": [Backend("heket", "gemma4", reasoning=False),
                        Backend("openai", settings.fallback_classify_model)],
 }
 ```
@@ -121,8 +125,8 @@ ROLES = {
 different builds across three eval runs (Mac old 9.6 GB, Mac new nvfp4 safetensors, box GGUF
 Q4_K_M), and they scored 39/45, 29/45 and 36/45 on the same cases. The new Mac build printed raw
 tool-call text instead of making calls. So the role table names a model *and* the digest it was
-evaluated at (`gemma4@dc35e8d9c606` on frankencompute today), and the gateway's startup health
-check refuses to route to frankencompute if `/api/tags` reports a different digest. Never
+evaluated at (`gemma4@dc35e8d9c606` on heket today), and the gateway's startup health
+check refuses to route to heket if `/api/tags` reports a different digest. Never
 `ollama pull` on the box without re-running the eval first.
 
 Tried in order. Note: gemma4 decides per call whether to think even with `think: true`
@@ -131,18 +135,18 @@ thinking in this response" isn't a gateway bug.
 
 ### Fallback rules
 
-Fall back to the next backend **only when frankencompute can't answer**, never because the answer
+Fall back to the next backend **only when heket can't answer**, never because the answer
 looks bad:
 
 - connect error / connection refused / DNS failure;
 - connect timeout (**2 s**) or total timeout (**30 s**, since eval p90 is 5.1 s and max 15.4 s);
 - HTTP 5xx from Ollama;
-- **overflow**: frankencompute already has `MAX_INFLIGHT` requests running (see Capacity).
+- **overflow**: heket already has `MAX_INFLIGHT` requests running (see Capacity).
 
 A 4xx from a backend (bad request) is returned to the client as-is, not retried. Retrying would
 just double the cost of a bug.
 
-**Circuit breaker:** after a connect failure, mark frankencompute *down* for 30 s and send
+**Circuit breaker:** after a connect failure, mark heket *down* for 30 s and send
 everything straight to fallback. That way every turn doesn't pay the 2 s timeout while the box is
 off. A background task probes `GET /api/version` every 15 s and marks it *up* again. In-memory
 state is fine: one server process, the same assumption `_PENDING_LOGINS` already makes.
@@ -178,7 +182,7 @@ These are runaway guards, not rationing. Every threshold sits well above a real 
 - **Global daily fallback budget:** `FALLBACK_DAILY_USD_CAP`, default $5, summed from today's
   hosted `llm_usage.cost_usd`. Read from the table, so a restart can't reset it; fails open if
   the database can't answer.
-  - **Past the cap, an *overflow* queues on frankencompute instead of paying.** The box is busy,
+  - **Past the cap, an *overflow* queues on heket instead of paying.** The box is busy,
     not broken.
   - **Past the cap, an *outage* gets `503`** ("try again shortly") instead of open-ended billing.
   - **What $5 buys:** about 10–25k Haiku 5.5 fallback calls, roughly $0.0002–0.0005 each.
@@ -195,7 +199,7 @@ These are runaway guards, not rationing. Every threshold sits well above a real 
 
 ### Config (new `Settings` fields + `docker-compose.prod.yml` env)
 
-`frankencompute_url` (e.g. `http://100.x.y.z:11434`), `openai_api_key`,
+`heket_url` (e.g. `http://100.x.y.z:11434`), `openai_api_key`,
 `fallback_chat_model` (`gpt-4o-mini`), `fallback_classify_model` (`gpt-4o-mini`),
 `llm_max_inflight` (2), `fallback_daily_usd_cap` (5.0).
 
@@ -204,7 +208,7 @@ These are runaway guards, not rationing. Every threshold sits well above a real 
 The gateway owns ALICE's prompts; pilots never receive them. Through the gateway
 (`LLM_PROVIDER=alice`) the client sends a placeholder system message,
 `{{alice-prompt:<name>}}` (`prompt_loader.prompt_messages`), and `routes/llm.py` expands it
-(`server/prompt_service.py`) before routing, so frankencompute and both fallbacks see the
+(`server/prompt_service.py`) before routing, so heket and both fallbacks see the
 real text. The installer no longer bundles `prompts/.prompt_cache.json`. Development
 against Ollama/OpenAI/Anthropic directly still loads the text client-side, as before.
 
@@ -222,20 +226,20 @@ committed snapshot), commit, redeploy.
 placeholders — an older server would hand the model the literal placeholder text.
 Clients from before the change still send full prompts and keep working.
 
-## frankencompute
+## heket
 
 Already done 2026-10-09: `OLLAMA_KEEP_ALIVE=-1`, `OLLAMA_CONTEXT_LENGTH=32768` (systemd override),
 GPU moved to the x16 slot (PCI_E1).
 
 Still to do:
 
-1. Install Tailscale on frankencompute and the Hetzner host. Add an ACL so only Hetzner can reach
-   frankencompute:11434.
+1. Install Tailscale on heket and the Hetzner host. Add an ACL so only Hetzner can reach
+   heket:11434.
 2. Make Ollama listen beyond loopback: `OLLAMA_HOST=0.0.0.0:11434` in the override. Firewall it
    to the tailnet only: `ufw allow in on tailscale0 to any port 11434`, with the default deny
    for everything else. (Binding straight to the Tailscale IP breaks if Ollama starts before
    tailscaled does.)
-3. From **inside the server container** on Hetzner, `curl http://<franken-tailscale-ip>:11434/api/version`.
+3. From **inside the server container** on Hetzner, `curl http://<heket-tailscale-ip>:11434/api/version`.
    This proves the Docker → host → tailnet path before any gateway code depends on it.
 4. Capacity: set `OLLAMA_NUM_PARALLEL=2`. Each parallel slot gets its own 32k KV cache, so confirm
    `ollama ps` still shows 100% GPU. If it doesn't, drop the context length before dropping
@@ -265,11 +269,11 @@ instead of making a pilot wait in a queue. Revisit when `llm_usage` shows `overf
 4. `PREWARM_OLLAMA` is already a no-op for any provider but `ollama`, and so is
    `anthropic_cache_mode()`.
 5. **`turn_metrics`:** done. `_answered_by` reads `alice_backend` and the model name, so
-   fallback calls are priced at OpenAI rates and frankencompute calls on electricity.
+   fallback calls are priced at OpenAI rates and heket calls on electricity.
 
 ## Verification results (2026-10-09)
 
-Same 3 cases × 5 samples throughout, gemma4 `dc35e8d9c606` on frankencompute:
+Same 3 cases × 5 samples throughout, gemma4 `dc35e8d9c606` on heket:
 
 | Path | Passed | Tool / args / location / price | Claims supported | Median turn |
 |---|---|---|---|---|
@@ -277,7 +281,7 @@ Same 3 cases × 5 samples throughout, gemma4 `dc35e8d9c606` on frankencompute:
 | Through local gateway (`alice-gateway__20261009-121904`) | 39/45 | 45/45 each | 39/45 | 3.05 s |
 
 The gateway adds ~0.3 s and changes no behavior (the 36 vs 39 is noise). 137 `llm_usage` rows,
-all frankencompute, 0 errors.
+all heket, 0 errors.
 
 **Fallback (box pointed at a dead port):** routing works. Calls answer via gpt-4o-mini tagged
 `openai`, with `fallback_reason=down`. But the eval **died on call 4: OpenAI 429, "Limit 5
@@ -290,7 +294,7 @@ Then re-run this check to get the fallback model's actual scores.
 
 The OpenAI fallback is unusable on this account (429 at 5 requests/minute), so the default
 fallback is now **Anthropic** (`server/anthropic_fallback.py`, official SDK, prompt caching on
-the tools+persona prefix). Same 3 cases × 5 samples, frankencompute forced down:
+the tools+persona prefix). Same 3 cases × 5 samples, heket forced down:
 
 | Fallback | Tool / args | Claims supported | Median turn | Cost per call (`llm_usage`) |
 |---|---|---|---|---|
@@ -313,13 +317,13 @@ something a new user can't supply:
 **Decided 2026-10-09: every third-party key moves to Hetzner.** After this, a shipped client
 holds only `ALICE_API_URL` and the pilot's JWT.
 
-### TTS proxy (Kokoro on frankencompute, ElevenLabs optional) — built 2026-10-12
+### TTS proxy (Kokoro on heket, ElevenLabs optional) — built 2026-10-12
 
-Changed from the ElevenLabs-only plan after the 2026-10-12 bench (docs/frankencompute-bench.md):
-Kokoro `bf_isabella` on frankencompute won by ear, especially on numbers, and costs only electricity.
+Changed from the ElevenLabs-only plan after the 2026-10-12 bench (docs/heket-bench.md):
+Kokoro `bf_isabella` on heket won by ear, especially on numbers, and costs only electricity.
 
-- **frankencompute:** `frankencompute/kokoro_server.py`, run by the `kokoro-tts` systemd service
-  (`frankencompute/kokoro-tts.service`).
+- **heket:** `heket/kokoro_server.py`, run by the `kokoro-tts` systemd service
+  (`heket/kokoro-tts.service`).
   - `POST /tts {"text", "voice"}` returns a whole 24 kHz WAV, with `X-Audio-Seconds`.
   - A typical reply takes ~0.1 s, so nothing streams yet.
   - It listens on :8880; ufw allows that port on `tailscale0` only, the same as Ollama.
@@ -345,9 +349,9 @@ Kokoro `bf_isabella` on frankencompute won by ear, especially on numbers, and co
   - `tts_first_chunk_ms` still measures time to first byte, now including the Hetzner hop.
 - **Not needed yet:** `proxy_buffering off` in nginx. Responses are whole files, so there's no
   stream to protect. Add it if Kokoro ever streams sentence by sentence.
-- **A Kokoro fallback off frankencompute** (same voice when the box is down) was considered.
+- **A Kokoro fallback off heket** (same voice when the box is down) was considered.
   - The Hetzner web host is 2 shared vCPUs that also serve the other apps, too small to do it well.
-  - frankencompute's own CPU manages only ~3× real time and dies with the box anyway.
+  - heket's own CPU manages only ~3× real time and dies with the box anyway.
   - If outages make the voice switch annoying, rent a small dedicated CPU box for it.
 - STT stays local (Whisper `base` on the pilot's machine, `voice/voice_input.py`). It needs no
   key, adds no server load, and keeps raw audio off the server.
@@ -479,17 +483,17 @@ still right; the comment isn't.
 Packaging the client so a non-developer can install it is out of scope here, but it's the other
 big gate on "10 users" and needs its own plan.
 
-Privacy: pilots' conversations will now pass through your server and frankencompute. Say so in
+Privacy: pilots' conversations will now pass through your server and heket. Say so in
 plain words at onboarding. Log usage metadata, never message content, unless a pilot opts in to
 debug logging.
 
 ## Verification (definition of done)
 
 1. **Same behavior through the gateway:** `evals/agent_eval/run.py` with `LLM_PROVIDER=alice`
-   against a local server pointed at frankencompute. Pass rate within noise of the direct-Ollama
+   against a local server pointed at heket. Pass rate within noise of the direct-Ollama
    run, and median latency ≤ direct + ~300 ms.
-2. **Fallback model is acceptable:** the same eval with frankencompute forced down
-   (`frankencompute_url` pointed at a dead port). This is the first eval of gpt-4o-mini on the
+2. **Fallback model is acceptable:** the same eval with heket forced down
+   (`heket_url` pointed at a dead port). This is the first eval of gpt-4o-mini on the
    current case set. If it's clearly worse, choose a better fallback model before launch, not
    after.
 3. **Pull the plug live:** stop Ollama mid-session, take a turn (should succeed via fallback
@@ -503,7 +507,7 @@ debug logging.
 
 | Days | Work |
 |---|---|
-| 1–2 | Tailscale + Ollama binding + container curl (frankencompute steps 1–3). Gateway endpoint with frankencompute only, auth, usage table. |
+| 1–2 | Tailscale + Ollama binding + container curl (heket steps 1–3). Gateway endpoint with heket only, auth, usage table. |
 | 3–4 | Fallback + circuit breaker + limits. Client `alice` provider + token timing + metrics. |
 | 5 | Verification 1–5. Deploy to Hetzner. |
 | 6–7 | TTS streaming proxy + nginx `proxy_buffering off`. Four missing UEX routes, `UEXCorpClient` repointed, `UEXCORP_*` gone from the client. |

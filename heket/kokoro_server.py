@@ -1,10 +1,10 @@
-"""ALICE's voice on frankencompute: Kokoro TTS behind a tiny HTTP API.
+"""ALICE's voice on heket: Kokoro TTS behind a tiny HTTP API.
 
 Runs on the box itself (not in this repo's Python env) under ~/tts/kokoro-env, as the
-kokoro-tts systemd service (frankencompute/kokoro-tts.service). Only the Hetzner server
+kokoro-tts systemd service (heket/kokoro-tts.service). Only the Hetzner server
 calls it, over Tailscale -- pilots reach it through the server's /tts route
 (server/tts_service.py), never directly. Setup and the reasons for each choice are in
-docs/frankencompute-bench.md (TTS) and docs/llm-gateway.md (TTS proxy).
+docs/heket-bench.md (TTS) and docs/llm-gateway.md (TTS proxy).
 
     POST /tts     {"text": "...", "voice": "bf_isabella"}  ->  audio/wav (16-bit, 24 kHz)
                   X-Audio-Seconds: length of the clip

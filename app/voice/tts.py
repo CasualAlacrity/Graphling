@@ -7,7 +7,7 @@ from elevenlabs import AsyncElevenLabs
 from auth.session_auth import PilotSessionAuth
 
 # TTS_PROVIDER=alice: speech comes from ALICE's own server (server/routes/tts.py), which
-# runs Kokoro on frankencompute and holds any ElevenLabs key -- the shipped product.
+# runs Kokoro on heket and holds any ElevenLabs key -- the shipped product.
 # elevenlabs (default): straight to ElevenLabs with this machine's own key, as before.
 TTS_PROVIDER = os.getenv("TTS_PROVIDER", "elevenlabs").strip().lower()
 # Kokoro answers a typical reply in ~0.1 s; the server's own ElevenLabs fallback can

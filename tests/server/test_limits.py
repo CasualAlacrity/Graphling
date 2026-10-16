@@ -62,7 +62,7 @@ def test_llm_route_returns_429_with_retry_after_over_the_limit(monkeypatch, clie
 def test_tts_route_stops_at_the_daily_character_guard(monkeypatch, client):
     async def fake_speak(text, user_id):
         from server.tts_service import Speech
-        return Speech(audio=b"RIFF", media_type="audio/wav", backend="frankencompute")
+        return Speech(audio=b"RIFF", media_type="audio/wav", backend="heket")
 
     monkeypatch.setattr(tts_route.tts_service, "speak", fake_speak)
     monkeypatch.setattr(tts_route, "rate_limiter", RateLimiter(max_events=100, window_s=60))

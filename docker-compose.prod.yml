@@ -35,18 +35,20 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       UEXCORP_API_KEY: ${UEXCORP_API_KEY}
       UEXCORP_BEARER_TOKEN: ${UEXCORP_BEARER_TOKEN}
-      # LLM gateway (docs/llm-gateway.md). frankencompute over Tailscale, e.g.
+      # LLM gateway (docs/llm-gateway.md). heket over Tailscale, e.g.
       # http://100.x.y.z:11434; the digest pins the evaluated model build.
-      FRANKENCOMPUTE_URL: ${FRANKENCOMPUTE_URL}
-      FRANKENCOMPUTE_MODEL_DIGEST: ${FRANKENCOMPUTE_MODEL_DIGEST}
-      # Fallback when frankencompute can't answer (server/config.py fallback_provider,
+      # The FRANKENCOMPUTE_* fallbacks are heket's pre-2026-10-16 nickname, kept so this
+      # works before /opt/graphling/.env is renamed. Drop them once it is.
+      HEKET_URL: ${HEKET_URL:-${FRANKENCOMPUTE_URL:-}}
+      HEKET_MODEL_DIGEST: ${HEKET_MODEL_DIGEST:-${FRANKENCOMPUTE_MODEL_DIGEST:-}}
+      # Fallback when heket can't answer (server/config.py fallback_provider,
       # default anthropic). Only the chosen provider's key is needed.
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
-      # TTS gateway: Kokoro on frankencompute over Tailscale, e.g. http://100.x.y.z:8880.
+      # TTS gateway: Kokoro on heket over Tailscale, e.g. http://100.x.y.z:8880.
       # ElevenLabs is the optional fallback (a different voice); leave its key empty to
-      # have ALICE stay quiet instead while frankencompute is down.
-      FRANKENCOMPUTE_TTS_URL: ${FRANKENCOMPUTE_TTS_URL}
+      # have ALICE stay quiet instead while heket is down.
+      HEKET_TTS_URL: ${HEKET_TTS_URL:-${FRANKENCOMPUTE_TTS_URL:-}}
       # ALICE's prompts (server/prompt_service.py). With a LangSmith key the server pulls
       # them from the Hub (EU tenant) and re-pulls every PROMPT_REFRESH_S; without one it
       # serves the snapshot baked into the image. PROMPT_HUB_TAG (e.g. "prod") = only the

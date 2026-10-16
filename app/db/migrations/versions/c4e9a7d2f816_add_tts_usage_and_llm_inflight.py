@@ -6,7 +6,7 @@ Create Date: 2026-10-12 00:00:00.000000
 
 tts_usage: one row per speech request through the TTS gateway (server/tts_service.py),
 the speech counterpart of llm_usage. llm_usage.inflight_at_start: how many requests were
-already running on frankencompute when each call arrived -- real concurrency for the
+already running on heket when each call arrived -- real concurrency for the
 hardware-sizing questions in docs/analytics.md. Nullable, so existing rows stay valid.
 """
 from collections.abc import Sequence

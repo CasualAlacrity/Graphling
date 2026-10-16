@@ -1,8 +1,8 @@
 """The TTS gateway (docs/llm-gateway.md, TTS section) -- every spoken ALICE reply goes
-through here, so no client holds an ElevenLabs key or reaches frankencompute directly.
+through here, so no client holds an ElevenLabs key or reaches heket directly.
 
 Per request:
-1. Kokoro on frankencompute (frankencompute/kokoro_server.py), unless it failed in the
+1. Kokoro on heket (heket/kokoro_server.py), unless it failed in the
    last DOWN_FOR_S seconds. It returns a whole WAV in ~0.1 s for a typical reply, so
    there is nothing to gain from streaming yet.
 2. On a connect error, timeout or 5xx, fall back to ElevenLabs -- only if a key is
@@ -25,13 +25,13 @@ from server.config import settings
 
 log = logging.getLogger(__name__)
 
-FRANKENCOMPUTE = "frankencompute"
+HEKET = "heket"
 ELEVENLABS = "elevenlabs"
 ELEVENLABS_TTS_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
 
 CONNECT_TIMEOUT_S = 2.0
 # Kokoro takes ~0.1 s for a typical reply on the 4080; 15 s is a hung box, not a slow one.
-FRANKENCOMPUTE_TIMEOUT_S = 15.0
+HEKET_TIMEOUT_S = 15.0
 ELEVENLABS_TIMEOUT_S = 30.0
 DOWN_FOR_S = 30.0
 
@@ -45,7 +45,7 @@ class NoBackendAvailable(RuntimeError):
     pass
 
 
-class FrankencomputeFailed(RuntimeError):
+class HeketFailed(RuntimeError):
     def __init__(self, reason: str):
         super().__init__(reason)
         self.reason = reason
@@ -80,49 +80,49 @@ async def speak(text: str, user_id: uuid.UUID) -> Speech:
         fallback_reason = state.down_reason or "down"
     if fallback_reason is None:
         try:
-            return await _speak_frankencompute(text, user_id, started)
-        except FrankencomputeFailed as failure:
+            return await _speak_heket(text, user_id, started)
+        except HeketFailed as failure:
             fallback_reason = failure.reason
             state.down_until = time.monotonic() + DOWN_FOR_S
             state.down_reason = failure.reason
-            log.warning("frankencompute TTS failed (%s); falling back", failure.reason)
+            log.warning("heket TTS failed (%s); falling back", failure.reason)
 
     if not elevenlabs_configured():
-        raise NoBackendAvailable(f"frankencompute TTS unavailable ({fallback_reason}) and no fallback is configured")
+        raise NoBackendAvailable(f"heket TTS unavailable ({fallback_reason}) and no fallback is configured")
     return await _speak_elevenlabs(text, user_id, time.monotonic(), fallback_reason)
 
 
-async def _speak_frankencompute(text: str, user_id: uuid.UUID, started: float) -> Speech:
+async def _speak_heket(text: str, user_id: uuid.UUID, started: float) -> Speech:
     try:
         async with _http_client(
-            base_url=settings.frankencompute_tts_url,
-            timeout=httpx.Timeout(FRANKENCOMPUTE_TIMEOUT_S, connect=CONNECT_TIMEOUT_S),
+            base_url=settings.heket_tts_url,
+            timeout=httpx.Timeout(HEKET_TIMEOUT_S, connect=CONNECT_TIMEOUT_S),
         ) as client:
             response = await client.post("/tts", json={"text": text, "voice": settings.tts_voice})
     except httpx.TimeoutException as exc:
-        raise FrankencomputeFailed("timeout") from exc
+        raise HeketFailed("timeout") from exc
     except httpx.TransportError as exc:
-        raise FrankencomputeFailed("down") from exc
+        raise HeketFailed("down") from exc
 
     latency_ms = (time.monotonic() - started) * 1000
     if response.status_code >= 500:
-        await _record_error(user_id, FRANKENCOMPUTE, settings.tts_voice, text, latency_ms, None)
-        raise FrankencomputeFailed("5xx")
+        await _record_error(user_id, HEKET, settings.tts_voice, text, latency_ms, None)
+        raise HeketFailed("5xx")
     if response.status_code != 200:
         # A 4xx is our request's fault (empty, too long), not the box's -- falling back
         # would only fail the same way and burn ElevenLabs characters doing it.
-        await _record_error(user_id, FRANKENCOMPUTE, settings.tts_voice, text, latency_ms, None)
-        raise NoBackendAvailable(f"frankencompute TTS rejected the request: {response.status_code}")
+        await _record_error(user_id, HEKET, settings.tts_voice, text, latency_ms, None)
+        raise NoBackendAvailable(f"heket TTS rejected the request: {response.status_code}")
 
     audio_seconds = _float_header(response, "X-Audio-Seconds")
     state.down_until = 0.0
     state.down_reason = None
     await record_usage(
-        user_id=user_id, backend=FRANKENCOMPUTE, voice=settings.tts_voice, characters=len(text),
+        user_id=user_id, backend=HEKET, voice=settings.tts_voice, characters=len(text),
         audio_seconds=audio_seconds, latency_ms=latency_ms, status="ok", fallback_reason=None,
         cost_usd=local_energy_cost_usd(latency_ms),
     )
-    return Speech(audio=response.content, media_type="audio/wav", backend=FRANKENCOMPUTE)
+    return Speech(audio=response.content, media_type="audio/wav", backend=HEKET)
 
 
 async def _speak_elevenlabs(text: str, user_id: uuid.UUID, started: float, fallback_reason: str) -> Speech:
