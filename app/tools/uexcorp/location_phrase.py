@@ -18,6 +18,13 @@ import re
 
 from tools.uexcorp.reference_cache import CachedTerminal
 
+# What the price tools leave out of each row they hand the model: anything it could build
+# its own place description from. Instructions alone didn't stop it (2026-10-16 matrix run:
+# "Admin - Endgame, at Pyro VI's L3, on Pyro IV" with the phrase sitting right there), so
+# `location` is the only place-name it gets. Filtering by system/orbit/moon happens before
+# this, on the full rows.
+RAW_LOCATION_FIELDS = {"terminal_name", "star_system_name", "orbit_name", "moon_name", "planet_name"}
+
 # Appended to every price tool's description, so the model says the phrase rather than
 # assembling its own from star_system_name/orbit_name/planet_name (which is what produced
 # "in orbit around Wala, on ArcCorp" in one answer and "on ArcCorp, in Stanton" the next).
@@ -26,7 +33,8 @@ LOCATION_GUIDANCE = (
     "'Baijini Point, over ArcCorp' or 'ArcCorp Mining Area 141, on Daymar'). When you name a "
     "terminal aloud, say its location exactly as given and continue the sentence from there: "
     "'Baijini Point, over ArcCorp, is selling Laranite for 3.15 aUEC per SCU.' Don't add the "
-    "system, orbit or planet yourself."
+    "system, orbit or planet yourself. To narrow to another system, moon or terminal, call "
+    "this tool again with that filter set."
 )
 
 # Stations whose official name nobody says. UEX's nicknames can't be used instead: they

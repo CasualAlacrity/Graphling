@@ -23,6 +23,7 @@ Turns are spaced out (--min-turn-seconds) to stay under the gateway's per-pilot 
 Usage (from the repo root, with a cached ALICE login):
     LLM_PROVIDER=alice .venv/bin/python evals/agent_eval/response_matrix.py
     LLM_PROVIDER=alice .venv/bin/python evals/agent_eval/response_matrix.py --limit 5
+    LLM_PROVIDER=alice .venv/bin/python evals/agent_eval/response_matrix.py --tools commodity_price_lookup
 """
 import argparse
 import asyncio
@@ -129,7 +130,7 @@ CSV_FIELDS = [
 ]
 
 
-def _utterances(limit: int | None) -> list[dict]:
+def _utterances(limit: int | None, tools: list[str] | None) -> list[dict]:
     rows = []
     for case in CASES:
         for phrasing in case.phrasings:
@@ -148,6 +149,14 @@ def _utterances(limit: int | None) -> list[dict]:
             "Pilot says": utterance,
             "Intended tool": tool,
         })
+    if tools:
+        wanted = []
+        for row in rows:
+            for tool in tools:
+                if tool in row["Intended tool"]:
+                    wanted.append(row)
+                    break
+        rows = wanted
     if limit is not None:
         rows = rows[:limit]
     return rows
@@ -235,13 +244,16 @@ async def main() -> int:
     global MIN_TURN_SECONDS
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--limit", type=int, default=None, help="only the first N utterances")
+    parser.add_argument("--tools", default=None,
+                        help="only rows whose intended tool is one of these, comma-separated")
     parser.add_argument("--timeout", type=float, default=240.0, help="seconds per turn before giving up")
     parser.add_argument("--min-turn-seconds", type=float, default=MIN_TURN_SECONDS,
                         help="space turns at least this far apart (gateway rate limit)")
     args = parser.parse_args()
     MIN_TURN_SECONDS = args.min_turn_seconds
 
-    rows = _utterances(args.limit)
+    tools = args.tools.split(",") if args.tools else None
+    rows = _utterances(args.limit, tools)
     RESULTS_DIR.mkdir(exist_ok=True)
     out_path = RESULTS_DIR / f"response-matrix__{datetime.now():%Y%m%d-%H%M%S}.csv"
 

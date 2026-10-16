@@ -30,9 +30,7 @@ class CommodityPriceTool(TradePriceTool):
         "(price_you_receive_when_selling). Never say a terminal is 'buying' when the pilot is the "
         "one buying. all_results lists "
         "every matching terminal, for when the user wants alternatives or a specific location "
-        "instead of the single best option. A broad query with no system/orbit/terminal may return "
-        "many rows in all_results — reuse this same result for a follow-up narrowing question "
-        "(e.g. 'what about in a specific system') instead of calling this tool again."
+        "instead of the single best option."
     ) + LOCATION_GUIDANCE
     args_schema: type[BaseModel] = CommodityPriceArgs
     progress_label: str = "UEX to check commodity price"

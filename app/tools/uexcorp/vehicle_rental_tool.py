@@ -5,7 +5,12 @@ from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
 from tools.uexcorp.args import LocationArgs
-from tools.uexcorp.location_phrase import LOCATION_GUIDANCE, location_phrase, terminals_by_id
+from tools.uexcorp.location_phrase import (
+    LOCATION_GUIDANCE,
+    RAW_LOCATION_FIELDS,
+    location_phrase,
+    terminals_by_id,
+)
 from tools.uexcorp.matching import filter_by_location, resolve_or_hedge
 from tools.uplink_tool import UEXBackedTool
 
@@ -64,7 +69,7 @@ class VehicleRentalTool(UEXBackedTool):
         terminals = terminals_by_id(cache.terminals)
 
         def row_dict(row: VehicleRentalData) -> dict[str, Any]:
-            data = row.model_dump(exclude_none=True)
+            data = row.model_dump(exclude_none=True, exclude=RAW_LOCATION_FIELDS)
             data["location"] = location_phrase(terminals.get(row.terminal_id), row.terminal_name)
             return data
 

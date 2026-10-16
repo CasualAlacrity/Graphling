@@ -4,7 +4,7 @@ from typing import Any
 
 from rapidfuzz import fuzz
 
-from tools.uexcorp.location_phrase import location_phrase, terminals_by_id
+from tools.uexcorp.location_phrase import RAW_LOCATION_FIELDS, location_phrase, terminals_by_id
 from tools.uexcorp.matching import filter_by_location, resolve_or_hedge
 from tools.uexcorp.reference_cache import UexReferenceCache
 from tools.uexcorp.trade_data import UEXTradeData
@@ -52,7 +52,7 @@ class TradePriceTool(UEXBackedTool):
         terminals = terminals_by_id(cache.terminals)
 
         def row_dict(row: UEXTradeData) -> dict[str, Any]:
-            data = row.model_dump(exclude_none=True)
+            data = row.model_dump(exclude_none=True, exclude=RAW_LOCATION_FIELDS)
             data["location"] = location_phrase(terminals.get(row.terminal_id), row.terminal_name)
             # An explicit boolean, not just a status code the model has to know how to read
             # -- it was still picking the cheapest-priced row out of all_results now and then.

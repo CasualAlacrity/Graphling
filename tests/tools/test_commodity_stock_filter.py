@@ -23,7 +23,7 @@ async def test_cheapest_to_buy_skips_an_out_of_stock_terminal():
     with install_fakes():
         result = await CommodityPriceTool(client=_client())._arun(commodity="Agricium")
 
-    assert result["cheapest_to_buy"]["terminal_name"] == world.PORT_TRESSLER.name
+    assert result["cheapest_to_buy"]["terminal_id"] == world.PORT_TRESSLER.id
     assert result["cheapest_to_buy"]["price_you_pay_to_acquire"] == 26.10
 
 
@@ -33,17 +33,19 @@ async def test_the_out_of_stock_terminal_stays_in_all_results():
     with install_fakes():
         result = await CommodityPriceTool(client=_client())._arun(commodity="Agricium")
 
-    by_name = {row["terminal_name"]: row for row in result["all_results"]}
-    assert by_name[world.BAIJINI_POINT.name]["status_buy"] == 1
-    assert by_name[world.BAIJINI_POINT.name]["in_stock"] is False
-    assert by_name[world.PORT_TRESSLER.name]["in_stock"] is True
+    by_id = {}
+    for row in result["all_results"]:
+        by_id[row["terminal_id"]] = row
+    assert by_id[world.BAIJINI_POINT.id]["status_buy"] == 1
+    assert by_id[world.BAIJINI_POINT.id]["in_stock"] is False
+    assert by_id[world.PORT_TRESSLER.id]["in_stock"] is True
 
 
 async def test_in_stock_commodity_is_unaffected():
     with install_fakes():
         result = await CommodityPriceTool(client=_client())._arun(commodity="Laranite")
 
-    assert result["cheapest_to_buy"]["terminal_name"] == world.BAIJINI_POINT.name
+    assert result["cheapest_to_buy"]["terminal_id"] == world.BAIJINI_POINT.id
 
 
 async def test_cheapest_to_buy_is_none_when_everything_is_out_of_stock(monkeypatch):
@@ -65,7 +67,7 @@ async def test_vehicle_lookup_is_not_filtered_by_status():
     with install_fakes():
         result = await VehiclePurchaseTool(client=_client())._arun(vehicle="Cutlass Black")
 
-    assert result["cheapest_to_buy"]["terminal_name"] == world.BAIJINI_POINT.name
+    assert result["cheapest_to_buy"]["terminal_id"] == world.BAIJINI_POINT.id
 
 
 async def test_vehicle_rows_get_no_in_stock_field():
@@ -73,3 +75,15 @@ async def test_vehicle_rows_get_no_in_stock_field():
         result = await VehiclePurchaseTool(client=_client())._arun(vehicle="Cutlass Black")
 
     assert all("in_stock" not in row for row in result["all_results"])
+
+
+async def test_the_model_gets_only_the_location_phrase_to_name_a_place():
+    """Anything else it could build its own place description from is left out: given the
+    raw fields, it mixed them into the phrase (2026-10-16 response matrix)."""
+    with install_fakes():
+        result = await CommodityPriceTool(client=_client())._arun(commodity="Laranite")
+
+    row = result["cheapest_to_buy"]
+    for field in ("terminal_name", "star_system_name", "orbit_name", "moon_name", "planet_name"):
+        assert field not in row
+    assert row["location"]
