@@ -1,0 +1,3 @@
+#,Source,Area,Prior turn,Pilot says,Intended tool,Tool ALICE called,Arguments,ALICE says,Words,Seconds (no speech),Notes,What ALICE should say,Jeff's notes
+1,utterance-coverage.md,Follow-up: search frame,Give me a good route from Orison.,What about Pyro?,(clarify) best_route,best_route,"{""origin"": ""Pyro"", ""origin_mode"": ""within""}",I still need to know which ship you are flying to give you a route from Pyro.,17,1.9,,,
+2,utterance-coverage.md,Follow-up: search frame,Give me a good route from Orison. >> What about Pyro?,"No, just routes to Pyro.",best_route (compare),(none),,I still need to know where you are starting from to calculate a route to Pyro.,16,2.3,,,

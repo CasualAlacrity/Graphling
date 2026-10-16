@@ -28,6 +28,40 @@ playtests and cuts a promo video alongside this list.
 6. **Response matrix, then fewer words per request.** First a table of every eval
    utterance and what ALICE answers today; Jeff marks up examples of what he expects;
    then the return-trip / ledger-inferred defaults are built against that.
+   Matrix: `evals/agent_eval/response_matrix.py` (built 2026-10-16; `--tools` re-runs a
+   subset). Price answers now name places one fixed way (`tools/uexcorp/location_phrase.py`).
+
+   **Follow-ups need a stated-vs-inferred search frame (designed with Jeff 2026-10-16).**
+   "What about Pyro?" after a route answer is ambiguous twice over:
+   - *Which part changes:* the source, the destination, or both ("routes to Pyro",
+     "routes within Pyro", "starting from Pyro" are three different searches).
+   - *Replace or compare:* a new answer, or the previous one held against an alternative.
+
+   The fix is for `best_route` (and the price tools) to return the **search frame** it
+   actually ran, every part tagged **stated** (the pilot said it) or **inferred** (a
+   default, the ledger, or ALICE's guess). E.g. "Give me a good route from Orison":
+   origin Orison (stated), destination anywhere in Stanton (inferred), ship Ironclad
+   (stated, or from the ledger = inferred). Then:
+   - A follow-up may only re-open an **inferred** part, or name a new one. When it could
+     mean more than one part, ALICE asks: "Do you want Pyro as the destination system?"
+   - When the pilot wants a **comparison**, ALICE answers with the delta against the
+     previous recommendation, and says that's what she's doing: "The best alternative
+     from Orison into Pyro is to <station>. It's <n> aUEC less than the route I
+     recommended." Information, not decisions: both options, the pilot picks.
+   - Stated intent narrows the frame up front: "Where's best to sell scrap?" means the
+     pilot already has the cargo, so the frame is destination-only and a follow-up "what
+     about Pyro?" can only mean destinations in Pyro.
+
+   Same stated/inferred split as `docs/ledger-trust-and-corrections.md` (provenance of
+   ledger values) and the ledger-inferred `best_route` defaults above; build them on one
+   idea, not three. Until then, price-tool system follow-ups simply re-call the tool with
+   `star_system` set (2026-10-16), which picks one meaning silently.
+
+   Jeff's reference conversation (in the matrix as a multi-turn row):
+   > "Give me a good route from Orison." → *a route within Stanton*
+   > "What about Pyro?" → "Do you want to have Pyro as the destination system?"
+   > "No, just routes to Pyro." → "The best alternative in Pyro from Orison is to
+   > <station>. It is <n> aUEC less than the route I've recommended."
 
 Other items below still stand, after these. The ordered phases that follow are the
 2026-09 direction, kept for the detail.

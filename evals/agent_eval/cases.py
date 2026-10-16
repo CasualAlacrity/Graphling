@@ -57,6 +57,7 @@ CASES: list[HarnessCase] = [
             "Where can I get some cheap Laranite?",
             "What's the best place to get Laranite?",
             "I need to buy some Laranite, where's it cheap?",
+            "Where can I get a good deal on Laranite?"
         ],
         expected_tool="commodity_price_lookup",
         expected_args={"commodity": "Laranite"},

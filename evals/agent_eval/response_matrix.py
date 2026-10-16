@@ -58,8 +58,12 @@ LEDGER_WRITES = [
 ]
 
 ROUTE_SETUP = "Find me the best route from Orison in my Railen"
+ORISON_ROUTE = "Give me a good route from Orison."
 
-# (area, utterance, intended tool, prior turn in the same conversation or None).
+# Separates turns in the "Prior turn" column; a prior turn can be a tuple of several.
+TURN_SEPARATOR = " >> "
+
+# (area, utterance, intended tool, prior turn(s) in the same conversation or None).
 # Intended tool is from docs/utterance-coverage.md; "(none)" means no tool is right,
 # "(gap)" means nothing handles it yet.
 COVERAGE_UTTERANCES = [
@@ -121,6 +125,11 @@ COVERAGE_UTTERANCES = [
     ("Gap: meta-commands", "Say that again.", "(gap)", ROUTE_SETUP),
     ("Gap: meta-commands", "Shorter.", "(gap)", ROUTE_SETUP),
     ("Gap: mining economics", "Is this rock worth it? 12% Quant, 8,000 mass.", "(gap)", None),
+    # Jeff's reference conversation for follow-ups (docs/todo.md priority 6, search frame):
+    # ALICE should ask which part "Pyro" changes, then answer a comparison with the delta.
+    ("Follow-up: search frame", "What about Pyro?", "(clarify) best_route", ORISON_ROUTE),
+    ("Follow-up: search frame", "No, just routes to Pyro.", "best_route (compare)",
+     (ORISON_ROUTE, "What about Pyro?")),
 ]
 
 CSV_FIELDS = [
@@ -145,7 +154,7 @@ def _utterances(limit: int | None, tools: list[str] | None) -> list[dict]:
         rows.append({
             "Source": "utterance-coverage.md",
             "Area": area,
-            "Prior turn": prior or "",
+            "Prior turn": _prior_text(prior),
             "Pilot says": utterance,
             "Intended tool": tool,
         })
@@ -160,6 +169,18 @@ def _utterances(limit: int | None, tools: list[str] | None) -> list[dict]:
     if limit is not None:
         rows = rows[:limit]
     return rows
+
+
+def _prior_turns(prior: str | tuple[str, ...] | None) -> list[str]:
+    if prior is None:
+        return []
+    if isinstance(prior, str):
+        return [prior]
+    return list(prior)
+
+
+def _prior_text(prior: str | tuple[str, ...] | None) -> str:
+    return TURN_SEPARATOR.join(_prior_turns(prior))
 
 
 def _blocked_write(name: str):
@@ -198,8 +219,11 @@ async def _run_row(row: dict, timeout_s: float) -> None:
     notes = []
     started = time.monotonic()
     try:
+        prior_turns = []
         if row["Prior turn"]:
-            setup = await asyncio.wait_for(_ask(row["Prior turn"], thread_id), timeout=timeout_s)
+            prior_turns = row["Prior turn"].split(TURN_SEPARATOR)
+        for prior_turn in prior_turns:
+            setup = await asyncio.wait_for(_ask(prior_turn, thread_id), timeout=timeout_s)
             await asyncio.sleep(setup["_pace_s"])
             started = time.monotonic()
         result = await asyncio.wait_for(_ask(row["Pilot says"], thread_id), timeout=timeout_s)
