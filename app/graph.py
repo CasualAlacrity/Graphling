@@ -8,8 +8,10 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
+import topic_client
+import topic_decision
 from db.models import LegType
 from llm import (
     anthropic_cache_control,
@@ -69,20 +71,12 @@ class State(BaseModel):
 
 
 class TopicClassification(BaseModel):
+    """The chat-model classifier's answer, used only when the topic decision model
+    (topic_client.py) can't be reached. It decides on- or off-topic and never "social":
+    asked to, it marked requests wrapped in a greeting ("Hey ALICE, landed.") as social and
+    so dropped them (2026-10-16)."""
     on_topic: bool
     reason: str
-    # Described here as well as in the Hub prompt, so the structured-output schema
-    # carries the rule even before the prompt mentions it. Required: as an optional field
-    # the model simply never filled it in (live check, 2026-10-16, gateway gemma4).
-    social: bool = Field(
-        description=(
-            "Set to true only when the WHOLE message is social talk addressed to ALICE, with "
-            "nothing asked or reported: a greeting, asking how she is, thanks, or a farewell. If "
-            "the message has anything else in it as well, it is not social talk: set this to false "
-            "('Morning ALICE, what's good to haul?', 'Hey ALICE, landed.'). Social talk is never "
-            "off-topic."
-        ),
-    )
 
 
 class RejectLine(BaseModel):
@@ -387,17 +381,29 @@ async def respond(state: State) -> dict:
     }
 
 
+# What decline_topic is told about why, when the decision model said off-topic (it gives
+# a choice, not a reason).
+OFF_TOPIC_REASON = "A real-world topic with no connection to Star Citizen."
+
+
 async def classify_topic(state: State) -> dict:
+    """Request, social talk or off-topic. Asks the topic decision model first (Tev1 via
+    topic_client.py: ~30 ms on heket, and it tells a greeting from a request wrapped in
+    one); falls back to the chat-model classifier, which only decides on- or off-topic."""
+    kind = await topic_client.topic_kind(_text_of(state.messages[-1]))
+    if kind is not None:
+        # Social talk is never off-topic: _alice_just_asked reads on_topic as "the last
+        # turn wasn't a decline".
+        on_topic = kind != topic_decision.OFF_TOPIC
+        reason = OFF_TOPIC_REASON if not on_topic else kind
+        return {"on_topic": on_topic, "reason": reason, "social": kind == topic_decision.SOCIAL}
+
     messages = list(CLASSIFY_MESSAGES)
     # full_result_turns=1: classify runs before this turn's tools, so every tool result
     # it sees is a previous turn's -- all stubbed, none needed to judge topic.
     history = _windowed_history(state.messages, CLASSIFY_HISTORY_TURNS, 1)
     response = await classifier_llm.ainvoke(messages + history)
-    social = response.social
-    # Social talk is never off-topic, whatever on_topic says: _alice_just_asked reads
-    # on_topic as "the last turn wasn't a decline".
-    on_topic = response.on_topic or social
-    return {"on_topic": on_topic, "reason": response.reason, "social": social}
+    return {"on_topic": response.on_topic, "reason": response.reason, "social": False}
 
 
 # A greeting that takes longer than this gets SOCIAL_FALLBACK_LINE instead: it's meant to

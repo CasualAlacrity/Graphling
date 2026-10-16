@@ -74,6 +74,11 @@ class Settings(BaseSettings):
     # The alice-chat-small role: short spoken lines (off-topic decline, social reply).
     # Empty = heket_chat_model, with thinking off.
     heket_small_chat_model: str = ""
+    # The decision model behind /llm/decide/topic (server/topic_decision_service.py):
+    # request, social or off-topic, before a turn is routed. Needs `ollama pull` on heket
+    # and Ollama 0.40.4+. Empty = endpoint off (503), and clients fall back to the
+    # alice-classify chat model.
+    heket_topic_model: str = "tev1:4b"
     # The digest the role table was evaluated at. Empty = don't check. When set, a box
     # reporting a different digest for the model is treated as down (falls back) rather
     # than silently serving an unevaluated build.

@@ -19,15 +19,56 @@ def test_requests_and_off_topic_still_route_as_before():
     assert route_topic(State(messages=[], on_topic=False)) == "decline"
 
 
-async def test_classify_marks_social_talk_on_topic(monkeypatch):
+def _topic(monkeypatch, kind):
+    async def topic_kind(utterance):
+        return kind
+
+    monkeypatch.setattr(graph.topic_client, "topic_kind", topic_kind)
+
+
+def _classifier(monkeypatch, on_topic):
+    calls = []
+
     async def classify(messages):
-        return SimpleNamespace(on_topic=False, reason="small talk", social=True)
+        calls.append(messages)
+        return SimpleNamespace(on_topic=on_topic, reason="classifier")
 
     monkeypatch.setattr(graph, "classifier_llm", SimpleNamespace(ainvoke=classify))
+    return calls
+
+
+async def test_the_decision_model_decides_social_talk(monkeypatch):
+    _topic(monkeypatch, "social")
+    classifier_calls = _classifier(monkeypatch, on_topic=False)
 
     result = await graph.classify_topic(State(messages=[HumanMessage("Good morning.")]))
 
     assert result["social"] is True
+    assert result["on_topic"] is True
+    assert classifier_calls == []
+
+
+async def test_the_decision_model_decides_requests_and_off_topic(monkeypatch):
+    _classifier(monkeypatch, on_topic=True)
+
+    _topic(monkeypatch, "request")
+    request = await graph.classify_topic(State(messages=[HumanMessage("Hey ALICE, landed.")]))
+    _topic(monkeypatch, "off_topic")
+    off_topic = await graph.classify_topic(State(messages=[HumanMessage("Who won the Super Bowl?")]))
+
+    assert (request["on_topic"], request["social"]) == (True, False)
+    assert (off_topic["on_topic"], off_topic["social"]) == (False, False)
+    assert off_topic["reason"] == graph.OFF_TOPIC_REASON
+
+
+async def test_without_the_decision_model_the_classifier_never_says_social(monkeypatch):
+    _topic(monkeypatch, None)
+    calls = _classifier(monkeypatch, on_topic=True)
+
+    result = await graph.classify_topic(State(messages=[HumanMessage("Good morning.")]))
+
+    assert len(calls) == 1
+    assert result["social"] is False
     assert result["on_topic"] is True
 
 

@@ -5,9 +5,10 @@ import json
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 
 from db.models import User
-from server import llm_gateway_service, prompt_service
+from server import llm_gateway_service, prompt_service, topic_decision_service
 from server.config import settings
 from server.dependencies import get_current_user
 from server.limits import RateLimiter
@@ -22,12 +23,33 @@ MAX_BODY_BYTES = 512 * 1024
 rate_limiter = RateLimiter(settings.llm_requests_per_minute, 60)
 
 
-@router.post("/api/chat")
-async def chat(request: Request, user: User = Depends(get_current_user)):
+def _check_rate(user: User) -> None:
     retry_after = rate_limiter.retry_after_s(user.id)
     if retry_after is not None:
         raise HTTPException(status_code=429, detail="Too many requests -- slow down a moment.",
                             headers={"Retry-After": str(max(1, round(retry_after)))})
+
+
+class TopicRequest(BaseModel):
+    # One spoken utterance; Tev1 works in ~2,000 tokens, and a pilot never says this much.
+    utterance: str = Field(min_length=1, max_length=2000)
+
+
+@router.post("/decide/topic")
+async def decide_topic(body: TopicRequest, user: User = Depends(get_current_user)):
+    """Request, social or off-topic (server/topic_decision_service.py). 503 when the
+    decision model can't answer: the client then classifies with its alice-classify
+    chat model instead."""
+    _check_rate(user)
+    try:
+        return await topic_decision_service.decide(body.utterance, user.id)
+    except topic_decision_service.TopicDecisionUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/api/chat")
+async def chat(request: Request, user: User = Depends(get_current_user)):
+    _check_rate(user)
     raw = await request.body()
     if len(raw) > MAX_BODY_BYTES:
         raise HTTPException(status_code=413, detail="Request body too large")

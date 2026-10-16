@@ -126,6 +126,16 @@ ROLES = {
 }
 ```
 
+**Topic decisions (added 2026-10-16): `POST /llm/decide/topic`.** Not a chat role: before a
+turn is routed, the client sends `{"utterance": ...}` and gets back `request`, `social` or
+`off_topic`, decided by Tev1 (`HEKET_TOPIC_MODEL`, default `tev1:4b`), a small decision
+model on heket that answers in ~30 ms. The question wording and confidence floors live in
+`app/topic_decision.py`, so they change with a server deploy. There's no hosted fallback
+for this endpoint: when heket or Tev1 can't answer it returns 503, and the client
+classifies with `alice-classify` instead, which only ever says on- or off-topic. Logged in
+`llm_usage` as role `alice-topic`. Needs Ollama 0.40.4+ on heket and `ollama pull tev1:4b`
+(done 2026-10-16); with gemma4 and Kokoro loaded it takes heket from 8.0 to 13.7 of 16.4 GB.
+
 **Pin the exact model build, not just the tag.** On 2026-10-09 `gemma4:latest` meant three
 different builds across three eval runs (Mac old 9.6 GB, Mac new nvfp4 safetensors, box GGUF
 Q4_K_M), and they scored 39/45, 29/45 and 36/45 on the same cases. The new Mac build printed raw

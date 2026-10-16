@@ -64,7 +64,9 @@ playtests and cuts a promo video alongside this list.
    > <station>. It is <n> aUEC less than the route I've recommended."
 
 **Blocker for the next installer: classify_topic must tell pure social talk from a
-request (found 2026-10-16).** The social path (graph.py: `TopicClassification.social` →
+request (found 2026-10-16). Fixed in code 2026-10-16 by switching the decision to Tev1
+(`app/topic_decision.py`, `POST /llm/decide/topic`); still to do: deploy the server and
+re-run these phrases through the gateway on heket before building the installer.** The social path (graph.py: `TopicClassification.social` →
 `social_reply`) answers greetings, "how are you", thanks and farewells with a short line
 from the `social-reply` prompt. But the classifier marks a greeting *with a request in it*
 as social, and the request is then silently dropped. Local gemma4, draft classifier
