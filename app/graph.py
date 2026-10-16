@@ -1,6 +1,6 @@
 import asyncio
 import os
-from typing import Annotated
+from typing import Annotated, Literal
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
@@ -8,11 +8,12 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from db.models import LegType
 from llm import anthropic_cache_control, anthropic_cache_mode, get_chat_llm, get_classification_llm
 from prompt_loader import prompt_messages
+from social_lines import is_only_social_talk, social_line
 from tools.best_route_tool import BestRouteTool
 from tools.starcitizenwiki.client import StarCitizenWikiClient
 from tools.trade_run import resolver
@@ -40,6 +41,9 @@ class State(BaseModel):
     messages: Annotated[list[BaseMessage], add_messages]
     on_topic: bool = True
     reason: str | None = None
+    # classify_topic's TopicClassification.social for this turn: pure social talk gets a
+    # line from social_lines.py instead of respond or the off-topic decline.
+    social: str | None = None
     # Set by respond() whenever a readback-producing tool (mark_cargo_acquired,
     # mark_cargo_sold -- stated numbers are always read back, docs/intent/voice-latency.md)
     # just ran, so the pilot's next utterance (a correction like "no, 614") skips
@@ -59,9 +63,25 @@ class State(BaseModel):
     last_touched_leg_id: int | None = None
 
 
+SocialKind = Literal["none", "greeting", "how_are_you", "thanks", "farewell"]
+
+
 class TopicClassification(BaseModel):
     on_topic: bool
     reason: str
+    # Described here as well as in the Hub prompt, so the structured-output schema
+    # carries the rule even before the prompt mentions it. Required, with an explicit
+    # "none": as an optional field the model simply never filled it in (live check,
+    # 2026-10-16, against the gateway's gemma4).
+    social: SocialKind = Field(
+        description=(
+            "'none' unless the WHOLE message is social talk addressed to ALICE, with no "
+            "request in it: 'greeting' (good morning, hey ALICE), 'how_are_you' (how are you, "
+            "hope you're doing well; use this when a greeting includes it), 'thanks' (thanks, "
+            "appreciate it), 'farewell' (bye, signing off, fly safe). A greeting plus a request "
+            "('Morning ALICE, what's good to haul?') is 'none'. Social talk is never off-topic."
+        ),
+    )
 
 
 class RejectLine(BaseModel):
@@ -366,7 +386,27 @@ async def classify_topic(state: State) -> dict:
     # it sees is a previous turn's -- all stubbed, none needed to judge topic.
     history = _windowed_history(state.messages, CLASSIFY_HISTORY_TURNS, 1)
     response = await classifier_llm.ainvoke(messages + history)
-    return {"on_topic": response.on_topic, "reason": response.reason}
+    # Social talk is never off-topic, whatever on_topic says: _alice_just_asked reads
+    # on_topic as "the last turn wasn't a decline".
+    social = None if response.social == "none" else response.social
+    # Anything said beyond social talk is a request ("Hey ALICE, landed.", "Thanks, now
+    # where do I sell this?"): answering it with a social line would swallow it, the worst
+    # way for this to fail. See social_lines.SOCIAL_WORDS.
+    if social in ("greeting", "thanks", "farewell") and not is_only_social_talk(_text_of(state.messages[-1])):
+        social = None
+    on_topic = response.on_topic or social is not None
+    return {"on_topic": on_topic, "reason": response.reason, "social": social}
+
+
+async def social_reply(state: State) -> dict:
+    """A greeting, "how are you", thanks or farewell: one line from social_lines.py, no
+    model call."""
+    last_line = None
+    for message in reversed(state.messages[:-1]):
+        if isinstance(message, AIMessage):
+            last_line = _text_of(message)
+            break
+    return {"messages": [AIMessage(social_line(state.social, last_line))]}
 
 
 async def decline_topic(state: State) -> dict:
@@ -385,6 +425,8 @@ async def decline_topic(state: State) -> dict:
 
 
 def route_topic(state: State) -> str:
+    if state.social is not None:
+        return "social"
     return "respond" if state.on_topic else "decline"
 
 
@@ -440,6 +482,7 @@ graph_builder = StateGraph(State)
 graph_builder.add_node("classify_topic", classify_topic)
 graph_builder.add_node("respond", respond)
 graph_builder.add_node("decline", decline_topic)
+graph_builder.add_node("social", social_reply)
 
 graph_builder.add_conditional_edges(START, route_start)
 graph_builder.add_conditional_edges("classify_topic", route_topic)

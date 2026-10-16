@@ -110,8 +110,14 @@ CASES: list[HarnessCase] = [
             "Hey, how are you?",
             "Morning, hope you're doing well.",
         ],
-        expected_on_topic=False,
-        expected_outcome="Should decline small talk without answering it, staying in character.",
+        # Flipped 2026-10-16 (Jeff): greetings are social, never off-topic. They get a
+        # short dry line from social_lines.py, never a push for a task.
+        expected_on_topic=True,
+        expected_outcome=(
+            "Should answer with one short, dry, in-character line (e.g. 'Good morning to you.', "
+            "'I am operational.') and nothing else: no refusal, and no asking what to haul or "
+            "for a manifest."
+        ),
     ),
 
     # --- best_route's sell_at_nqa_only flag (2026-10-06) ---------------------------------
