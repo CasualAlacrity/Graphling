@@ -12,9 +12,10 @@ import html
 from dataclasses import dataclass
 
 # A permanent (never-expiring) invite to the ALICE Discord, shown as a button on the
-# "not in the server" page. None = no button; the text still says where to go. The
-# invite handed out on 2026-10-12 expires 2026-11-11, so it isn't used here.
-ALICE_DISCORD_INVITE_URL: str | None = None
+# "not in the server" page. None = no button; the text still says where to go. It must
+# not carry the Beta Access role: role-granting invites are the capped ones handed out
+# by hand, and a link baked into every installer would bypass that cap.
+ALICE_DISCORD_INVITE_URL: str | None = "https://discord.gg/x4htzcm9X3"
 
 _WRONG_ACCOUNT_HINT = (
     "Signed in with the wrong Discord account? Log out of Discord in this browser, "

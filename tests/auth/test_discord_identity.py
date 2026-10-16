@@ -324,7 +324,10 @@ def test_outcome_for_each_listener_result(result, expected_key):
 
 
 @pytest.mark.parametrize("key", list(login_pages.OUTCOMES))
-def test_every_outcome_renders_a_self_contained_page(key):
+def test_every_outcome_renders_a_self_contained_page(key, monkeypatch):
+    # The invite button is a link to follow, not something the page loads; leave it out
+    # so the "http" check below only catches resources.
+    monkeypatch.setattr(login_pages, "ALICE_DISCORD_INVITE_URL", None)
     page = login_pages.render_page(login_pages.OUTCOMES[key], "jeff")
 
     assert page.startswith("<!doctype html>")
@@ -345,6 +348,7 @@ def test_page_escapes_the_discord_username():
 
 def test_invite_button_only_when_an_invite_is_configured(monkeypatch):
     outcome = login_pages.OUTCOMES["not_in_server"]
+    monkeypatch.setattr(login_pages, "ALICE_DISCORD_INVITE_URL", None)
     assert "Join the ALICE Discord" not in login_pages.render_page(outcome, "jeff")
 
     monkeypatch.setattr(login_pages, "ALICE_DISCORD_INVITE_URL", "https://discord.gg/example")
