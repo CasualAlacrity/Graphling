@@ -3,8 +3,7 @@
 Before this, a search could only afford MAX_LIVE_ROUTE_FETCHES (8) live UEX calls, so a
 first search of Stanton saw 8 of its 117 trade terminals and coverage only grew as
 pilots searched. UEX allows 7,000 calls a day; refreshing all 161 trade terminals
-(matching.trade_terminals) hourly costs ~3,900 of them, and searches then find
-everything already cached.
+hourly costs ~3,900 of them, and searches then find everything already cached.
 
 Each run skips terminals fetched recently (a restart or redeploy doesn't re-spend a
 whole round) and stops once today's remaining calls drop to settings.uex_prefetch_reserve,
@@ -18,14 +17,26 @@ from db.session import SessionLocal
 from server import uex_budget, uex_cache_service
 from server.config import settings
 from tools.uexcorp.client import UexCallBudgetExhausted
-from tools.uexcorp.matching import trade_terminals
 from tools.uexcorp.price_cache import route_origin_fetched_at
+from tools.uexcorp.reference_cache import TerminalType
 
 # Same as overlay/uex_lookup.py's ROUTE_FANOUT_CONCURRENCY: a whole round goes out in
 # under a minute without bursting 161 requests at UEX at once.
 PREFETCH_CONCURRENCY = 5
 
 log = logging.getLogger(__name__)
+
+
+def trade_terminals(cache) -> list:
+    """The same pool as tools/uexcorp/matching.trade_terminals (COMMODITY terminals only;
+    see its docstring for why), repeated rather than imported: matching pulls in the name
+    matchers (jellyfish, rapidfuzz), which the server image doesn't install, and importing
+    it crash-looped the server on 2026-10-16."""
+    result = []
+    for terminal in cache.terminals:
+        if terminal.type == TerminalType.COMMODITY:
+            result.append(terminal)
+    return result
 
 
 def _recent_enough() -> timedelta:
