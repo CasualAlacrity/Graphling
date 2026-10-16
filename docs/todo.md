@@ -1,5 +1,37 @@
 # Graphling — working todo
 
+## Priorities (set by Jeff, 2026-10-16) — work these in order
+
+Context: 0.2.7 is out; the goal is the first outside pilots (10 by ~2026-10-23). Jeff
+playtests and cuts a promo video alongside this list.
+
+1. **Route search respects what the pilot can afford.** `find_best_route` never passes
+   UEX's `investment` parameter (Phase 3 section below). New pilots are exactly the ones
+   who can't fill a big hold.
+2. **Usage data on the server.** Who comes back, not just who downloaded: the client's
+   `turn_metrics.jsonl` (time + tokens + cost per call) feeding the server DB
+   (`docs/analytics.md`).
+3. **Voice latency, stage by stage** — whisper → graph stages → TTS → playback per live
+   turn. Spec: `docs/voice-stage-timing.md`.
+4. **Correct a misheard number by voice** (`correct_trade_value`, Phase 4) — on top of the
+   overlay edit path, which is built (`docs/ledger-edit-path.md`).
+5. **Travel time — scoped down, effectively done (Jeff, 2026-10-16).** What's modelled
+   (QT acceleration stages, per-ship spool, drop-out at arrival radius, sublight approach,
+   gateway legs) has 15 passing tests in `tests/tools/test_travel_time.py`. Deliberately
+   NOT modelled: atmosphere (in game, burn is the same in atmosphere as in space today),
+   landing (pilot skill), jump-gate transit (1–3 min, a server limitation, not
+   calculable), QT cooldown. The wiki has cooldown as a fixed per-drive figure
+   (`standard_jump.cooldown_time`, XL-1 = 10.4 s), but in game it scales with the jump:
+   Jeff's Railen has no real cooldown after Seraphim → OM-1 and a noticeable one after
+   Seraphim → microTech, so the wiki number can't be trusted. It also only costs time
+   when another jump follows on the same leg; a single-hop trade leg ends in landing.
+6. **Response matrix, then fewer words per request.** First a table of every eval
+   utterance and what ALICE answers today; Jeff marks up examples of what he expects;
+   then the return-trip / ledger-inferred defaults are built against that.
+
+Other items below still stand, after these. The ordered phases that follow are the
+2026-09 direction, kept for the detail.
+
 Direction set 2026-09-09/10 (where-are-we review + scope + product-framing conversation):
 
 1. **Finish the trade route tracker — working end to end by voice.** Nothing else starts
@@ -90,7 +122,7 @@ directly.
       `delete_run`. **Decided 2026-09-24: staying that way, on purpose.** Abandoning a
       run is purely a pilot-run action — no voice path, no confirmed-only exception. Not
       implicit anymore.
-- [ ] **URGENT — recorded leg values can't be edited (found 2026-09-29).** Once a
+- [x] **URGENT — recorded leg values can't be edited (found 2026-09-29).** *Built 2026-09-29, see `docs/ledger-edit-path.md`; the voice layer is priority 4 above.* Once a
       purchase/sale is recorded — overlay *or* voice — it's permanent: `record_purchase`/
       `record_sale` (`app/server/ledger_service.py`) refuse a second record, no update
       endpoint exists, Mark Done and Finalize Run show read-only recaps
