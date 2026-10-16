@@ -38,7 +38,7 @@ async def test_prewarm_is_a_noop_for_a_non_ollama_provider(monkeypatch):
 
 
 async def test_prewarm_runs_for_the_alice_gateway(monkeypatch):
-    """The gateway relays to Ollama on frankencompute, so pilots pay the same cold
+    """The gateway relays to Ollama on heket, so pilots pay the same cold
     prompt cost a local Ollama does (the likely cause of a 20s first turn, 2026-10-15)."""
     monkeypatch.setenv("LLM_PROVIDER", "alice")
     monkeypatch.delenv("PREWARM_OLLAMA", raising=False)

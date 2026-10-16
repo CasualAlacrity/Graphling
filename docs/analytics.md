@@ -14,7 +14,7 @@ Grafana. Where they overlap, that doc wins. In short:
 
 **The questions it answers:**
 - How much of ALICE runs on our own hardware vs. paid cloud APIs, and what each costs.
-- How close frankencompute runs to its limits.
+- How close heket runs to its limits.
 - When buying hardware beats paying for the cloud.
 
 ## Data sources
@@ -29,17 +29,17 @@ metadata only, never text.
 
 **Shared columns:**
 - `user_id` (FK to `users`), `created_at`
-- `backend`: `frankencompute`, `anthropic` or `openai` for LLM; `frankencompute` or `elevenlabs` for TTS
+- `backend`: `heket`, `anthropic` or `openai` for LLM; `heket` or `elevenlabs` for TTS
 - `latency_ms`
 - `status`: `ok` or `error`
 - `fallback_reason`: `down`, `timeout`, `5xx`, `overflow` or `digest_mismatch`; NULL means
-  frankencompute answered. `overflow` is *planned peak diversion*; every other value is a
+  heket answered. `overflow` is *planned peak diversion*; every other value is a
   *failure fallback*. They're tagged separately on purpose: [intent/model-stack.md](intent/model-stack.md)
   says they must never share a counter.
 - `cost_usd`
 
 **LLM-only:** `role`, `model`, `prompt_tokens`, `cache_read_tokens`, `completion_tokens`, and
-`inflight_at_start` (requests already running on frankencompute when this one arrived).
+`inflight_at_start` (requests already running on heket when this one arrived).
 
 **TTS-only:** `voice`, `characters`, `audio_seconds`.
 
@@ -47,7 +47,7 @@ metadata only, never text.
 - **Cloud rows:** what the provider bills, from `model_pricing.MODEL_PRICING`. ElevenLabs is
   characters × `ELEVENLABS_USD_PER_1K_CHARS`, which is 0 while on the free tier. Characters are
   stored either way.
-- **frankencompute rows:** the electricity used *above idle*, i.e. call duration × 210 W × the
+- **heket rows:** the electricity used *above idle*, i.e. call duration × 210 W × the
   tariff (€0.34/kWh × `USD_PER_EUR`, see `model_pricing.py`).
 - **The box's idle draw is not in any row.** It's ~80 W, €0.66/day, ~€20/month. It's the fixed
   cost of having the box on, so show it as its own constant line, not spread over calls.
@@ -66,9 +66,9 @@ SELECT $__timeGroupAlias(created_at, '1d'), backend, count(*) AS requests, sum(c
 FROM llm_usage WHERE $__timeFilter(created_at) GROUP BY 1, 2 ORDER BY 1;
 ```
 Make the same panel for `tts_usage`. The headline stat is the **local share**:
-`count(*) FILTER (WHERE backend = 'frankencompute')::float / count(*)`.
+`count(*) FILTER (WHERE backend = 'heket')::float / count(*)`.
 
-**Why calls left frankencompute:**
+**Why calls left heket:**
 ```sql
 SELECT fallback_reason, count(*), sum(cost_usd) AS usd
 FROM llm_usage WHERE $__timeFilter(created_at) AND fallback_reason IS NOT NULL GROUP BY 1;
@@ -121,7 +121,7 @@ WHERE backend = 'elevenlabs' AND created_at >= date_trunc('month', now());
 | p95 latency at load 2–3 vs. Haiku's | latency panel | If shared turns are slower than Haiku, lower `LLM_MAX_INFLIGHT` (speed) or add a GPU. |
 | Outage fallbacks (`down`/`timeout`/`5xx`) per month | fallback panel | Reliability: UPS, a second box, or a rented Kokoro CPU box for voice continuity. |
 | Local share of TTS | TTS requests by backend | Low = ElevenLabs is covering outages. Count the characters against the plan. |
-| Turns/month vs. break-even | `count(*)` of respond calls | The box beats Haiku-only at roughly 18k–55k turns/month (docs/frankencompute-bench.md). |
+| Turns/month vs. break-even | `count(*)` of respond calls | The box beats Haiku-only at roughly 18k–55k turns/month (docs/heket-bench.md). |
 
 ## Alerts (from intent/observability.md)
 
@@ -136,7 +136,7 @@ WHERE backend = 'elevenlabs' AND created_at >= date_trunc('month', now());
 
 - **Time to first token.** The observability doc names *TTFT under concurrency* as the
   hardware-purchase trigger. Today `llm_usage.latency_ms` is the whole call. The gateway already
-  streams frankencompute's reply, so adding a `first_token_ms` column is a small change: stamp
+  streams heket's reply, so adding a `first_token_ms` column is a small change: stamp
   the first chunk. Do it before relying on the latency panel for a purchase decision.
 - **Decline rate by classify `reason`** (guardrail health) is client-side, in the graph's
   classify_topic. It never reaches the server. It needs either the turn-metrics upload below,

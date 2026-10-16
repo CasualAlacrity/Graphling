@@ -1,4 +1,4 @@
-# ALICE's voice on frankencompute (frankencompute/kokoro_server.py).
+# ALICE's voice on heket (heket/kokoro_server.py).
 # Install: copy kokoro_server.py to /home/seven/tts/, this file to
 # /etc/systemd/system/kokoro-tts.service, then `systemctl enable --now kokoro-tts`.
 [Unit]

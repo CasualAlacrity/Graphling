@@ -1,26 +1,26 @@
 """The LLM gateway (docs/llm-gateway.md) -- every pilot's model calls go through here, so
-no client ever holds a provider key or reaches frankencompute directly.
+no client ever holds a provider key or reaches heket directly.
 
 Speaks Ollama's native /api/chat format, not OpenAI's, on purpose: Ollama's
 OpenAI-compatible endpoint silently drops gemma4's thinking (verified 2026-10-09:
 reasoning_effort=high still produced zero reasoning tokens), and the evals showed
 reasoning helps the default model. So the client keeps using ChatOllama exactly as
-evaluated, just pointed at this server, and the frankencompute path is a pass-through.
+evaluated, just pointed at this server, and the heket path is a pass-through.
 Only the fallback translates (OpenAI here, Anthropic in server/anthropic_fallback.py).
 
 Routing, per request:
 1. The client names a ROLE (alice-chat / alice-classify), never a real model -- the
    server picks the model, the thinking flag, and the fallback, so they can change
    without a client release.
-2. frankencompute first, unless it's known to be down or already has llm_max_inflight
+2. heket first, unless it's known to be down or already has llm_max_inflight
    requests running ("overflow").
-3. Fall back (settings.fallback_provider: Anthropic or OpenAI) only when frankencompute
+3. Fall back (settings.fallback_provider: Anthropic or OpenAI) only when heket
    can't answer: connect error, timeout, or 5xx. Never because an answer looks bad,
    and never after any bytes have reached the client (non-streamed fallback is what
    makes this clean). Once the day's hosted spend passes fallback_daily_usd_cap, an
    overflow queues on the box instead, and an outage gets a 503.
 4. Every call writes one llm_usage row, including how many requests were already running
-   on frankencompute when it arrived (real concurrency, for hardware sizing).
+   on heket when it arrived (real concurrency, for hardware sizing).
 
 In-memory state (the down flag, the in-flight count) assumes one server process, the
 same assumption server/routes/auth.py's _PENDING_LOGINS already makes.
@@ -48,7 +48,7 @@ from server.tool_call_ids import with_tool_call_ids
 
 log = logging.getLogger(__name__)
 
-FRANKENCOMPUTE = "frankencompute"
+HEKET = "heket"
 OPENAI = "openai"
 ANTHROPIC = anthropic_fallback.ANTHROPIC
 
@@ -56,7 +56,7 @@ ANTHROPIC = anthropic_fallback.ANTHROPIC
 # 4.5, measured 2026-10-09 (3 cases x 5 samples through the gateway): 45/45 correct tool
 # and args vs 33/45 (4.5 asked a clarifying question instead of looking prices up in
 # 12 turns), at ~$0.0002 vs ~$0.0016 per call. Costs ~1.9 s more per turn than
-# frankencompute (it thinks by default) -- fine for a fallback.
+# heket (it thinks by default) -- fine for a fallback.
 DEFAULT_FALLBACK_MODELS = {ANTHROPIC: "claude-haiku-5-5", OPENAI: "gpt-4o-mini"}
 OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 
@@ -70,7 +70,7 @@ CONNECT_TIMEOUT_S = 2.0
 # continuously. Eval p90 for a whole turn was 5.1 s, max 15.4 s (2026-10-09).
 READ_TIMEOUT_S = 30.0
 OPENAI_TIMEOUT_S = 60.0
-# How long a failed request benches frankencompute before it's tried again. The probe
+# How long a failed request benches heket before it's tried again. The probe
 # (probe_forever) can clear it sooner.
 DOWN_FOR_S = 30.0
 PROBE_INTERVAL_S = 15.0
@@ -90,7 +90,7 @@ class NoBackendAvailable(RuntimeError):
     pass
 
 
-class FrankencomputeFailed(RuntimeError):
+class HeketFailed(RuntimeError):
     def __init__(self, reason: str):
         super().__init__(reason)
         self.reason = reason
@@ -98,7 +98,7 @@ class FrankencomputeFailed(RuntimeError):
 
 @dataclass(frozen=True)
 class Role:
-    frankencompute_model: str
+    heket_model: str
     think: bool
     fallback_model: str
 
@@ -109,10 +109,10 @@ def roles() -> dict[str, Role]:
     default_fallback = DEFAULT_FALLBACK_MODELS.get(settings.fallback_provider, "")
     return {
         "alice-chat": Role(
-            settings.frankencompute_chat_model, True, settings.fallback_chat_model or default_fallback,
+            settings.heket_chat_model, True, settings.fallback_chat_model or default_fallback,
         ),
         "alice-classify": Role(
-            settings.frankencompute_classify_model, False, settings.fallback_classify_model or default_fallback,
+            settings.heket_classify_model, False, settings.fallback_classify_model or default_fallback,
         ),
     }
 
@@ -125,7 +125,7 @@ def fallback_configured() -> bool:
     return False
 
 
-class FrankencomputeState:
+class HeketState:
     def __init__(self) -> None:
         self.down_until = 0.0
         self.down_reason: str | None = None
@@ -140,11 +140,11 @@ class FrankencomputeState:
         self.down_reason = None
 
 
-state = FrankencomputeState()
+state = HeketState()
 
 
-def skip_frankencompute_reason(now: float) -> str | None:
-    """Why this request shouldn't even try frankencompute, or None to try it."""
+def skip_heket_reason(now: float) -> str | None:
+    """Why this request shouldn't even try heket, or None to try it."""
     if now < state.down_until:
         return state.down_reason or "down"
     if settings.llm_max_inflight and state.inflight >= settings.llm_max_inflight:
@@ -178,26 +178,26 @@ async def open_chat(payload: dict, user_id: uuid.UUID) -> Relay:
 
     started = time.monotonic()
     inflight_at_start = state.inflight
-    fallback_reason = skip_frankencompute_reason(started)
+    fallback_reason = skip_heket_reason(started)
     if fallback_reason == "overflow" and await fallback_budget_exhausted():
         # Busy, not broken: with the day's budget spent, wait for a slot on the box
         # rather than pay for the call.
         fallback_reason = None
     if fallback_reason is None:
         try:
-            return await _open_frankencompute(payload, role_name, role, user_id, started, inflight_at_start)
-        except FrankencomputeFailed as failure:
+            return await _open_heket(payload, role_name, role, user_id, started, inflight_at_start)
+        except HeketFailed as failure:
             fallback_reason = failure.reason
             state.mark_down(failure.reason, time.monotonic() + DOWN_FOR_S)
-            log.warning("frankencompute failed (%s); falling back", failure.reason)
+            log.warning("heket failed (%s); falling back", failure.reason)
 
     if not fallback_configured():
-        raise NoBackendAvailable(f"frankencompute unavailable ({fallback_reason}) and no fallback is configured")
+        raise NoBackendAvailable(f"heket unavailable ({fallback_reason}) and no fallback is configured")
     if await fallback_budget_exhausted():
-        log.error("frankencompute unavailable (%s) and today's fallback budget ($%.2f) is spent",
+        log.error("heket unavailable (%s) and today's fallback budget ($%.2f) is spent",
                   fallback_reason, settings.fallback_daily_usd_cap)
         raise NoBackendAvailable(
-            f"frankencompute unavailable ({fallback_reason}) and today's fallback budget is spent -- try again shortly"
+            f"heket unavailable ({fallback_reason}) and today's fallback budget is spent -- try again shortly"
         )
     context = CallContext(role_name, role, user_id, started, fallback_reason, inflight_at_start)
     if settings.fallback_provider == ANTHROPIC:
@@ -205,39 +205,39 @@ async def open_chat(payload: dict, user_id: uuid.UUID) -> Relay:
     return await _relay_openai(payload, context)
 
 
-# ---- frankencompute (pass-through) ----
+# ---- heket (pass-through) ----
 
-def frankencompute_payload(payload: dict, role: Role) -> dict:
+def heket_payload(payload: dict, role: Role) -> dict:
     """The client's request with the role resolved and anything box-wide stripped."""
     forwarded = {key: value for key, value in payload.items() if key not in ("keep_alive", "options")}
-    forwarded["model"] = role.frankencompute_model
+    forwarded["model"] = role.heket_model
     forwarded["think"] = role.think
     options = payload.get("options") or {}
     forwarded["options"] = {key: value for key, value in options.items() if key in ALLOWED_OPTIONS}
     return forwarded
 
 
-async def _open_frankencompute(
+async def _open_heket(
     payload: dict, role_name: str, role: Role, user_id: uuid.UUID, started: float, inflight_at_start: int,
 ) -> Relay:
     client = _http_client(
-        base_url=settings.frankencompute_url,
+        base_url=settings.heket_url,
         timeout=httpx.Timeout(READ_TIMEOUT_S, connect=CONNECT_TIMEOUT_S),
     )
-    request = client.build_request("POST", "/api/chat", json=frankencompute_payload(payload, role))
+    request = client.build_request("POST", "/api/chat", json=heket_payload(payload, role))
     try:
         response = await client.send(request, stream=True)
     except httpx.TimeoutException as exc:
         await client.aclose()
-        raise FrankencomputeFailed("timeout") from exc
+        raise HeketFailed("timeout") from exc
     except httpx.TransportError as exc:
         await client.aclose()
-        raise FrankencomputeFailed("down") from exc
+        raise HeketFailed("down") from exc
 
     if response.status_code >= 500:
         await response.aclose()
         await client.aclose()
-        raise FrankencomputeFailed("5xx")
+        raise HeketFailed("5xx")
 
     # Counted from here, not from the try above: a request only occupies the box once
     # it's actually been accepted.
@@ -258,21 +258,21 @@ async def _open_frankencompute(
                 if chunk.get("done"):
                     # Lets the client's turn_metrics tell which backend answered
                     # (ChatOllama copies the final chunk's fields into response_metadata).
-                    chunk["alice_backend"] = FRANKENCOMPUTE
+                    chunk["alice_backend"] = HEKET
                     final = chunk
                 yield (json.dumps(chunk) + "\n").encode()
         except httpx.HTTPError:
             # Mid-stream failure -- too late to fall back, the client already has
             # bytes. Record it and let the client see a truncated response.
             status = "error"
-            log.warning("frankencompute stream broke mid-response")
+            log.warning("heket stream broke mid-response")
         finally:
             state.inflight -= 1
             await response.aclose()
             await client.aclose()
             latency_ms = (time.monotonic() - started) * 1000
             await record_usage(
-                user_id=user_id, role=role_name, backend=FRANKENCOMPUTE, model=role.frankencompute_model,
+                user_id=user_id, role=role_name, backend=HEKET, model=role.heket_model,
                 prompt_tokens=final.get("prompt_eval_count", 0), cache_read_tokens=0,
                 completion_tokens=final.get("eval_count", 0),
                 latency_ms=latency_ms, status=status, fallback_reason=None,
@@ -466,7 +466,7 @@ async def fallback_spend_today_usd() -> float:
         async with SessionLocal() as session:
             result = await session.execute(
                 select(func.coalesce(func.sum(LlmUsage.cost_usd), 0.0)).where(
-                    LlmUsage.backend != FRANKENCOMPUTE, LlmUsage.created_at >= midnight,
+                    LlmUsage.backend != HEKET, LlmUsage.created_at >= midnight,
                 )
             )
             return float(result.scalar_one())
@@ -490,9 +490,9 @@ async def record_usage(**fields) -> None:
 # ---- health probe ----
 
 async def probe_once() -> None:
-    """Marks frankencompute up or down from its own /api/tags, including the digest pin."""
+    """Marks heket up or down from its own /api/tags, including the digest pin."""
     try:
-        async with _http_client(base_url=settings.frankencompute_url, timeout=5.0) as client:
+        async with _http_client(base_url=settings.heket_url, timeout=5.0) as client:
             response = await client.get("/api/tags")
             response.raise_for_status()
             models = response.json().get("models", [])
@@ -500,18 +500,18 @@ async def probe_once() -> None:
         state.mark_down("down", math.inf)
         return
 
-    if settings.frankencompute_model_digest:
+    if settings.heket_model_digest:
         # The pin applies to the chat model, the one the evals measured. A different
         # classify model would need its own pin (not needed while both are gemma4).
-        wanted = settings.frankencompute_chat_model
+        wanted = settings.heket_chat_model
         wanted_tag = wanted if ":" in wanted else f"{wanted}:latest"
         digest = ""
         for model in models:
             if model.get("name") == wanted_tag:
                 digest = model.get("digest", "")
-        if not digest.startswith(settings.frankencompute_model_digest):
-            log.error("frankencompute %s digest %r doesn't match pinned %r -- routing to fallback",
-                      wanted_tag, digest[:12], settings.frankencompute_model_digest)
+        if not digest.startswith(settings.heket_model_digest):
+            log.error("heket %s digest %r doesn't match pinned %r -- routing to fallback",
+                      wanted_tag, digest[:12], settings.heket_model_digest)
             state.mark_down("digest_mismatch", math.inf)
             return
 

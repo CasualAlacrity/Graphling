@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import ConfigDict
+from pydantic import AliasChoices, ConfigDict, Field
 from pydantic_settings import BaseSettings
 
 
@@ -56,21 +56,33 @@ class Settings(BaseSettings):
     # or rows expire between runs.
     uex_route_prefetch_interval_s: int = 3600
 
-    # LLM gateway (server/llm_gateway_service.py, docs/llm-gateway.md). frankencompute is
+    # LLM gateway (server/llm_gateway_service.py, docs/llm-gateway.md). heket is
     # the self-hosted Ollama box, reached over Tailscale -- never exposed to pilots.
-    frankencompute_url: str = "http://localhost:11434"
-    frankencompute_chat_model: str = "gemma4"
-    frankencompute_classify_model: str = "gemma4"
+    # The box was nicknamed "frankencompute" until 2026-10-16. The old FRANKENCOMPUTE_*
+    # env names are still read (HEKET_* wins when both are set), so a deploy can't
+    # silently drop to the localhost defaults below before prod's .env is updated.
+    # Remove the second alias once /opt/graphling/.env only has HEKET_* names.
+    heket_url: str = Field(
+        "http://localhost:11434", validation_alias=AliasChoices("heket_url", "frankencompute_url"),
+    )
+    heket_chat_model: str = Field(
+        "gemma4", validation_alias=AliasChoices("heket_chat_model", "frankencompute_chat_model"),
+    )
+    heket_classify_model: str = Field(
+        "gemma4", validation_alias=AliasChoices("heket_classify_model", "frankencompute_classify_model"),
+    )
     # The digest the role table was evaluated at. Empty = don't check. When set, a box
     # reporting a different digest for the model is treated as down (falls back) rather
     # than silently serving an unevaluated build.
-    frankencompute_model_digest: str = ""
-    # Requests already running on frankencompute before new ones overflow to fallback.
-    # Matches the box's OLLAMA_NUM_PARALLEL=3 (docs/frankencompute-bench.md): beyond 3,
+    heket_model_digest: str = Field(
+        "", validation_alias=AliasChoices("heket_model_digest", "frankencompute_model_digest"),
+    )
+    # Requests already running on heket before new ones overflow to fallback.
+    # Matches the box's OLLAMA_NUM_PARALLEL=3 (docs/heket-bench.md): beyond 3,
     # a request would only queue there. 0 disables overflow (everything queues on the box).
     llm_max_inflight: int = 3
 
-    # Fallback when frankencompute can't answer: "anthropic" or "openai". No key for the
+    # Fallback when heket can't answer: "anthropic" or "openai". No key for the
     # chosen provider = no fallback (503 instead). Empty model = that provider's default
     # (server/llm_gateway_service.DEFAULT_FALLBACK_MODELS).
     fallback_provider: str = "anthropic"
@@ -79,12 +91,14 @@ class Settings(BaseSettings):
     fallback_chat_model: str = ""
     fallback_classify_model: str = ""
 
-    # TTS gateway (server/tts_service.py). Kokoro on frankencompute over Tailscale
-    # (frankencompute/kokoro_server.py), e.g. http://100.x.y.z:8880. bf_isabella was
-    # picked by ear over ElevenLabs and Chatterbox (docs/frankencompute-bench.md).
-    frankencompute_tts_url: str = "http://localhost:8880"
+    # TTS gateway (server/tts_service.py). Kokoro on heket over Tailscale
+    # (heket/kokoro_server.py), e.g. http://100.x.y.z:8880. bf_isabella was
+    # picked by ear over ElevenLabs and Chatterbox (docs/heket-bench.md).
+    heket_tts_url: str = Field(
+        "http://localhost:8880", validation_alias=AliasChoices("heket_tts_url", "frankencompute_tts_url"),
+    )
     tts_voice: str = "bf_isabella"
-    # Fallback when frankencompute can't speak. ALICE then sounds different (a different
+    # Fallback when heket can't speak. ALICE then sounds different (a different
     # voice), so it's optional: no key = no fallback (503, ALICE stays quiet but still
     # answers in the overlay). The rate prices tts_usage rows; 0 while on the free tier,
     # set it to the plan's per-1k-character rate once paying.
@@ -101,7 +115,7 @@ class Settings(BaseSettings):
     # ~250 spoken replies a day per pilot; a 3-hour session is ~20k.
     tts_daily_chars_per_user: int = 50_000
     # Hosted-fallback spend across ALL pilots per UTC day, from llm_usage. Past it, an
-    # outage means 503 instead of open-ended billing; a merely-busy frankencompute just
+    # outage means 503 instead of open-ended billing; a merely-busy heket just
     # queues instead of overflowing. 0 = no cap.
     fallback_daily_usd_cap: float = 5.0
 

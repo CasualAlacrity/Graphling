@@ -265,7 +265,11 @@ def _answered_by(response) -> tuple[str, str] | None:
     backend = info.get("alice_backend")
     if backend is None:
         return None
-    provider = "ollama" if backend == "frankencompute" else backend
+    # Servers before 2026-10-16 tagged local calls "frankencompute", heket's old nickname.
+    if backend in ("heket", "frankencompute"):
+        provider = "ollama"
+    else:
+        provider = backend
     return provider, info.get("model_name") or info.get("model") or "unknown"
 
 

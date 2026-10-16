@@ -1,4 +1,4 @@
-"""Hosted-model token prices and frankencompute's electricity price, shared by the desktop
+"""Hosted-model token prices and heket's electricity price, shared by the desktop
 client (turn_metrics.py) and the server (server/llm_gateway_service.py and
 server/tts_service.py, which price every call for llm_usage / tts_usage).
 
@@ -48,10 +48,10 @@ MODEL_PRICING: dict[tuple[str, str], ModelRates] = {
 }
 
 
-# ---- Local hardware (frankencompute) ----
+# ---- Local hardware (heket) ----
 #
 # A local call costs electricity, which scales with how long the box is busy, not with
-# tokens. Measured 2026-10-11 with a smart plug at the wall (docs/frankencompute-bench.md):
+# tokens. Measured 2026-10-11 with a smart plug at the wall (docs/heket-bench.md):
 # the box idles at ~80 W whether or not a model is loaded, and a gemma4 turn used
 # ~0.17 Wh above idle over ~2.9 s of model time, i.e. ~210 W on top of idle while busy.
 #
@@ -72,6 +72,6 @@ USD_PER_EUR = float(os.getenv("USD_PER_EUR", "1.10"))
 
 
 def local_energy_cost_usd(busy_ms: float, watts: float = LOCAL_BUSY_WATTS_ABOVE_IDLE) -> float:
-    """Electricity for `busy_ms` of frankencompute work, above idle, in USD."""
+    """Electricity for `busy_ms` of heket work, above idle, in USD."""
     kwh = (watts / 1000) * (busy_ms / 3_600_000)
     return kwh * ELECTRICITY_EUR_PER_KWH * USD_PER_EUR

@@ -1,6 +1,6 @@
 """Covers server/llm_gateway_service.py and server/routes/llm.py: request shaping, the
 Ollama <-> OpenAI translation on the fallback path, and the routing decision (pass
-through to frankencompute vs fall back). Outbound HTTP goes through httpx.MockTransport
+through to heket vs fall back). Outbound HTTP goes through httpx.MockTransport
 via the service's _http_client seam -- no real box, no real OpenAI -- and record_usage
 is swapped for a list, so nothing touches Postgres.
 """
@@ -33,7 +33,7 @@ CHAT_PAYLOAD = {
 
 @pytest.fixture(autouse=True)
 def fresh_state(monkeypatch):
-    monkeypatch.setattr(gateway, "state", gateway.FrankencomputeState())
+    monkeypatch.setattr(gateway, "state", gateway.HeketState())
     # The OpenAI-path tests below mock httpx; the Anthropic path has its own tests at the
     # bottom with a fake SDK client. No test may pick up a real key from .env.
     monkeypatch.setattr(settings, "fallback_provider", "openai")
@@ -42,7 +42,7 @@ def fresh_state(monkeypatch):
     monkeypatch.setattr(settings, "fallback_chat_model", "")
     monkeypatch.setattr(settings, "fallback_classify_model", "")
     monkeypatch.setattr(settings, "llm_max_inflight", 2)
-    monkeypatch.setattr(settings, "frankencompute_model_digest", "")
+    monkeypatch.setattr(settings, "heket_model_digest", "")
     # No test reaches Postgres for the budget; the budget tests set their own spend.
     monkeypatch.setattr(settings, "fallback_daily_usd_cap", 5.0)
     monkeypatch.setattr(gateway, "fallback_spend_today_usd", _spent(0.0))
@@ -86,12 +86,12 @@ async def collect(relay):
 
 # ---- request shaping ----
 
-def test_frankencompute_payload_resolves_the_role_and_strips_box_wide_settings():
+def test_heket_payload_resolves_the_role_and_strips_box_wide_settings():
     role = gateway.roles()["alice-chat"]
 
-    forwarded = gateway.frankencompute_payload(CHAT_PAYLOAD, role)
+    forwarded = gateway.heket_payload(CHAT_PAYLOAD, role)
 
-    assert forwarded["model"] == settings.frankencompute_chat_model
+    assert forwarded["model"] == settings.heket_chat_model
     assert forwarded["think"] is True
     assert "keep_alive" not in forwarded
     assert forwarded["options"] == {"temperature": 0.2}
@@ -170,7 +170,7 @@ def test_openai_cost_counts_cached_tokens_at_the_cache_rate():
 
 # ---- routing ----
 
-async def test_healthy_frankencompute_is_passed_through(monkeypatch, usage_rows):
+async def test_healthy_heket_is_passed_through(monkeypatch, usage_rows):
     seen = {}
 
     def handler(request):
@@ -188,11 +188,11 @@ async def test_healthy_frankencompute_is_passed_through(monkeypatch, usage_rows)
     chunks = await collect(relay)
 
     assert seen["url"].endswith("/api/chat")
-    assert seen["body"]["model"] == settings.frankencompute_chat_model
+    assert seen["body"]["model"] == settings.heket_chat_model
     assert relay.status_code == 200
     assert [chunk["message"]["content"] for chunk in chunks] == ["Try ", "Area18."]
-    assert chunks[-1]["alice_backend"] == "frankencompute"
-    assert usage_rows[0]["backend"] == "frankencompute"
+    assert chunks[-1]["alice_backend"] == "heket"
+    assert usage_rows[0]["backend"] == "heket"
     assert usage_rows[0]["prompt_tokens"] == 900
     assert usage_rows[0]["fallback_reason"] is None
     assert usage_rows[0]["inflight_at_start"] == 0
@@ -201,7 +201,7 @@ async def test_healthy_frankencompute_is_passed_through(monkeypatch, usage_rows)
     assert gateway.state.inflight == 0
 
 
-async def test_unreachable_frankencompute_falls_back_and_benches_the_box(monkeypatch, usage_rows):
+async def test_unreachable_heket_falls_back_and_benches_the_box(monkeypatch, usage_rows):
     def handler(request):
         if request.url.host == "api.openai.com":
             return httpx.Response(200, json={
@@ -225,7 +225,7 @@ async def test_unreachable_frankencompute_falls_back_and_benches_the_box(monkeyp
     assert gateway.state.down_until > 0
 
 
-async def test_a_frankencompute_5xx_falls_back(monkeypatch, usage_rows):
+async def test_a_heket_5xx_falls_back(monkeypatch, usage_rows):
     def handler(request):
         if request.url.host == "api.openai.com":
             return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}], "usage": {}})
@@ -238,7 +238,7 @@ async def test_a_frankencompute_5xx_falls_back(monkeypatch, usage_rows):
     assert usage_rows[0]["fallback_reason"] == "5xx"
 
 
-async def test_benched_frankencompute_is_skipped_without_trying_it(monkeypatch, usage_rows):
+async def test_benched_heket_is_skipped_without_trying_it(monkeypatch, usage_rows):
     tried = []
 
     def handler(request):
@@ -283,7 +283,7 @@ async def test_unknown_role_is_rejected():
 # ---- health probe ----
 
 async def test_probe_marks_a_digest_mismatch_as_down(monkeypatch):
-    monkeypatch.setattr(settings, "frankencompute_model_digest", "dc35e8d9c606")
+    monkeypatch.setattr(settings, "heket_model_digest", "dc35e8d9c606")
 
     def handler(request):
         return httpx.Response(200, json={"models": [{"name": "gemma4:latest", "digest": "eb2177adf764aaaa"}]})
@@ -296,7 +296,7 @@ async def test_probe_marks_a_digest_mismatch_as_down(monkeypatch):
 
 
 async def test_probe_marks_the_pinned_digest_as_up(monkeypatch):
-    monkeypatch.setattr(settings, "frankencompute_model_digest", "dc35e8d9c606")
+    monkeypatch.setattr(settings, "heket_model_digest", "dc35e8d9c606")
     gateway.state.mark_down("down", until=float("inf"))
 
     def handler(request):
@@ -489,7 +489,7 @@ async def test_an_outage_over_budget_is_refused_instead_of_billed(monkeypatch, u
     assert "api.openai.com" not in tried
 
 
-async def test_overflow_over_budget_queues_on_frankencompute(monkeypatch, usage_rows):
+async def test_overflow_over_budget_queues_on_heket(monkeypatch, usage_rows):
     def handler(request):
         assert request.url.host != "api.openai.com"
         return httpx.Response(200, headers={"content-type": "application/x-ndjson"}, text=ndjson(
@@ -502,7 +502,7 @@ async def test_overflow_over_budget_queues_on_frankencompute(monkeypatch, usage_
 
     await collect(await gateway.open_chat(CHAT_PAYLOAD, USER_ID))
 
-    assert usage_rows[0]["backend"] == "frankencompute"
+    assert usage_rows[0]["backend"] == "heket"
     assert usage_rows[0]["inflight_at_start"] == 3
 
 

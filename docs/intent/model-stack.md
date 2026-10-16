@@ -4,7 +4,7 @@
 - **2026-09-18:** the decisions below came out of the FrankenLab hardware discussion.
 - **2026-10-09:** the LLM gateway shipped (docs/llm-gateway.md). It does per-role models,
   fallback, timeouts and peak-diversion tagging.
-- **2026-10-11/12:** measured on the real hardware (docs/frankencompute-bench.md). The TTS role
+- **2026-10-11/12:** measured on the real hardware (docs/heket-bench.md). The TTS role
   was added.
 - **Still open:** hard spend caps, and the embedding / Uplink roles.
 
@@ -34,14 +34,14 @@ The client asks for a **role**, never a model. The Hetzner server picks the back
 
 | Role | Primary | Fallback | Notes |
 |---|---|---|---|
-| `alice-chat` | gemma4 `dc35e8d9c606` on frankencompute, thinking on | Claude Haiku 5.5 | Digest-pinned: a different build is treated as down |
-| `alice-classify` | gemma4 on frankencompute, thinking off | Claude Haiku 5.5 | Same loaded model as chat, so no extra VRAM |
-| speech (`/tts`) | Kokoro `bf_isabella` on frankencompute | ElevenLabs, only if a key is set | Different voice, so the fallback is optional |
+| `alice-chat` | gemma4 `dc35e8d9c606` on heket, thinking on | Claude Haiku 5.5 | Digest-pinned: a different build is treated as down |
+| `alice-classify` | gemma4 on heket, thinking off | Claude Haiku 5.5 | Same loaded model as chat, so no extra VRAM |
+| speech (`/tts`) | Kokoro `bf_isabella` on heket | ElevenLabs, only if a key is set | Different voice, so the fallback is optional |
 | STT | Whisper `base` on the pilot's machine | — | Free, no server load, keeps audio off the server |
 
 **Fallback triggers:**
 - **Failure:** connect error, timeout (2 s connect, 30 s between streamed chunks) or a 5xx.
-- **Peak diversion:** `overflow`, when frankencompute already has `LLM_MAX_INFLIGHT=3` requests
+- **Peak diversion:** `overflow`, when heket already has `LLM_MAX_INFLIGHT=3` requests
   running.
 
 Each LLM call writes an `llm_usage` row and each speech call a `tts_usage` row, with cost and
@@ -49,18 +49,18 @@ the fallback reason (docs/analytics.md).
 
 ## Decided
 
-- **Chat runs local on frankencompute.** *Built.* This is what drops marginal LLM cost per
+- **Chat runs local on heket.** *Built.* This is what drops marginal LLM cost per
   user to electricity, which is what makes a cheap subscription viable at all.
   - Measured: ~0.17 Wh, about €0.00006, per turn above idle.
   - Plus a fixed ~€20/month for the box being on (80 W idle).
 - **~~Classifier stays on a cheap hosted model (GPT-4o-mini).~~** *Superseded 2026-10-09:*
-  the classifier runs on frankencompute's gemma4, with thinking off.
+  the classifier runs on heket's gemma4, with thinking off.
   - **VRAM wasn't the constraint it was expected to be.** gemma4 with 3 parallel slots uses 6.4
     GB of 16, and classify reuses the already-loaded model, so it costs no extra VRAM.
   - **gemma4 honours Ollama's JSON-schema `format`,** so its structured output is reliable.
   - **Keeping it local takes the per-turn hosted call off every reply.**
   - Not every local model is like this. gpt-oss:20b ignores `format` entirely
-    (docs/frankencompute-bench.md), so any candidate has to be checked on structured output.
+    (docs/heket-bench.md), so any candidate has to be checked on structured output.
 - **Fallback ranks are ordered by cost-of-failure, not by quality.** *Built as one cheap
   rank:* Haiku 5.5, at ~$0.0002–0.0005 per call, $0.10/$0.50 per M tokens.
   - Haiku 4.5 was rejected at 10× the price and with worse tool use (33/45 vs 45/45).
@@ -86,7 +86,7 @@ the fallback reason (docs/analytics.md).
   `FALLBACK_DAILY_USD_CAP` (docs/llm-gateway.md, Limits). A runaway fallback can outspend a
   month of subscription revenue in a weekend. "ALICE is busy, try again shortly" is ugly
   and bounded; an uncapped key isn't.
-- **Wait vs. spend under load: spend, but rarely.** *Decided 2026-10-12.* frankencompute runs 3
+- **Wait vs. spend under load: spend, but rarely.** *Decided 2026-10-12.* heket runs 3
   parallel slots (`OLLAMA_NUM_PARALLEL=3`), and a 4th simultaneous request diverts to Haiku.
   - **Three-way sharing slows turns** from 2.9 s to ~5.0 s. Haiku answers in ~4.3 s, so beyond 3,
     diverting is the faster option, not just the more expensive one.
@@ -94,7 +94,7 @@ the fallback reason (docs/analytics.md).
     per active pilot: overflow is well under 1% of the time.
   - `inflight_at_start` on every `llm_usage` row replaces that estimate with real numbers.
 
-## Hardware: frankencompute (built 2026-10-08)
+## Hardware: heket (built 2026-10-08)
 
 | Part | Spec |
 |---|---|

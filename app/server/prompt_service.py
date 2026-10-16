@@ -3,7 +3,7 @@ persona/classifier text never ships to pilots (not in the installer, not over th
 
 The client sends a placeholder system message, {{alice-prompt:<name>}}
 (prompt_loader.prompt_messages); expand() replaces it with that prompt's messages before
-the request is routed anywhere, so frankencompute and both hosted fallbacks see the real
+the request is routed anywhere, so heket and both hosted fallbacks see the real
 text. Every ALICE prompt is static — no template variables, by design, so prewarming can
 match it (graph.decline_topic's note) — which is what makes a straight swap possible.
 

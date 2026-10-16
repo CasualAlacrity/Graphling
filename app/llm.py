@@ -19,7 +19,7 @@ ALICE_CLASSIFY_ROLE = "alice-classify"
 
 def _alice_llm(role: str, reasoning: bool) -> ChatOllama:
     """ChatOllama pointed at the gateway, which speaks Ollama's native /api/chat -- the
-    same protocol the evals ran against, so the frankencompute path is unchanged.
+    same protocol the evals ran against, so the heket path is unchanged.
 
     The gateway decides whether the model actually thinks (per role). `reasoning` here
     only mirrors that so ChatOllama keeps the thinking in each AIMessage and sends it

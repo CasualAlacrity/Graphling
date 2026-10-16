@@ -1,4 +1,4 @@
-"""Covers server/tts_service.py and server/routes/tts.py: Kokoro on frankencompute first,
+"""Covers server/tts_service.py and server/routes/tts.py: Kokoro on heket first,
 ElevenLabs only when the box can't answer and a key is configured, and one tts_usage row
 per attempt. Outbound HTTP goes through httpx.MockTransport via the _http_client seam --
 no real box, no real ElevenLabs -- and record_usage is swapped for a list.
@@ -63,7 +63,7 @@ def elevenlabs_ok(request):
     return httpx.Response(200, content=MP3, headers={"content-type": "audio/mpeg"})
 
 
-async def test_kokoro_on_frankencompute_answers_first(monkeypatch, usage_rows):
+async def test_kokoro_on_heket_answers_first(monkeypatch, usage_rows):
     seen = {}
 
     def handler(request):
@@ -75,11 +75,11 @@ async def test_kokoro_on_frankencompute_answers_first(monkeypatch, usage_rows):
 
     speech = await tts_service.speak("Baijini Point sells Laranite.", USER_ID)
 
-    assert speech == tts_service.Speech(audio=WAV, media_type="audio/wav", backend="frankencompute")
+    assert speech == tts_service.Speech(audio=WAV, media_type="audio/wav", backend="heket")
     assert seen["url"].endswith("/tts")
     assert b"bf_isabella" in seen["body"]
     row = usage_rows[0]
-    assert (row["backend"], row["status"], row["fallback_reason"]) == ("frankencompute", "ok", None)
+    assert (row["backend"], row["status"], row["fallback_reason"]) == ("heket", "ok", None)
     assert row["characters"] == len("Baijini Point sells Laranite.")
     assert row["audio_seconds"] == 5.62
     assert row["cost_usd"] > 0
@@ -119,7 +119,7 @@ async def test_a_kokoro_5xx_falls_back(monkeypatch, usage_rows, with_elevenlabs)
 
     assert speech.backend == "elevenlabs"
     attempts = [(row["backend"], row["status"]) for row in usage_rows]
-    assert attempts == [("frankencompute", "error"), ("elevenlabs", "ok")]
+    assert attempts == [("heket", "error"), ("elevenlabs", "ok")]
     assert usage_rows[1]["fallback_reason"] == "5xx"
 
 
@@ -174,6 +174,6 @@ def test_route_returns_audio_and_names_the_backend(monkeypatch, usage_rows):
     assert response.status_code == 200
     assert response.content == WAV
     assert response.headers["content-type"] == "audio/wav"
-    assert response.headers["X-Alice-TTS-Backend"] == "frankencompute"
+    assert response.headers["X-Alice-TTS-Backend"] == "heket"
     assert empty.status_code == 400
     assert too_long.status_code == 413

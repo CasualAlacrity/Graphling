@@ -129,7 +129,7 @@ outside the console.
 | Capability | Affordances / states | Pri | Notes |
 |---|---|---|---|
 | Connection | Connected / reconnecting / server unreachable | P0 | Tray icon state, plus the workbench status line. |
-| Degraded voice or brain | "Running on backup" when frankencompute is down and Haiku or ElevenLabs answers | P1 | Open question in docs/llm-gateway.md: show it at all? Lean: a small indicator, never spoken. |
+| Degraded voice or brain | "Running on backup" when heket is down and Haiku or ElevenLabs answers | P1 | Open question in docs/llm-gateway.md: show it at all? Lean: a small indicator, never spoken. |
 | Limits hit | "Slow down a moment" (rate limit); "Voice resumes tomorrow" (daily speech guard) | P0 | Text from the 429 responses. |
 | Data freshness | Prices are from UEX, cached up to 30 min | P2 | Relevant once crowd-sourced OCR data exists. |
 

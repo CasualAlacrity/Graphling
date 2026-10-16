@@ -146,7 +146,7 @@ _PREWARM_TARGETS = [
 _warmed: set[str] = set()
 
 # Providers that end up on an Ollama prefix cache: a local Ollama, or ALICE's gateway,
-# which relays to Ollama on frankencompute. Hosted providers have no such cold start.
+# which relays to Ollama on heket. Hosted providers have no such cold start.
 _PREWARM_PROVIDERS = ("ollama", "alice")
 
 
@@ -162,12 +162,12 @@ async def prewarm() -> None:
     model-loading cost, and Ollama's cache is keyed on the actual prompt content —
     which is why this replays the real prompts rather than sending something
     arbitrary. Runs for LLM_PROVIDER=alice too: the gateway relays to Ollama on
-    frankencompute. A pilot's first turn spent ~20s in classify on 2026-10-15, most
+    heket. A pilot's first turn spent ~20s in classify on 2026-10-15, most
     likely this cold prompt.
     The box's cache is shared, so one pilot's warm-up also warms it for the others.
     Hosted providers don't have this cold-start cost, so this is a no-op for them
     rather than spending real money on a call that buys nothing. (With alice, a warm-up
-    can still land on the hosted fallback while frankencompute is down; that's three
+    can still land on the hosted fallback while heket is down; that's three
     small metered calls per launch, accepted for now.)
 
     Idempotent via _warmed — safe to call more than once; only targets not already
