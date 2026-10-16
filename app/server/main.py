@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from server import llm_gateway_service, prompt_service, uex_route_prefetch
+from server import llm_gateway_service, prompt_service, topic_decision_service, uex_route_prefetch
 from server.routes.auth import router as auth_router
 from server.routes.ledger import router as ledger_router
 from server.routes.llm import router as llm_router
@@ -26,8 +26,9 @@ async def lifespan(app: FastAPI):
     await prompt_service.refresh()
     prompt_task = asyncio.create_task(prompt_service.refresh_forever())
     prefetch_task = asyncio.create_task(uex_route_prefetch.prefetch_forever())
+    topic_warm_task = asyncio.create_task(topic_decision_service.warm_forever())
     yield
-    for task in (probe_task, prompt_task, prefetch_task):
+    for task in (probe_task, prompt_task, prefetch_task, topic_warm_task):
         task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await task

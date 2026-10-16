@@ -105,3 +105,49 @@ def test_route_answers_the_kind_and_503s_when_unavailable(monkeypatch):
 
 def test_route_requires_authentication():
     assert TestClient(app).post("/llm/decide/topic", json={"utterance": "Hi"}).status_code in (401, 403)
+
+
+async def test_a_cold_topic_model_gets_loaded_without_benching_heket(monkeypatch):
+    calls = []
+
+    def handler(request):
+        calls.append(request.url.path)
+        if request.url.path == "/api/ps":
+            return httpx.Response(200, json={"models": [{"name": "gemma4:latest"}]})
+        return _answer("social", 0.99)
+
+    _heket(monkeypatch, handler)
+
+    await service.warm_if_cold()
+
+    assert calls == ["/api/ps", "/v1/systemone"]
+    assert gateway.state.down_reason is None
+
+
+async def test_a_loaded_topic_model_or_a_down_heket_is_left_alone(monkeypatch):
+    calls = []
+
+    def handler(request):
+        calls.append(request.url.path)
+        return httpx.Response(200, json={"models": [{"name": "tev1:4b"}]})
+
+    _heket(monkeypatch, handler)
+    await service.warm_if_cold()
+    assert calls == ["/api/ps"]
+
+    gateway.state.mark_down("warming", float("inf"))
+    await service.warm_if_cold()
+    assert calls == ["/api/ps"]
+
+
+async def test_a_failed_warm_up_never_benches_heket(monkeypatch):
+    def handler(request):
+        if request.url.path == "/api/ps":
+            return httpx.Response(200, json={"models": []})
+        return httpx.Response(404, json={"error": "model not found"})
+
+    _heket(monkeypatch, handler)
+
+    await service.warm_if_cold()
+
+    assert gateway.state.down_reason is None

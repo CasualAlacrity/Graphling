@@ -7,7 +7,14 @@ the call fails, the route answers 503 and the client falls back to its alice-cla
 chat-model classifier, which goes through the normal gateway (and its own fallback).
 A Tev1 failure doesn't mark heket down: it can be Tev1-specific (not pulled), while chat
 on heket still works.
+
+Warming is separate from the chat warm-up (llm_gateway_service.probe_once) for the same
+reason: that one benches heket until its models are loaded, and a Tev1 that can't load
+must never take chat down with it. Tev1 loads in ~9 s, past TIMEOUT_S, so without its own
+warm-up a decision request would time out and cancel the load every time.
 """
+import asyncio
+import logging
 import time
 import uuid
 
@@ -18,10 +25,14 @@ from model_pricing import local_energy_cost_usd
 from server import llm_gateway_service as gateway
 from server.config import settings
 
+log = logging.getLogger(__name__)
+
 ROLE = "alice-topic"
 # A decision takes ~30 ms once loaded and ~9 s to load cold; past this the client's
 # fallback answers faster than waiting would.
 TIMEOUT_S = 3.0
+WARMUP_TIMEOUT_S = 120.0
+WARM_CHECK_INTERVAL_S = 15.0
 
 
 class TopicDecisionUnavailable(RuntimeError):
@@ -67,3 +78,36 @@ async def decide(utterance: str, user_id: uuid.UUID) -> dict:
         "choice": choice,
         "confidence": confidence,
     }
+
+
+async def warm_if_cold() -> None:
+    """Loads the topic model on heket if it isn't loaded and heket is otherwise up. Owned
+    by the server, so no pilot request's timeout can cancel the load; never benches heket."""
+    model = settings.heket_topic_model
+    if not model or gateway.skip_heket_reason(time.monotonic()) is not None:
+        return
+    tag = model if ":" in model else f"{model}:latest"
+    try:
+        async with gateway._http_client(base_url=settings.heket_url, timeout=5.0) as client:
+            response = await client.get("/api/ps")
+            response.raise_for_status()
+            loaded = set()
+            for running in response.json().get("models", []):
+                loaded.add(running.get("name"))
+                loaded.add(running.get("model"))
+        if tag in loaded:
+            return
+        log.info("warming %s on heket", tag)
+        started = time.monotonic()
+        async with gateway._http_client(base_url=settings.heket_url, timeout=WARMUP_TIMEOUT_S) as client:
+            response = await client.post("/v1/systemone", json=topic_decision.request_body(model, "Good morning."))
+            response.raise_for_status()
+        log.info("%s warm on heket after %.1f s", tag, time.monotonic() - started)
+    except (httpx.HTTPError, ValueError) as exc:
+        log.warning("warming %s on heket failed: %r", tag, exc)
+
+
+async def warm_forever() -> None:
+    while True:
+        await warm_if_cold()
+        await asyncio.sleep(WARM_CHECK_INTERVAL_S)
