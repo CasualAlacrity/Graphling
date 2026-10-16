@@ -74,6 +74,12 @@ OPENAI_TIMEOUT_S = 60.0
 # (probe_forever) can clear it sooner.
 DOWN_FOR_S = 30.0
 PROBE_INTERVAL_S = 15.0
+# How long the server's own warm-up may take to load a role's model. A cold gemma4 took
+# ~35 s after an Ollama restart (2026-10-16: ~21 s load plus a slow first prompt), more
+# than READ_TIMEOUT_S -- so a pilot request can't do the load itself: it times out, and
+# the cancel kills the half-done load ("llama-server terminated signal: killed"), so
+# every retry started from zero and the box never warmed up.
+WARMUP_TIMEOUT_S = 300.0
 
 
 def _http_client(**kwargs) -> httpx.AsyncClient:
@@ -498,7 +504,8 @@ async def record_usage(**fields) -> None:
 # ---- health probe ----
 
 async def probe_once() -> None:
-    """Marks heket up or down from its own /api/tags, including the digest pin."""
+    """Marks heket up or down from its own /api/tags, including the digest pin, and
+    keeps it benched as "warming" while a role's model isn't loaded (/api/ps)."""
     try:
         async with _http_client(base_url=settings.heket_url, timeout=5.0) as client:
             response = await client.get("/api/tags")
@@ -524,10 +531,91 @@ async def probe_once() -> None:
             state.mark_down("digest_mismatch", math.inf)
             return
 
+    cold = await cold_models()
+    if cold:
+        # Up, but a pilot request would have to wait for the load. Keep pilots on the
+        # fallback until the server's own warm-up has loaded every role's model; the
+        # next probe after it finishes marks the box up.
+        state.mark_down("warming", math.inf)
+        start_warmup(cold)
+        return
+
     state.mark_up()
 
 
+def _tagged(model: str) -> str:
+    return model if ":" in model else f"{model}:latest"
+
+
+async def cold_models() -> list[str]:
+    """The roles' heket models that Ollama doesn't have loaded right now (/api/ps).
+    Empty if /api/ps can't be read -- the box answered /api/tags, so don't bench it
+    over a check that only exists to save pilots a slow first turn."""
+    try:
+        async with _http_client(base_url=settings.heket_url, timeout=5.0) as client:
+            response = await client.get("/api/ps")
+            response.raise_for_status()
+            running = response.json().get("models", [])
+    except (httpx.HTTPError, ValueError):
+        log.warning("couldn't read heket's loaded models; assuming they're warm")
+        return []
+
+    loaded = set()
+    for model in running:
+        loaded.add(model.get("name"))
+        loaded.add(model.get("model"))
+
+    cold = []
+    for role in roles().values():
+        tag = _tagged(role.heket_model)
+        if tag not in loaded and tag not in cold:
+            cold.append(tag)
+    return cold
+
+
+_warmup_task: asyncio.Task | None = None
+
+
+def start_warmup(models: list[str]) -> None:
+    """Loads models on heket in a background task, unless a warm-up is already running.
+    The task belongs to the server, not to any pilot request, so nothing a pilot does
+    (timing out, hanging up) can cancel the load halfway."""
+    global _warmup_task
+    if _warmup_task is not None and not _warmup_task.done():
+        return
+    _warmup_task = asyncio.create_task(warm_up(models))
+
+
+async def warm_up(models: list[str]) -> None:
+    """One tiny chat per model: loads it, and runs a first prompt through it too, since
+    the first prompt after a load was also slow. No keep_alive is sent, so the box's
+    own OLLAMA_KEEP_ALIVE decides how long the model stays."""
+    timeout = httpx.Timeout(WARMUP_TIMEOUT_S, connect=CONNECT_TIMEOUT_S)
+    async with _http_client(base_url=settings.heket_url, timeout=timeout) as client:
+        for model in models:
+            log.info("warming %s on heket", model)
+            started = time.monotonic()
+            try:
+                response = await client.post("/api/chat", json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": "ping"}],
+                    "stream": False,
+                    "think": False,
+                    "options": {"num_predict": 1},
+                })
+                response.raise_for_status()
+            except httpx.HTTPError as exc:
+                # The probe keeps heket benched and tries again on its next round.
+                log.warning("warming %s on heket failed: %r", model, exc)
+                return
+            log.info("%s warm on heket after %.1f s", model, time.monotonic() - started)
+
+
 async def probe_forever() -> None:
-    while True:
-        await probe_once()
-        await asyncio.sleep(PROBE_INTERVAL_S)
+    try:
+        while True:
+            await probe_once()
+            await asyncio.sleep(PROBE_INTERVAL_S)
+    finally:
+        if _warmup_task is not None:
+            _warmup_task.cancel()

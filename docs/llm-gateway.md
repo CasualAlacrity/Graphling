@@ -166,6 +166,13 @@ everything straight to fallback. That way every turn doesn't pay the 2 s timeout
 off. A background task probes `GET /api/version` every 15 s and marks it *up* again. In-memory
 state is fine: one server process, the same assumption `_PENDING_LOGINS` already makes.
 
+**Warm-up (added 2026-10-16):** the probe also reads `/api/ps`. If a role's model isn't loaded
+(after an Ollama restart, say), heket stays benched as `warming` and the server loads the model
+itself with a tiny chat request (5-minute timeout, no `keep_alive`, one at a time); the next probe
+after it finishes marks heket up. Before this, a cold gemma4 (~35 s to load and answer) outlasted
+the 30 s pilot timeout, and each timed-out pilot request cancelled the half-done load, so heket
+never warmed up on its own.
+
 ### Usage log
 
 New table `llm_usage` (Alembic migration):
@@ -178,7 +185,7 @@ New table `llm_usage` (Alembic migration):
 | `prompt_tokens`, `completion_tokens` | from the backend's `usage` |
 | `latency_ms` | gateway-measured |
 | `status` | `ok` / `error` |
-| `fallback_reason` | null, or `down` / `timeout` / `5xx` / `overflow` |
+| `fallback_reason` | null, or `down` / `timeout` / `5xx` / `overflow` / `warming` / `digest_mismatch` |
 
 This table is the seed of the subscription story: cost per user, who's active, and how often
 fallback (real money) fires. It's the server-side counterpart to the turn-metrics → Grafana idea.
