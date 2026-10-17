@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class UEXTradeData(BaseModel):
@@ -20,6 +20,10 @@ class UEXTradeData(BaseModel):
 
 
 class UEXTradeRoute(BaseModel):
+    # The client re-sends a route to the ledger server dumped by field name (commodity_id),
+    # not by UEX's id_* alias, so both spellings must validate.
+    model_config = ConfigDict(populate_by_name=True)
+
     commodity_id: int = Field(validation_alias="id_commodity")
     commodity_name: str
     origin_terminal_id: int = Field(validation_alias="id_terminal_origin")
