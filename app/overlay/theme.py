@@ -59,13 +59,14 @@ BORDER_SUBTLE = "#24272A"
 
 TEXT_PRIMARY = "#EDEAE4"
 TEXT_SECONDARY = "#9AA0A6"
-TEXT_DISABLED = "#5C6266"
+TEXT_DISABLED = "#7A8085"
 
 ACCENT = "#F2650C"
 ACCENT_HOVER = "#FF7A1F"
 ACCENT_ACTIVE = "#C94F00"
 ACCENT_MUTED = "rgba(242, 101, 12, 40)"
 FOCUS_RING = "#FF9142"
+ON_ACCENT = "#1A1200"  # text/icons on orange and green fills
 
 SUCCESS = "#4CAF6D"
 WARNING = "#E8B23A"
@@ -98,6 +99,8 @@ QTabBar::tab {{
     font-weight: 600;
     border: 1px solid {BORDER};
     border-bottom: none;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
     padding: 6px 18px;
     margin-right: 2px;
 }}
@@ -154,9 +157,10 @@ QLineEdit, QComboBox, QSpinBox {{
     font-size: 12px;
     min-height: 18px;
     padding: 5px 7px;
+    border-radius: 6px;
 }}
 QLineEdit:focus, QComboBox:focus, QSpinBox:focus {{
-    border: 1px solid {FOCUS_RING};
+    border: 1px solid {ACCENT};
 }}
 QLineEdit:disabled {{
     color: {TEXT_DISABLED};
@@ -166,7 +170,7 @@ QComboBox QAbstractItemView {{
     border: 1px solid {BORDER};
     color: {TEXT_PRIMARY};
     selection-background-color: {ACCENT};
-    selection-color: {BG};
+    selection-color: {ON_ACCENT};
 }}
 
 QPushButton#filterIconToggle {{
@@ -177,6 +181,7 @@ QPushButton#filterIconToggle {{
     max-width: 30px;
     min-height: 30px;
     max-height: 30px;
+    border-radius: 6px;
 }}
 QPushButton#filterIconToggle:hover {{
     border-color: {FOCUS_RING};
@@ -198,6 +203,7 @@ QPushButton {{
     font-weight: 600;
     padding: 4px 16px;
     border: 1px solid {BORDER};
+    border-radius: 6px;
     background-color: transparent;
     color: {TEXT_SECONDARY};
 }}
@@ -208,7 +214,7 @@ QPushButton:hover {{
 QPushButton#primaryButton {{
     background-color: {ACCENT};
     border: 1px solid {ACCENT};
-    color: {BG};
+    color: {ON_ACCENT};
 }}
 QPushButton#primaryButton:hover {{
     background-color: {ACCENT_HOVER};
@@ -322,7 +328,7 @@ QPushButton#addRouteButton {{
 QPushButton#addRouteButton:hover {{
     background-color: {ACCENT};
     border-color: {ACCENT};
-    color: {BG};
+    color: {ON_ACCENT};
 }}
 QPushButton#addRouteButton:pressed {{
     background-color: {ACCENT_ACTIVE};
@@ -372,9 +378,9 @@ QScrollArea#cardScrollArea QScrollBar::sub-page:vertical {{
 }}
 
 QFrame#tradeRunCard {{
-    background: transparent;
-    border: none;
-    border-bottom: 1px solid {BORDER_SUBTLE};
+    background-color: {SURFACE};
+    border: 1px solid {BORDER_SUBTLE};
+    border-radius: 10px;
 }}
 QLabel#runShip {{
     color: {TEXT_PRIMARY};
@@ -395,14 +401,8 @@ QLabel#legBadge {{
     font-weight: 700;
     padding: 1px 6px;
     border: 1px solid {BORDER};
-}}
-QLabel#legBadge[legType="acquisition"] {{
-    color: {INFO};
-    border-color: {INFO};
-}}
-QLabel#legBadge[legType="sale"] {{
-    color: {SUCCESS};
-    border-color: {SUCCESS};
+    border-radius: 4px;
+    color: {TEXT_SECONDARY};
 }}
 QLabel#legTerminal {{
     color: {TEXT_PRIMARY};
@@ -416,9 +416,9 @@ QLabel#legDetail {{
     font-size: 10.5px;
 }}
 QPushButton#markDoneButton {{
-    background-color: {SUCCESS};
-    border: 1px solid {SUCCESS};
-    color: {BG};
+    background-color: {ACCENT};
+    border: 1px solid {ACCENT};
+    color: {ON_ACCENT};
     font-family: {DISPLAY_FONT};
     font-size: 13px;
     font-weight: 600;
@@ -428,15 +428,62 @@ QPushButton#markDoneButton:hover {{
     background-color: {ACCENT_HOVER};
     border-color: {ACCENT_HOVER};
 }}
+QPushButton#markDoneButton:pressed {{
+    background-color: {ACCENT_ACTIVE};
+    border-color: {ACCENT_ACTIVE};
+}}
 QPushButton#finalizeRunButton {{
     background-color: {SUCCESS};
     border: 1px solid {SUCCESS};
-    color: {BG};
+    color: {ON_ACCENT};
+    padding: 6px;
 }}
-QPushButton#finalizeRunButton:disabled {{
-    background-color: transparent;
-    border: 1px solid {BORDER};
+QPushButton#finalizeRunButton:hover {{
+    background-color: #5FC27F;
+    border-color: #5FC27F;
+}}
+QFrame#finalizeSummaryCard {{
+    background-color: {SURFACE_ALT};
+    border: 1px solid {BORDER_SUBTLE};
+    border-left: 3px solid {SUCCESS};
+    border-radius: 8px;
+}}
+QLabel#summaryLabel {{
+    color: {TEXT_SECONDARY};
+    font-family: {MONO_FONT};
+    font-size: 11.5px;
+}}
+QLabel#summaryValue {{
+    color: {TEXT_PRIMARY};
+    font-family: {MONO_FONT};
+    font-size: 11.5px;
+}}
+QFrame#summaryRule {{
+    background-color: {BORDER_SUBTLE};
+    border: none;
+}}
+QLabel#summaryProfit {{
+    font-family: {MONO_FONT};
+    font-size: 15px;
+    font-weight: 700;
+    color: {TEXT_PRIMARY};
+}}
+QLabel#summaryProfit[profitable="true"] {{
+    color: {SUCCESS};
+}}
+QLabel#summaryProfit[profitable="false"] {{
+    color: {ERROR};
+}}
+QLabel#summaryWarning {{
     color: {TEXT_DISABLED};
+    font-family: {LABEL_FONT};
+    font-size: 10.5px;
+    padding: 4px 0px;
+}}
+QLabel#upcomingStepHint {{
+    color: {TEXT_DISABLED};
+    font-family: {MONO_FONT};
+    font-size: 10px;
 }}
 QPushButton#abandonRunButton {{
     border: 1px solid {ERROR};
@@ -509,21 +556,7 @@ QLabel#ledgerDayTotalLabel {{
 QPushButton#chevronButton {{
     background: transparent;
     border: none;
-    color: {TEXT_SECONDARY};
-    font-size: 14px;
-    font-weight: 700;
     padding: 0px 4px;
-}}
-QPushButton#chevronButton:hover {{
-    color: {ACCENT};
-}}
-QPushButton#chevronButton[small="true"] {{
-    color: {TEXT_DISABLED};
-    font-size: 10px;
-    font-weight: 400;
-}}
-QPushButton#chevronButton[small="true"]:hover {{
-    color: {ACCENT};
 }}
 
 QWidget#legSummaryRow {{
@@ -589,9 +622,9 @@ QLabel#dialogTotal {{
     font-weight: 700;
 }}
 QPushButton#confirmButton {{
-    background-color: {SUCCESS};
-    border: 1px solid {SUCCESS};
-    color: {BG};
+    background-color: {ACCENT};
+    border: 1px solid {ACCENT};
+    color: {ON_ACCENT};
     font-family: {DISPLAY_FONT};
     font-size: 13px;
     font-weight: 600;
@@ -642,12 +675,12 @@ QLabel#breadcrumbDot {{
 QLabel#breadcrumbDot[done="true"] {{
     border-color: {SUCCESS};
     background-color: {SUCCESS};
-    color: {BG};
+    color: {ON_ACCENT};
 }}
 QLabel#breadcrumbDot[current="true"] {{
     border-color: {ACCENT};
     background-color: {ACCENT};
-    color: {BG};
+    color: {ON_ACCENT};
 }}
 QLabel#breadcrumbLabel {{
     color: {TEXT_DISABLED};

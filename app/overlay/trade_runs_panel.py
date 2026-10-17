@@ -45,6 +45,16 @@ LEDGER_PROFIT_COLUMN_WIDTH = 110
 LEDGER_SCROLLBAR_COLUMN_WIDTH = 10
 
 
+def _make_chevron(parent, expanded, small=False):
+    button = QPushButton(parent=parent, objectName="chevronButton")
+    if small:
+        button.setProperty("small", True)
+    color = theme.TEXT_DISABLED if small else theme.TEXT_SECONDARY
+    button.setIcon(theme.load_icon("chevron-down" if expanded else "chevron-right", color, size=16))
+    button.setIconSize(QSize(14, 14))
+    return button
+
+
 def _build_scroll_list(parent, header_text, column_header=None, help_text=None):
     """Shared scaffold for both panels: a header label over a scrollable, top-packed
     column of cards. Uses a plain QScrollArea + QVBoxLayout rather than QListWidget —
@@ -63,7 +73,8 @@ def _build_scroll_list(parent, header_text, column_header=None, help_text=None):
     layout = QVBoxLayout(parent)
     layout.setContentsMargins(12, 5, 12, 6)
     layout.setSpacing(2)
-    layout.addWidget(QLabel(parent=parent, text=header_text, objectName="panelHeader"))
+    if header_text is not None:
+        layout.addWidget(QLabel(parent=parent, text=header_text, objectName="panelHeader"))
     if help_text is not None:
         help_label = QLabel(parent=parent, text=help_text, objectName="panelHelpText")
         help_label.setWordWrap(True)
@@ -230,6 +241,19 @@ def _projected_totals(run, draft_by_leg_id):
     return investment, revenue - investment - fees
 
 
+def _run_totals(run):
+    """(investment, revenue, fees) from recorded leg values — no drafts, since this is
+    only shown once every leg is finalized."""
+    investment, revenue, fees = 0, 0, 0
+    for leg in run.legs:
+        fees += leg.cargo_transfer_fee
+        if leg.leg_type == LegType.ACQUISITION:
+            investment += leg.quantity_scu * leg.price_per_unit
+        else:
+            revenue += leg.quantity_scu * leg.price_per_unit
+    return investment, revenue, fees
+
+
 class TradeRunsPanel(HudWindow):
     run_finalized = Signal(object)
     runs_changed = Signal(int)
@@ -259,7 +283,7 @@ class TradeRunsPanel(HudWindow):
 
     def _build_ui(self):
         self.runs_list, self._runs_content_layout = _build_scroll_list(
-            self, "▸ TRADE RUNS IN PROGRESS",
+            self, None,
             help_text=(
                 "Each run tracks one Acquisition and one Sale leg. Work through a leg's "
                 "milestones in order — travel, transact, confirm — then Finalize once "
@@ -322,12 +346,13 @@ class TradeRunsPanel(HudWindow):
         for leg in trade_run_store.ordered_legs(run):
             is_current = leg.id == (current_leg.id if current_leg else None)
             body_layout.addWidget(self._build_leg_container(run, leg, is_current))
-        if not _is_ready_to_finalize(run):
+        if _is_ready_to_finalize(run):
+            body_layout.addWidget(self._build_finalize_summary(run))
+        else:
             # Every leg gets its own row already (current or collapsed "Pending"), but
             # finalization itself had no representation at all until every leg was
-            # already done — this greyed row previews that it's still coming.
+            # already done — this dim row previews that it's still coming.
             body_layout.addWidget(self._build_upcoming_finalize_row())
-        body_layout.addWidget(self._build_run_footer(run))
         # Reparent into the card's layout BEFORE touching visibility — setVisible() on a
         # still-parentless QWidget makes Qt treat it as a top-level window for a moment,
         # which corrupts the paint state of deeply-nested children once it's reparented
@@ -346,7 +371,7 @@ class TradeRunsPanel(HudWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
 
-        chevron = QPushButton(parent=row, text="▾" if expanded else "▸", objectName="chevronButton")
+        chevron = _make_chevron(row, expanded)
         chevron.clicked.connect(lambda checked=False, rid=run.id, cur=expanded: self._toggle_run(rid, cur))
         layout.addWidget(chevron)
 
@@ -382,7 +407,7 @@ class TradeRunsPanel(HudWindow):
 
         if _can_abandon(run):
             abandon_button = QPushButton(parent=row, objectName="abandonRunButton")
-            abandon_button.setIcon(theme.load_icon("trash-can", theme.ERROR))
+            abandon_button.setIcon(theme.load_icon("trash", theme.ERROR))
             abandon_button.setIconSize(QSize(14, 14))
             abandon_button.setToolTip("Abandon run")
             abandon_button.clicked.connect(lambda checked=False, rid=run.id: self._on_abandon(rid))
@@ -428,12 +453,11 @@ class TradeRunsPanel(HudWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
-        chevron = QPushButton(parent=row, text="▾" if expanded else "▸", objectName="chevronButton")
-        chevron.setProperty("small", True)
+        chevron = _make_chevron(row, expanded, small=True)
         chevron.clicked.connect(lambda checked=False, lid=leg.id, cur=expanded: self._toggle_leg(lid, cur))
         layout.addWidget(chevron)
 
-        badge = QLabel(parent=row, text="BUY" if leg.leg_type == LegType.ACQUISITION else "SELL", objectName="legBadge")
+        badge = QLabel(parent=row, text="↓ BUY" if leg.leg_type == LegType.ACQUISITION else "↑ SELL", objectName="legBadge")
         badge.setProperty("legType", leg.leg_type.value)
         badge.style().unpolish(badge)
         badge.style().polish(badge)
@@ -552,22 +576,53 @@ class TradeRunsPanel(HudWindow):
         row = QWidget(objectName="upcomingStepRow")
         layout = QHBoxLayout(row)
         layout.setContentsMargins(28, 2, 4, 2)
-        layout.addWidget(QLabel(parent=row, text="Run Summary and Finalization", objectName="upcomingStepLabel"))
+        layout.addWidget(QLabel(parent=row, text="Run summary and finalization", objectName="upcomingStepLabel"))
         layout.addStretch()
+        layout.addWidget(QLabel(parent=row, text="after both legs are finalized", objectName="upcomingStepHint"))
         return row
 
-    def _build_run_footer(self, run):
-        row = QWidget()
-        layout = QHBoxLayout(row)
-        layout.setContentsMargins(0, 4, 0, 0)
-        layout.addStretch()
+    def _build_finalize_summary(self, run):
+        """Only exists once every leg is finalized — Finalize Run is the one irreversible
+        step, so it isn't shown (even greyed) until the pilot can actually take it."""
+        investment, revenue, fees = _run_totals(run)
+        profit = revenue - investment - fees
 
-        finalize_button = QPushButton(parent=row, text="Finalize Run", objectName="finalizeRunButton")
-        finalize_button.setEnabled(_is_ready_to_finalize(run))
+        card = QFrame(objectName="finalizeSummaryCard")
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(14, 10, 14, 12)
+        layout.setSpacing(4)
+
+        for caption, amount in (("Revenue", revenue), ("Invested", investment), ("Fees", fees)):
+            line = QHBoxLayout()
+            line.addWidget(QLabel(parent=card, text=caption, objectName="summaryLabel"))
+            line.addStretch()
+            line.addWidget(QLabel(parent=card, text=f"{amount:,} aUEC", objectName="summaryValue"))
+            layout.addLayout(line)
+
+        rule = QFrame(parent=card, objectName="summaryRule")
+        rule.setFixedHeight(1)
+        layout.addWidget(rule)
+
+        profit_line = QHBoxLayout()
+        profit_line.addWidget(QLabel(parent=card, text="Profit", objectName="summaryLabel"))
+        profit_line.addStretch()
+        profit_label = QLabel(parent=card, text=f"{profit:+,} aUEC", objectName="summaryProfit")
+        profit_label.setProperty("profitable", profit >= 0)
+        profit_line.addWidget(profit_label)
+        layout.addLayout(profit_line)
+
+        warning = QLabel(
+            parent=card,
+            text="Moves this run to the Ledger. Recorded values can't be changed after this.",
+            objectName="summaryWarning",
+        )
+        warning.setWordWrap(True)
+        layout.addWidget(warning)
+
+        finalize_button = QPushButton(parent=card, text="Finalize Run", objectName="finalizeRunButton")
         finalize_button.clicked.connect(lambda checked=False, rid=run.id: self._on_finalize(rid))
         layout.addWidget(finalize_button)
-
-        return row
+        return card
 
     def _toggle_run(self, run_id, currently_expanded):
         self._run_expanded[run_id] = not currently_expanded
@@ -668,7 +723,7 @@ class TradeLedgerPanel(HudWindow):
 
     def _build_ui(self):
         self.ledger_list, self._ledger_content_layout = _build_scroll_list(
-            self, "▸ LEDGER", column_header=self._build_column_header_row()
+            self, None, column_header=self._build_column_header_row()
         )
         # Always-on (not as-needed) so the scrollbar's width is reserved consistently —
         # otherwise rows narrow by LEDGER_SCROLLBAR_COLUMN_WIDTH only once there's enough
@@ -780,7 +835,7 @@ class TradeLedgerPanel(HudWindow):
         layout.setContentsMargins(0, 6, 0, 4)
         layout.setSpacing(10)
 
-        chevron = QPushButton(parent=row, text="▾" if expanded else "▸", objectName="chevronButton")
+        chevron = _make_chevron(row, expanded)
         chevron.clicked.connect(lambda checked=False, d=day, cur=expanded: self._toggle_day(d, cur))
         layout.addWidget(chevron)
 

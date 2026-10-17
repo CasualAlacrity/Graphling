@@ -219,11 +219,10 @@ def test_only_the_current_leg_gets_a_live_dialog(trade_runs_panel):
     assert len(card.findChildren(TravelWidget)) == 1
 
 
-def test_finalize_button_disabled_until_every_leg_is_finalized(trade_runs_panel):
+def test_finalize_button_absent_until_every_leg_is_finalized(trade_runs_panel):
     run = make_trade_run(legs=[make_trade_leg(LegType.ACQUISITION), make_trade_leg(LegType.SALE)])
     card = trade_runs_panel._build_run_card(run, 0)
-    finalize_button = card.findChild(QPushButton, "finalizeRunButton")
-    assert finalize_button.isEnabled() is False
+    assert card.findChild(QPushButton, "finalizeRunButton") is None
 
 
 def test_finalize_button_enabled_when_every_leg_is_finalized(trade_runs_panel):
@@ -238,7 +237,9 @@ def test_finalize_button_enabled_when_every_leg_is_finalized(trade_runs_panel):
     run = make_trade_run(legs=[_finished(LegType.ACQUISITION), _finished(LegType.SALE)])
     card = trade_runs_panel._build_run_card(run, 0)
     finalize_button = card.findChild(QPushButton, "finalizeRunButton")
+    assert finalize_button is not None
     assert finalize_button.isEnabled() is True
+    assert card.findChild(QLabel, "summaryProfit") is not None
 
 
 def test_upcoming_finalize_row_shown_while_a_leg_is_unfinished(trade_runs_panel):
