@@ -48,6 +48,9 @@ def format_duration(seconds: float) -> str:
 # volatility_price_* value is a currency stddev, meaningless without dividing by price.
 # Thresholds are from real sampling across 210 live commodity/terminal price rows
 # (p25=1.7%, median=3.6%, p75=7.0%, p90=11.2%), not guessed.
+# How many result rows are shown — and so the most that get volatility/travel time fetched.
+DISPLAYED_ROUTES = 20
+
 VOLATILITY_STABLE_MAX = 0.03
 VOLATILITY_MODERATE_MAX = 0.08
 
@@ -226,15 +229,22 @@ class ResultsPanel(HudWindow):
         # (gray "Unknown" dots, blank time) rather than making the user wait on a
         # network round trip before seeing results at all. Keeps whichever sort
         # (Profit/Margin) is already selected instead of resetting it every search.
+        # Ranked once, then reused: ranking runs the container-packing DP per route, and a
+        # broad search (a whole system to a whole system) returns thousands of them. Only
+        # the rows render_routes shows get volatility/travel time fetched — neither
+        # affects the order, so the ranking stays valid after they arrive.
         if self.sort_toggle.isChecked():
-            self.sort_by_margin()
+            ranked = self.sort_by_margin()
         else:
-            self.sort_by_profit()
-
-        volatility_changed = await self._fetch_missing_volatility(routes)
-        travel_time_changed = await self._fetch_missing_travel_times(routes, ship_name)
-        if volatility_changed or travel_time_changed:
-            self.render_routes(sorted(self.last_routes, key=self._active_sort_key, reverse=True))
+            ranked = self.sort_by_profit()
+        sort_key = self._active_sort_key
+        displayed = ranked[:DISPLAYED_ROUTES]
+        volatility_changed = await self._fetch_missing_volatility(displayed)
+        travel_time_changed = await self._fetch_missing_travel_times(displayed, ship_name)
+        # A newer search or a sort toggle during the fetch already rendered its own result.
+        superseded = self.last_routes is not routes or self._active_sort_key is not sort_key
+        if (volatility_changed or travel_time_changed) and not superseded:
+            self.render_routes(ranked)
 
     @Slot(str)
     def show_message(self, message):
@@ -252,8 +262,8 @@ class ResultsPanel(HudWindow):
         # lives in tools.cargo_packing.reachable_scu, shared with the Trade Advisor.
         return reachable_scu(route, self.cargo_scu)
 
-    async def _fetch_missing_volatility(self, routes):
-        commodity_ids = {route.commodity_id for route in routes}
+    async def _fetch_missing_volatility(self, displayed):
+        commodity_ids = {route.commodity_id for route in displayed}
         missing = [cid for cid in commodity_ids if cid not in self._volatility_by_commodity]
         if not missing:
             return False
@@ -263,17 +273,14 @@ class ResultsPanel(HudWindow):
             self._volatility_by_commodity[commodity_id] = result
         return True
 
-    async def _fetch_missing_travel_times(self, routes, ship_name):
+    async def _fetch_missing_travel_times(self, displayed, ship_name):
         if not ship_name:
             return False
 
-        # Bounded to what render_routes will actually show (top 20 by the active sort)
-        # rather than every route in a broad search — travel time is a much heavier
-        # per-item fetch than volatility (ship speed + orbit distance, not just a
-        # cached price lookup), so no point paying for rows that never get displayed.
-        # Sort order here doesn't depend on travel time, so this slice is stable
-        # regardless of fetch order.
-        displayed = sorted(routes, key=self._active_sort_key, reverse=True)[:20]
+        # `displayed` is the already-ranked rows render_routes will show, not every route in
+        # a broad search — travel time is a much heavier per-item fetch than volatility
+        # (ship speed + orbit distance, not just a cached price lookup), so no point paying
+        # for rows that never get displayed.
         missing = []
         for route in displayed:
             key = (route.origin_terminal_id, route.destination_terminal_id, ship_name)
@@ -508,7 +515,7 @@ class ResultsPanel(HudWindow):
             self.results_list.addItem("No routes found for these filters.")
             return
 
-        for route in routes[:20]:
+        for route in routes[:DISPLAYED_ROUTES]:
             row_widget = self._build_route_row(route)
             item = QListWidgetItem(self.results_list)
             item.setSizeHint(row_widget.sizeHint())
@@ -516,8 +523,13 @@ class ResultsPanel(HudWindow):
 
     def sort_by_profit(self):
         self._active_sort_key = self.estimated_profit_for
-        self.render_routes(sorted(self.last_routes, key=self._active_sort_key, reverse=True))
+        return self._render_ranked()
 
     def sort_by_margin(self):
         self._active_sort_key = lambda route: route.price_margin
-        self.render_routes(sorted(self.last_routes, key=self._active_sort_key, reverse=True))
+        return self._render_ranked()
+
+    def _render_ranked(self):
+        ranked = sorted(self.last_routes, key=self._active_sort_key, reverse=True)
+        self.render_routes(ranked)
+        return ranked
