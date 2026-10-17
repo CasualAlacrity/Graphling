@@ -165,6 +165,13 @@ Depot), and "FS-9" lists a magazine plus four skins of the LMG. Plan, in two ste
    `price_lookup` (what, action: buy|sell|rent, location filters) on top of it: no
    wrong-tool guess, ~3,100 -> ~1,000 tool-description tokens. Keep commodity behaviour
    (per SCU, stock filtering, volatility). Check against the matrix baseline (91-96%).
+   One tool covers every price question: "how much", "where can I buy", "cheapest",
+   "who pays most", "can I sell", "can I rent" all read the same per-terminal rows for an
+   action (buy / sell / rent); the persona's "answer in the shape of the question" picks
+   price vs place. No separate sell or purchase-location tool. When something is sold at
+   many terminals (multitool, row 39), the result says so, so ALICE asks where the pilot
+   is. Tools 19 -> 16; mining_location_lookup and refinery_yield_lookup stay separate
+   (spawn and yield data, no prices).
 
 **6b. Spoken prices (2026-10-17).** Live UEX prices are whole aUEC, mostly in the
 thousands (1,247 checked, none with decimals). Pilots say the unit: "14.2 thousand" for
