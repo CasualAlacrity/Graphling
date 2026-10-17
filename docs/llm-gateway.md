@@ -412,13 +412,13 @@ tools don't change. Remove `UEXCORP_*` from the client `.env-template`.
 **Shared UEX rate limit: accepted (2026-10-09).** Caching keeps volume low, and Jeff has a
 direct line to UEX if limits become a problem.
 
-**The limit is 7,000 calls a day (learned 2026-10-16), and it's now spent on purpose.**
+**The limit was first reported as 7,000 calls a day (2026-10-16); the UEX dashboard on 2026-10-17 showed 13k requests as 2% of the allowance (~650k/day). The cap is now 100,000 as a conservative placeholder. The prefetch below was sized for the 7,000 figure and is unchanged.**
 Three pieces, all server-side:
 
 - **Daily counter (`server/uex_budget.py`).** Every live UEX call goes through
   `UEXCorpClient.before_call`, which counts it in `uex_call_count` (one row per UTC day, in
   Postgres so restarts don't reset it). Past `UEX_DAILY_CALL_LIMIT - UEX_CALL_MARGIN`
-  (7,000 - 200) nothing calls UEX: cached lookups serve their last rows however old, and
+  (100,000 - 200 by default; was 7,000) nothing calls UEX: cached lookups serve their last rows however old, and
   only a lookup with nothing cached at all gets a 503. The margin covers UEX resetting on
   its own clock rather than UTC, and `get_with_retries` retrying a 5xx uncounted.
 - **Hourly route prefetch (`server/uex_route_prefetch.py`).** Every trade terminal's routes

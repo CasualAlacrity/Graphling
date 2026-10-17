@@ -40,11 +40,14 @@ class Settings(BaseSettings):
     # uncached lookups) stays client-side and never reads this.
     uexcorp_api_key: str = ""
     uexcorp_bearer_token: str = ""
-    # UEX allows 7,000 requests a day per key (told to Jeff, 2026-10-16). server/uex_budget.py
+    # UEX first said 7,000 requests a day per key (2026-10-16), but its dashboard showed 13k
+    # requests as 2% of the daily allowance on 2026-10-17, i.e. roughly 650k. 100k is a
+    # deliberately conservative cap until the real figure (and any burst limit) is known.
+    # server/uex_budget.py
     # counts every live call against it, per UTC day: UEX's own reset time isn't known,
     # which the margin partly covers. Past limit - margin, nothing calls UEX and the
     # cache serves stale rows where it has them.
-    uex_daily_call_limit: int = 7000
+    uex_daily_call_limit: int = 100_000
     uex_call_margin: int = 200
     # The hourly route prefetch (server/uex_route_prefetch.py) stops once fewer than this
     # many calls are left today, so pilots' own lookups always have room. 0 = prefetch may
