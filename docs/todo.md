@@ -152,6 +152,20 @@ when it didn't.
 - "Best refinery for Gold near me" (row 46): she answered without knowing the pilot's
   location. Ask, or use a known location; never imply "near you" without one.
 
+**6a. One price lookup with a resolution helper (designed with Jeff, 2026-10-17).** Hull A
+goes to item lookup every run (its five liveries match "Hull A" better than the ship, and
+none of them is sold anywhere; UEX does sell many other liveries in-game, e.g. at Dumper's
+Depot), and "FS-9" lists a magazine plus four skins of the LMG. Plan, in two steps:
+1. A resolution helper: search commodities, items and vehicles together; keep only
+   candidates that can actually be bought / sold / rented for the question's action
+   (UEX price rows); prefer a base thing over its variants (skins, liveries) and
+   accessories (magazines); one clear winner -> answer and say what was understood, a
+   genuine tie -> ask with at most 2-3 options. Tests from Hull A, FS-9, "Cat".
+2. Merge commodity / item / vehicle purchase / vehicle rental lookups into one
+   `price_lookup` (what, action: buy|sell|rent, location filters) on top of it: no
+   wrong-tool guess, ~3,100 -> ~1,000 tool-description tokens. Keep commodity behaviour
+   (per SCU, stock filtering, volatility). Check against the matrix baseline (91-96%).
+
 **6b. Spoken prices (2026-10-17).** Live UEX prices are whole aUEC, mostly in the
 thousands (1,247 checked, none with decimals). Pilots say the unit: "14.2 thousand" for
 14,200, "11 hundred" for 1,100 (Jeff). The old "Bought 640 at 14.2" rows were refused for
