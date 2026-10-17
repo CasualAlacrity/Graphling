@@ -87,6 +87,93 @@ those were in the prompt as counter-examples. A word-list guard fixed it but was
      through the gateway, not just the Mac's local gemma4; add them to the response matrix.
    Until then, don't ship a client with the social path.
 
+## Response matrix feedback (Jeff, 2026-10-16)
+
+From Jeff's markup of `evals/agent_eval/results/response-matrix__20261016-112239.csv` (row
+numbers below are that file's `#`). Not yet ordered against the priorities above. Re-run
+the listed rows after each fix (`response_matrix.py --tools ...`).
+
+**Already addressed 2026-10-16 (re-run to confirm):**
+- Place names said one fixed way, shops lead with the shop (rows 1-9): `location_phrase.py`.
+- "for less?" replaced with phrasings pilots use (rows 2, 5).
+- Greetings and farewells answered, never declined, no "state your manifest" (rows 10-12).
+- Off-topic false positives on real requests (rows 62, 63, 71, 73, 77, 85, 86): the topic
+  decision moved to Tev1, which calls these requests.
+
+**1. Active-run context ("this needs context pieces").** The biggest group: rows 55-58,
+60-62, 64, 65, 67, 68, 70, 79, 84. With one active trade run, "Landed.", "Bought 640 at
+14.2", "Got the copper", "Cargo's off", "Where am I going again?", "How much am I
+carrying?", "What crates do I buy?" should resolve against it without being asked; with
+several runs where the utterance fits more than one, ALICE asks which. Two parts:
+- The matrix ran on an account with **no** active run, so these rows can't pass as
+  written. Add scenario setup to `response_matrix.py`: a seeded active run (one, and two),
+  an active timer (row 73 "How long left?", with and without one).
+- Then check what the tools actually do with an active run (`tools/trade_run/resolver.py`
+  already resolves legs) and close the gaps it shows.
+
+**2. Route search asks for the ship every time** (rows 13-34, 47, 74: nearly every route
+row answers "Which ship are you flying?"). This is priority 6's "fewer words": infer the
+ship from the ledger/last run, and let "I'm in the C2 today." set it (row 82, which she
+misread as a location).
+
+**3. "Nothing in Pyro" was treated as "in Pyro"** (row 49). An exclusion filter came out as
+an inclusion: the answer was a Pyro destination. Bug in how `best_route` reads negation.
+
+**4. Say less, and mirror the question** (prompt changes, Jeff in the Hub):
+- Route answers too wordy (rows 50, 51). Wanted: "The best route I could find from Orison
+  is: RMC from Orison Municipal Services - Providence Platform at Orison to Terra Mills
+  Hydrofarm. The run pays about 840 thousand aUEC." No per-hour figure, no runner-up
+  unless asked.
+- One answer, not a list (row 35, "who's paying the most for quant"): the top one only;
+  pilots will narrow it themselves.
+- Mirror the pilot's wording (rows 1-3, 5, 7-9): "The cheapest I could find is…", "The
+  best place to buy a Cutlass Black is…", "A good deal on … is at…".
+
+**5. "UEX pricing API is temporarily unavailable" for things that aren't UEX** (rows 52-54,
+starting a run). `UplinkTool._safe_run` (`tools/uplink_tool.py`) returns that text for
+*any* exception. In these rows the cause was the matrix blocking the ledger write, but in
+real use a ledger or code error would also be reported to the pilot as a UEX outage. Say
+what actually failed. Also check row 80: with the delete blocked, she still said "The
+current trade run has been marked for termination", so she may claim a write succeeded
+when it didn't.
+
+**6. Item and vehicle lookups:**
+- "Cheapest size 3 quantum drive" (row 40): a category + size search (S3 quantum drives),
+  not a name match against helmets and cannons.
+- "Can I sell my old FS-9 anywhere?" (row 41): disambiguation too busy. Shorter ("FS-9
+  could be several items, which one?") and prefer the obvious reading (the LMG); maybe
+  check whether all candidates sell at the same terminals anyway.
+- "How much is a Hull A in-game?" (row 42) went to item lookup and listed liveries; it's
+  clearly the ship. (Ships can't be sold in game, which matters for "sell" phrasings.)
+- "Can I rent a Cat…" (row 43): "cat" → Caterpillar is in `vocabulary/aliases.py`, but the
+  rental lookup still failed. Find why the alias didn't apply there.
+- "Where do I get a Pyro RYT multitool?" (row 39): sold almost everywhere, so ALICE should
+  ask where the pilot is (or use what she knows) rather than pick one shop.
+- "Best refinery for Gold near me" (row 46): she answered without knowing the pilot's
+  location. Ask, or use a known location; never imply "near you" without one.
+
+**7. New capabilities wanted:**
+- Time-budget routes: "Something short, I've got 20 minutes" (row 48).
+- Ledger history: "How much did I make today?", "What was my last run?" (rows 85, 86;
+  utterance-coverage.md gap #1).
+- Ship facts: "How much SCU does a Hull C hold?" (row 87), and landing pad size, "Can my
+  Freelancer land at Orison?" (row 88).
+- Voice corrections, "No, it was 620, not 640" (row 78): priority 4 above.
+- Mining rock value (row 92): needs a mining module, later.
+
+**8. Fix or drop matrix rows. Done 2026-10-17:** cases moved to
+`evals/agent_eval/matrix_cases.py` as single turns and multi-turn workflow conversations,
+run against scenarios in `matrix_scenarios.py` (a fake ledger: no run, buying, selling, two
+runs, a running timer), one CSV row per turn. The changes below are applied there.
+Also found: run-status answers use raw terminal names ("Admin - Baijini Point"), not
+`location_phrase`. Original notes:
+- Drop: "Quantuming out." (row 83), "Loaded, what's the ETA?" (row 59, out of context).
+- Unclear what they test, rewrite or drop: "RMC at Grim Hex" (row 38), "Did I pick badly?"
+  (row 66), "Shorter." (row 91: shorter answer, or shorter run?), "Can I make it to Pyro?"
+  (row 70: fuel? not ALICE's question unless a full tank is assumed).
+- "Is Laranite worth taking to Hurston?" (row 36) is fine but should become a multi-turn
+  row with an origin.
+
 Other items below still stand, after these. The ordered phases that follow are the
 2026-09 direction, kept for the detail.
 
