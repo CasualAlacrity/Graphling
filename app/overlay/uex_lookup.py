@@ -300,7 +300,15 @@ def _filter_by_destination(rows, terminal_ids):
 
 
 async def _commodity_ids_at_any(terminal_ids, side):
-    results = await asyncio.gather(*(commodity_ids_at(terminal_id, side) for terminal_id in terminal_ids))
+    # A region can hold dozens of terminals — bounded like the route fan-out, so picking
+    # "Stanton" doesn't open a connection per terminal at once.
+    semaphore = asyncio.Semaphore(ROUTE_FANOUT_CONCURRENCY)
+
+    async def fetch(terminal_id):
+        async with semaphore:
+            return await commodity_ids_at(terminal_id, side)
+
+    results = await asyncio.gather(*(fetch(terminal_id) for terminal_id in terminal_ids))
     return set().union(*results)
 
 

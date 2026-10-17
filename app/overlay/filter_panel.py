@@ -383,7 +383,13 @@ class FilterPanel(HudWindow):
 
     @staticmethod
     async def _commodity_ids_at_any(terminal_ids, side):
-        results = await asyncio.gather(*(commodity_ids_at(terminal_id, side) for terminal_id in terminal_ids))
+        semaphore = asyncio.Semaphore(uex_lookup.ROUTE_FANOUT_CONCURRENCY)
+
+        async def fetch(terminal_id):
+            async with semaphore:
+                return await commodity_ids_at(terminal_id, side)
+
+        results = await asyncio.gather(*(fetch(terminal_id) for terminal_id in terminal_ids))
         return set().union(*results)
 
     async def _refresh_filters_async(self):
@@ -413,27 +419,28 @@ class FilterPanel(HudWindow):
         if commodity is not None:
             terminal_ids = await terminal_ids_for(commodity.id, "buy")
             source_reachable = [t.nickname for t in uex_lookup.uex_cache.terminals if t.id in terminal_ids]
-        elif destination_ids is not None:
+        elif destination_ids is not None and len(destination_ids) == 1:
             reachable_commodity_ids = await self._commodity_ids_at_any(destination_ids, "sell")
             results = await asyncio.gather(*(terminal_ids_for(cid, "buy") for cid in reachable_commodity_ids))
             terminal_ids = set().union(*results)
-            if len(destination_ids) == 1:  # a lone terminal can't be its own source; a region can
-                terminal_ids -= destination_ids
+            terminal_ids -= destination_ids  # a terminal can't be its own source
             source_reachable = [t.nickname for t in uex_lookup.uex_cache.terminals if t.id in terminal_ids]
         else:
             source_reachable = list(uex_lookup.terminal_names)
 
         # Destination candidates: direct from commodity, or fanned out from source
         # (every terminal that buys anything the source sells), same concurrency.
+        # Only a single terminal fans out: a region sells nearly everything, so its
+        # fan-out would fetch every commodity's prices (the multi-second UI stall seen
+        # picking "Crusader") just to conclude almost every terminal is reachable.
         if commodity is not None:
             terminal_ids = await terminal_ids_for(commodity.id, "sell")
             destination_reachable = [t.nickname for t in uex_lookup.uex_cache.terminals if t.id in terminal_ids]
-        elif source_ids is not None:
+        elif source_ids is not None and len(source_ids) == 1:
             available_commodity_ids = await self._commodity_ids_at_any(source_ids, "buy")
             results = await asyncio.gather(*(terminal_ids_for(cid, "sell") for cid in available_commodity_ids))
             terminal_ids = set().union(*results)
-            if len(source_ids) == 1:
-                terminal_ids -= source_ids
+            terminal_ids -= source_ids
             destination_reachable = [t.nickname for t in uex_lookup.uex_cache.terminals if t.id in terminal_ids]
         else:
             destination_reachable = list(uex_lookup.terminal_names)
