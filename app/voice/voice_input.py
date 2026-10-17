@@ -223,6 +223,10 @@ def _input_device() -> int | None:
     return audio_devices.resolve(os.getenv("ALICE_MIC_DEVICE"), "input")
 
 
+def _open_input_stream() -> sd.InputStream:
+    return sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="float32", device=_input_device())
+
+
 def record_until_release(hotkey: str | None = None) -> np.ndarray:
     """
     Blocks until the PTT key is pressed, records while held, stops on release.
@@ -246,14 +250,33 @@ def record_until_release(hotkey: str | None = None) -> np.ndarray:
 
     frames: list[np.ndarray] = []
 
-    _pressed.wait()
-    earcons.play(earcons.START_CHIRP)
-    print("[Voice] Recording...")
+    # Opened now, started on the press: constructing the stream is the slow part (the
+    # device open can take a few hundred ms on Windows), and doing it after the press
+    # meant the first words were spoken before the mic was live. start() is near-instant.
+    # Not started until the press, so nothing is captured -- and the OS mic indicator
+    # shouldn't light -- while waiting.
+    stream = _open_input_stream()
+    try:
+        _pressed.wait()
+        pressed_at = time.monotonic()
+        try:
+            stream.start()
+        except sd.PortAudioError:
+            # The device went away while idle (unplugged, sleep/resume): reopen once.
+            stream.close()
+            stream = _open_input_stream()
+            stream.start()
+        live_ms = (time.monotonic() - pressed_at) * 1000
+        # Chirp after the mic is live, not before: sd.play opens an output stream first,
+        # which used to delay the start of recording by however long that took.
+        earcons.play(earcons.START_CHIRP)
+        print(f"[Voice] Recording... (mic live {live_ms:.0f} ms after the press)")
 
-    with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="float32", device=_input_device()) as stream:
         while not _released.is_set():
             chunk, _ = stream.read(1024)
             frames.append(chunk)
+    finally:
+        stream.close()
 
     earcons.play(earcons.STOP_CHIRP)
     print("[Voice] Recording stopped")

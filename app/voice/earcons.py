@@ -37,6 +37,9 @@ def _note(frequency: float) -> np.ndarray:
 
 START_CHIRP = np.concatenate([_note(LOW_HZ), _note(HIGH_HZ)])
 STOP_CHIRP = np.concatenate([_note(HIGH_HZ), _note(LOW_HZ)])
+# A lower, falling pair: "that didn't work", distinct from the stop chirp even without
+# the spoken explanation (which needs the server's TTS and may be what failed).
+ERROR_CHIRP = np.concatenate([_note(LOW_HZ / 2), _note(LOW_HZ / 2 * 0.75)])
 
 
 def enabled() -> bool:

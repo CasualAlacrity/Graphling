@@ -20,8 +20,9 @@ import startup_status
 from auth.discord_identity import LoginFailed, get_pilot_session
 from transcript_log import this_turns_messages, tool_calls_with_results, write_event
 from turn_metrics import TurnMetricsCallback, log_turn_metrics
-from voice import voice_input
+from voice import earcons, voice_input
 from voice.audio_output import play_audio
+from voice.failure_lines import failure_line
 from voice.tts import synthesize
 from voice.voice_input import listen_once, load_whisper
 
@@ -127,8 +128,21 @@ async def run() -> None:
             traceback.print_exc()
             print("[ALICE] That turn failed; listening again.")
             write_event("turn", thread_id=thread_id, turn=turn, heard=heard, error=f"{type(exc).__name__}: {exc}")
+            await _announce_failure(exc)
             continue
         play_audio(audio)
+
+
+async def _announce_failure(error: Exception) -> None:
+    """Tell the pilot the turn failed. The chirp comes first and needs nothing from the
+    network; the spoken line follows if TTS still works. Never raises -- a failure while
+    announcing a failure must not end the voice loop."""
+    earcons.play(earcons.ERROR_CHIRP)
+    try:
+        audio, _first_chunk_ms = await synthesize(failure_line(error))
+        play_audio(audio)
+    except Exception as announce_error:
+        print(f"[ALICE] Couldn't speak the failure either ({announce_error!r}).")
 
 
 async def _run_turn(
