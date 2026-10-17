@@ -1,3 +1,4 @@
+import functools
 from datetime import UTC, datetime, timedelta
 
 from PySide6.QtCore import QSize, Qt, Signal, Slot
@@ -438,7 +439,8 @@ class TradeRunsPanel(HudWindow):
         body_layout.setContentsMargins(28, 4, 4, 8)
 
         if is_current:
-            body_layout.addWidget(build_leg_breadcrumb(leg))
+            on_edit = functools.partial(self._on_start_edit, leg.id) if _can_edit_transaction(run, leg) else None
+            body_layout.addWidget(build_leg_breadcrumb(leg, on_edit=on_edit))
             body_layout.addWidget(self._build_leg_dialog(run, leg))
         else:
             body_layout.addWidget(self._build_recap_or_edit(run, leg))
@@ -457,7 +459,8 @@ class TradeRunsPanel(HudWindow):
         chevron.clicked.connect(lambda checked=False, lid=leg.id, cur=expanded: self._toggle_leg(lid, cur))
         layout.addWidget(chevron)
 
-        badge = QLabel(parent=row, text="↓ BUY" if leg.leg_type == LegType.ACQUISITION else "↑ SELL", objectName="legBadge")
+        badge_text = "↓ BUY" if leg.leg_type == LegType.ACQUISITION else "↑ SELL"
+        badge = QLabel(parent=row, text=badge_text, objectName="legBadge")
         badge.setProperty("legType", leg.leg_type.value)
         badge.style().unpolish(badge)
         badge.style().polish(badge)
@@ -489,6 +492,11 @@ class TradeRunsPanel(HudWindow):
 
     def _build_leg_dialog(self, run, leg):
         field = trade_run_store.next_unset_field(leg)
+
+        # Reached by clicking the completed Buy/Sell dot in the breadcrumb: the edit form
+        # replaces whatever step dialog is current until saved or cancelled.
+        if self._leg_editing.get(leg.id) and _can_edit_transaction(run, leg):
+            return self._build_recap_or_edit(run, leg)
 
         if field == LegMilestone.REACHED_AT:
             return TravelWidget(leg, lambda checked=False, lid=leg.id: self._on_advance(lid))
@@ -677,7 +685,8 @@ class TradeRunsPanel(HudWindow):
         await self.refresh()
 
     @asyncSlot(object, object, object, object, object)
-    async def _on_update_transaction(self, leg_id, quantity_scu, price_per_unit, cargo_transfer_type, cargo_transfer_fee):
+    async def _on_update_transaction(
+            self, leg_id, quantity_scu, price_per_unit, cargo_transfer_type, cargo_transfer_fee):
         try:
             await ledger_client.update_transaction(
                 leg_id, quantity_scu=quantity_scu, price_per_unit=price_per_unit,

@@ -90,14 +90,14 @@ def apply_floors(choice: str, confidence: float) -> str:
 
 TOOL_GROUPS = {
     "trade_run": (
-        "start_trade_run", "mark_arrived", "mark_cargo_acquired", "confirm_cargo_loaded",
+        "start_trade_run", "mark_arrived", "update_leg_details", "mark_cargo_acquired", "confirm_cargo_loaded",
         "confirm_cargo_unloaded", "mark_cargo_sold", "trade_run_status", "trade_advisor",
         "cargo_packing_suggestion",
     ),
     "prices": ("price_lookup",),
     "routes": ("best_route",),
     "travel": ("estimate_travel_time",),
-    "timers": ("start_timer", "check_timer"),
+    "timers": ("start_timer", "check_timer", "cancel_timer"),
     "mining": ("mining_location_lookup", "refinery_yield_lookup"),
 }
 

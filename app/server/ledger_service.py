@@ -220,19 +220,17 @@ async def update_transaction(
         cargo_transfer_fee: int | None = None, cargo_transfer_type: CargoTransferType | None = None,
         *, user_id: UUID,
 ) -> TradeLeg:
-    """Corrects a leg's already-recorded quantity/price/fee/transfer-type, up until its
-    run is finalized -- for a Whisper mishearing or any other after-the-fact fix. Doesn't
-    touch transaction_completed_at/transferred_at/finalized_at: editing a done leg keeps
-    it done, only its values change. No cross-check against the sibling leg's quantity --
+    """Sets a leg's quantity/price/fee/transfer-type, up until its run is finalized --
+    both for correcting an already-recorded transaction (a Whisper mishearing) and for
+    filling in details before the transaction happens (the pilot reads the autoload fee
+    off the kiosk a click before buying). Doesn't touch transaction_completed_at/
+    transferred_at/finalized_at: editing a done leg keeps it done, and filling in a
+    pending leg keeps it pending -- record_purchase/record_sale is still the only thing
+    that completes the transaction. No cross-check against the sibling leg's quantity --
     a sale exceeding its own run's acquisition is a real case (cargo sold from inventory
     carried over from earlier play), not something to reject."""
     async with SessionLocal() as session:
         leg = await _get_owned_leg(session, leg_id, user_id)
-        if leg.transaction_completed_at is None:
-            raise ValueError(
-                f"Trade leg {leg_id} has no recorded transaction yet -- "
-                "use record_purchase/record_sale instead"
-            )
 
         result = await session.execute(select(TradeRun.finalized_at).where(TradeRun.id == leg.run_id))
         if result.scalar_one_or_none() is not None:

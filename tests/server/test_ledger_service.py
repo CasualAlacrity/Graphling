@@ -307,12 +307,14 @@ async def test_update_transaction_rejects_on_a_finalized_run(monkeypatch):
         await ledger_service.update_transaction(leg.id, quantity_scu=1, user_id=OWNER)
 
 
-async def test_update_transaction_rejects_before_anything_recorded(monkeypatch):
+async def test_update_transaction_before_the_transaction_fills_details_without_completing_it(monkeypatch):
     leg = _make_leg(LegType.ACQUISITION)
     monkeypatch.setattr(ledger_service, "SessionLocal", lambda: _FakeSession(get_value=leg))
 
-    with pytest.raises(ValueError, match="record_purchase/record_sale"):
-        await ledger_service.update_transaction(leg.id, quantity_scu=1, user_id=OWNER)
+    result = await ledger_service.update_transaction(leg.id, cargo_transfer_fee=19350, user_id=OWNER)
+
+    assert result.cargo_transfer_fee == 19350
+    assert result.transaction_completed_at is None
 
 
 async def test_update_transaction_raises_when_leg_not_found(monkeypatch):

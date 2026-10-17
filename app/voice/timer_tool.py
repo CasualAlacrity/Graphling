@@ -36,6 +36,25 @@ def _notify_when_done(label: str, duration_seconds: int, started_at: datetime) -
     asyncio.run(_speak(f"{label} timer's done."))
 
 
+def _spoken_duration(total_seconds: int) -> str:
+    """"23 minutes", "1 minute 30 seconds" -- not "23:00", which the model repeats verbatim
+    and which reads aloud as a clock time rather than a length of time."""
+    minutes, seconds = divmod(max(int(total_seconds), 0), 60)
+    parts = []
+    if minutes:
+        parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
+    if seconds or not parts:
+        parts.append(f"{seconds} second{'s' if seconds != 1 else ''}")
+    return " ".join(parts)
+
+
+def _match_label(label: str) -> str | None:
+    return next(
+        (existing for existing in _timers if fuzz.partial_ratio(label.lower(), existing.lower()) >= 60),
+        None,
+    )
+
+
 class StartTimerArgs(BaseModel):
     label: str = Field(
         description="A short name for what this timer is for, e.g. 'cargo loading'. "
@@ -53,9 +72,10 @@ class StartTimerTool(UplinkTool):
     description: str = (
         "Start a countdown timer and speak a notification out loud once it finishes — "
         "call this when the pilot mentions a wait with a duration attached, e.g. 'the "
-        "autoload will take 8 minutes', 'set a timer for 5 minutes', or 'let me know "
-        "when the cargo's done, it's about 8 minutes 33 seconds'. Not specific to trade "
-        "runs — usable for any timed wait the pilot mentions."
+        "loading will take 8 minutes', 'set a timer for 5 minutes', or 'let me know "
+        "when the cargo's done, it's about 8 minutes 33 seconds'. Needs a length of time — "
+        "a money amount like an 'autoload fee of 19,350' is never a timer. "
+        "Not specific to trade runs — usable for any timed wait the pilot mentions."
     )
     args_schema: type[BaseModel] = StartTimerArgs
     progress_label: str = "Starting a timer."
@@ -66,8 +86,7 @@ class StartTimerTool(UplinkTool):
         threading.Thread(
             target=_notify_when_done, args=(label, duration_seconds, started_at), daemon=True
         ).start()
-        minutes, seconds = divmod(duration_seconds, 60)
-        return f"Timer '{label}' set for {minutes}:{seconds:02d}."
+        return f"Timer '{label}' set for {_spoken_duration(duration_seconds)}."
 
 
 class CheckTimerArgs(BaseModel):
@@ -91,10 +110,7 @@ class CheckTimerTool(UplinkTool):
 
     async def _arun(self, label: str | None = None, *args: Any, **kwargs: Any) -> Any:
         if label:
-            matched_label = next(
-                (existing for existing in _timers if fuzz.partial_ratio(label.lower(), existing.lower()) >= 60),
-                None,
-            )
+            matched_label = _match_label(label)
             if matched_label is None:
                 return f"No running timer found matching '{label}'."
         else:
@@ -111,5 +127,38 @@ class CheckTimerTool(UplinkTool):
         if remaining <= 0:
             return f"The '{matched_label}' timer has already finished."
 
-        minutes, seconds = divmod(int(remaining), 60)
-        return f"{minutes}:{seconds:02d} remaining on the '{matched_label}' timer."
+        return f"{_spoken_duration(int(remaining))} remaining on the '{matched_label}' timer."
+
+
+class CancelTimerArgs(BaseModel):
+    label: str | None = Field(
+        default=None,
+        description="Which timer to cancel, if the pilot named one. Leave unset to cancel the "
+                    "only running timer; with several running, the pilot must say which."
+    )
+
+
+class CancelTimerTool(UplinkTool):
+    name: str = "cancel_timer"
+    description: str = (
+        "Cancel a running timer without it announcing — call this when the pilot says to "
+        "cancel, stop, or forget a timer, or says a timer was set by mistake or is wrong."
+    )
+    args_schema: type[BaseModel] = CancelTimerArgs
+    progress_label: str = "Cancelling the timer."
+
+    async def _arun(self, label: str | None = None, *args: Any, **kwargs: Any) -> Any:
+        if not _timers:
+            return "No timers are currently running."
+        if label:
+            matched_label = _match_label(label)
+            if matched_label is None:
+                return f"No running timer found matching '{label}'."
+        elif len(_timers) > 1:
+            return f"More than one timer is running — which one? ({', '.join(_timers)})"
+        else:
+            matched_label = next(iter(_timers))
+        # Removing the entry is the whole cancellation: _notify_when_done's sleeping thread
+        # sees the label gone when it wakes and returns without speaking.
+        del _timers[matched_label]
+        return f"Cancelled the '{matched_label}' timer."

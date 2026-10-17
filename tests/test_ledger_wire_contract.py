@@ -6,7 +6,6 @@ into the real FastAPI route, so the two can't drift apart unnoticed.
 """
 import json
 import uuid
-from datetime import UTC, datetime
 
 import httpx
 from fastapi.testclient import TestClient

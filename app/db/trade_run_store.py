@@ -100,6 +100,14 @@ def trade_run_info(run: TradeRun) -> str:
     current leg additionally reports its next milestone via current_step_title."""
     active_leg = current_leg(run)
     lines = [f"Trade run status — ship: {run.ship or 'unspecified'}"]
+    if active_leg is not None:
+        # Leads with the pilot's present position: a flat leg list let "where are we
+        # going?" be answered with the final sale destination while they were still at
+        # the acquisition leg.
+        verb = "buying" if active_leg.leg_type == LegType.ACQUISITION else "selling"
+        lines.append(f"Right now: {verb} {active_leg.commodity_name} at {active_leg.terminal_name} "
+                     f"— {current_step_description(active_leg)}. Answer 'where are we going' / "
+                     f"'what's next' from this leg, not a later one.")
     for leg in ordered_legs(run):
         leg_label = "Acquisition" if leg.leg_type == LegType.ACQUISITION else "Sale"
         detail = (f"{leg_label} — {leg.quantity_scu} SCU {leg.commodity_name} at "

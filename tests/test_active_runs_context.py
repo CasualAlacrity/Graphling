@@ -122,7 +122,7 @@ def test_routed_models_only_carry_their_groups_tools():
     for tool in routed.kwargs["tools"]:
         names.append(tool["function"]["name"])
 
-    assert sorted(names) == ["check_timer", "start_timer"]
+    assert sorted(names) == ["cancel_timer", "check_timer", "start_timer"]
     assert graph._llm_for(["timers"]) is routed
     assert graph._llm_for(None) is graph.llm
 

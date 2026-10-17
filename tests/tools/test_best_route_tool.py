@@ -56,7 +56,8 @@ def tool(monkeypatch):
         return fake_cache
 
     monkeypatch.setattr(UEXCorpClient, "get_uex_cache", fake_get_uex_cache)
-    return BestRouteTool(uex_client=UEXCorpClient(api_key="test", bearer_token="test"), scw_client=StarCitizenWikiClient())
+    uex_client = UEXCorpClient(api_key="test", bearer_token="test")
+    return BestRouteTool(uex_client=uex_client, scw_client=StarCitizenWikiClient())
 
 
 async def test_runner_up_gets_its_own_token_and_scu(tool, monkeypatch):

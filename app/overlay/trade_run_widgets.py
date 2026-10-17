@@ -446,8 +446,30 @@ class _TravelNode(QWidget):
         painter.end()
 
 
-def _breadcrumb_step_dot(number, done, current):
-    dot = QLabel(text="\N{CHECK MARK}" if done else str(number), objectName="breadcrumbDot")
+class _ClickableDot(QLabel):
+    """A completed breadcrumb dot whose step has editable values (Buy / Sell cargo) --
+    clicking reopens that step's form. Still a QLabel with the breadcrumbDot objectName,
+    so the existing QSS applies unchanged."""
+
+    def __init__(self, text, on_click, parent=None):
+        super().__init__(text, parent)
+        self._on_click = on_click
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip("Edit this step")
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._on_click()
+        super().mousePressEvent(event)
+
+
+def _breadcrumb_step_dot(number, done, current, on_edit=None):
+    text = "\N{CHECK MARK}" if done else str(number)
+    if done and on_edit is not None:
+        dot = _ClickableDot(text, on_edit)
+        dot.setObjectName("breadcrumbDot")
+    else:
+        dot = QLabel(text=text, objectName="breadcrumbDot")
     dot.setFixedSize(_BREADCRUMB_DOT_SIZE, _BREADCRUMB_DOT_SIZE)
     dot.setAlignment(Qt.AlignmentFlag.AlignCenter)
     dot.setProperty("done", done)
@@ -477,13 +499,15 @@ def _breadcrumb_node(dot_widget, label_text, current):
     return column
 
 
-def build_leg_breadcrumb(leg):
+def build_leg_breadcrumb(leg, on_edit=None):
     """The Arkanis-style step tracker for a leg's current milestone. started_at is always
     already set by the time a leg is shown here (stamped automatically, never a manual
     step — see trade_run_store), so the Travel node only ever visually distinguishes
     in-transit (orange) from arrived (green), never an unstarted state. The rest come
     straight from trade_run_store.breadcrumb_steps, so the step count/labels always match
-    whatever next_unset_field is actually walking (Acquisition, Sale/Manual, Sale/Autoload)."""
+    whatever next_unset_field is actually walking (Acquisition, Sale/Manual, Sale/Autoload).
+    on_edit, when given, makes the completed Buy/Sell dot clickable -- the only step with
+    editable values; the other milestones are bare timestamps."""
     row = QWidget()
     layout = QHBoxLayout(row)
     layout.setContentsMargins(0, 2, 0, 12)
@@ -501,7 +525,8 @@ def build_leg_breadcrumb(leg):
         layout.addWidget(_breadcrumb_rail(done=left_done))
         done = getattr(leg, field) is not None
         current = field == current_field
-        dot = _breadcrumb_step_dot(index + 2, done, current)  # Travel is step 1
+        step_on_edit = on_edit if field == LegMilestone.TRANSACTION_COMPLETED_AT else None
+        dot = _breadcrumb_step_dot(index + 2, done, current, step_on_edit)  # Travel is step 1
         layout.addWidget(_breadcrumb_node(dot, label, current))
         left_done = done
 

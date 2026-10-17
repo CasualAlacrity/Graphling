@@ -367,7 +367,8 @@ async def test_relogin_only_says_expired_when_there_was_a_token(
     monkeypatch.setattr(discord_identity, "IDENTITY_CACHE_PATH", tmp_path / "identity.json")
     if cached_token is not None:
         discord_identity._save_cached_session(discord_identity.PilotSession(token=cached_token, username="jeff"))
-    monkeypatch.setattr(discord_identity, "login", _returning(discord_identity.PilotSession(token="new", username="jeff")))
+    new_session = discord_identity.PilotSession(token="new", username="jeff")
+    monkeypatch.setattr(discord_identity, "login", _returning(new_session))
 
     await discord_identity.relogin_after_rejection(cached_token)
 

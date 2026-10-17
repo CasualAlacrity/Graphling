@@ -272,7 +272,8 @@ class _Switch(QCheckBox):
         painter.setBrush(QColor(theme.ON_ACCENT if on else theme.TEXT_SECONDARY))
         painter.drawEllipse(QRectF(knob_x, track.top() + 3, knob, knob))
         painter.setPen(QColor(theme.TEXT_PRIMARY if enabled else theme.TEXT_DISABLED))
-        text_rect = QRectF(self.TRACK.width() + self.GAP, 0, self.width() - self.TRACK.width() - self.GAP, self.height())
+        text_left = self.TRACK.width() + self.GAP
+        text_rect = QRectF(text_left, 0, self.width() - text_left, self.height())
         painter.drawText(text_rect, int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft), self.text())
         painter.end()
 

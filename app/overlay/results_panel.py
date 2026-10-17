@@ -464,7 +464,8 @@ class ResultsPanel(HudWindow):
 
         layout.addWidget(self._build_terminal_block(
             route_terminal_name(route.origin_terminal_id, route.origin_terminal_name),
-            route_location(route.origin_star_system_name, route.origin_planet_name), "buy", route.price_origin, self._volatility_cv_for(route, "buy"),
+            route_location(route.origin_star_system_name, route.origin_planet_name),
+            "buy", route.price_origin, self._volatility_cv_for(route, "buy"),
         ), 3)
 
         connector = self._build_route_connector(route)
@@ -473,7 +474,8 @@ class ResultsPanel(HudWindow):
 
         layout.addWidget(self._build_terminal_block(
             route_terminal_name(route.destination_terminal_id, route.destination_terminal_name),
-            route_location(route.destination_star_system_name, route.destination_planet_name), "sell", route.price_destination, self._volatility_cv_for(route, "sell"),
+            route_location(route.destination_star_system_name, route.destination_planet_name),
+            "sell", route.price_destination, self._volatility_cv_for(route, "sell"),
         ), 3)
 
         layout.addWidget(self._build_profit_block(route), 2)

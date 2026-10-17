@@ -38,12 +38,13 @@ from tools.trade_run.mark_cargo_sold_tool import MarkCargoSoldTool
 from tools.trade_run.start_trade_run_tool import StartTradeRunTool
 from tools.trade_run.trade_advisor_tool import TradeAdvisorTool
 from tools.trade_run.trade_run_status_tool import TradeRunStatusTool
+from tools.trade_run.update_leg_details_tool import UpdateLegDetailsTool
 from tools.travel_time_tool import TravelTimeTool
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.mining_location_tool import MiningLocationTool
 from tools.uexcorp.price_lookup_tool import PriceLookupTool
 from tools.uexcorp.refinery_yield_tool import RefineryYieldTool
-from voice.timer_tool import CheckTimerTool, StartTimerTool
+from voice.timer_tool import CancelTimerTool, CheckTimerTool, StartTimerTool
 
 
 class State(BaseModel):
@@ -120,6 +121,7 @@ uex_backed_tools = [price_lookup_tool, refinery_yield_tool, mining_location_tool
 # Trade Run Voice Tools
 mark_arrived_tool = MarkArrivedTool()
 mark_cargo_acquired_tool = MarkCargoAcquiredTool()
+update_leg_details_tool = UpdateLegDetailsTool()
 mark_cargo_sold_tool = MarkCargoSoldTool()
 confirm_cargo_loaded_tool = ConfirmCargoLoadedTool()
 confirm_cargo_unloaded_tool = ConfirmCargoUnloadedTool()
@@ -128,17 +130,18 @@ cargo_packing_tool = CargoPackingTool(client=uex_client)
 start_trade_run_tool = StartTradeRunTool()
 trade_advisor_tool = TradeAdvisorTool(uex_client=uex_client, scw_client=scw_client)
 
-trade_run_tools = [mark_arrived_tool, mark_cargo_acquired_tool, mark_cargo_sold_tool, confirm_cargo_loaded_tool,
-                   confirm_cargo_unloaded_tool, trade_run_status_tool, cargo_packing_tool, start_trade_run_tool,
-                   trade_advisor_tool]
+trade_run_tools = [mark_arrived_tool, update_leg_details_tool, mark_cargo_acquired_tool, mark_cargo_sold_tool,
+                   confirm_cargo_loaded_tool, confirm_cargo_unloaded_tool, trade_run_status_tool,
+                   cargo_packing_tool, start_trade_run_tool, trade_advisor_tool]
 
 # General Tools
 timer_tool = StartTimerTool()
 check_timer_tool = CheckTimerTool()
+cancel_timer_tool = CancelTimerTool()
 travel_time_tool = TravelTimeTool(uex_client=uex_client, scw_client=scw_client)
 best_route_tool = BestRouteTool(uex_client=uex_client, scw_client=scw_client)
 
-general_tools = [timer_tool, check_timer_tool, travel_time_tool, best_route_tool]
+general_tools = [timer_tool, check_timer_tool, cancel_timer_tool,travel_time_tool, best_route_tool]
 
 tools = uex_backed_tools + trade_run_tools + general_tools
 
