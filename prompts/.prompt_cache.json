@@ -196,7 +196,7 @@
     "social-reply": {
       "owner": "-",
       "repo": "social-reply",
-      "commit_hash": "local-draft-2026-10-16",
+      "commit_hash": "6ca19bcadc3fa2f6d391257d183c776f6d46e70c48f04e09a09d0b54f7df0dcc",
       "manifest": {
         "lc": 1,
         "type": "constructor",
@@ -396,114 +396,6 @@
                   }
                 }
               }
-            },
-            {
-              "lc": 1,
-              "type": "constructor",
-              "id": [
-                "langchain",
-                "prompts",
-                "chat",
-                "HumanMessagePromptTemplate"
-              ],
-              "kwargs": {
-                "prompt": {
-                  "lc": 1,
-                  "type": "constructor",
-                  "id": [
-                    "langchain",
-                    "prompts",
-                    "prompt",
-                    "PromptTemplate"
-                  ],
-                  "kwargs": {
-                    "input_variables": [],
-                    "template_format": "f-string",
-                    "template": "Pilot said: Thanks ALICE."
-                  }
-                }
-              }
-            },
-            {
-              "lc": 1,
-              "type": "constructor",
-              "id": [
-                "langchain",
-                "prompts",
-                "chat",
-                "AIMessagePromptTemplate"
-              ],
-              "kwargs": {
-                "prompt": {
-                  "lc": 1,
-                  "type": "constructor",
-                  "id": [
-                    "langchain",
-                    "prompts",
-                    "prompt",
-                    "PromptTemplate"
-                  ],
-                  "kwargs": {
-                    "input_variables": [],
-                    "template_format": "f-string",
-                    "template": "Anytime."
-                  }
-                }
-              }
-            },
-            {
-              "lc": 1,
-              "type": "constructor",
-              "id": [
-                "langchain",
-                "prompts",
-                "chat",
-                "HumanMessagePromptTemplate"
-              ],
-              "kwargs": {
-                "prompt": {
-                  "lc": 1,
-                  "type": "constructor",
-                  "id": [
-                    "langchain",
-                    "prompts",
-                    "prompt",
-                    "PromptTemplate"
-                  ],
-                  "kwargs": {
-                    "input_variables": [],
-                    "template_format": "f-string",
-                    "template": "Pilot said: Signing off, fly safe."
-                  }
-                }
-              }
-            },
-            {
-              "lc": 1,
-              "type": "constructor",
-              "id": [
-                "langchain",
-                "prompts",
-                "chat",
-                "AIMessagePromptTemplate"
-              ],
-              "kwargs": {
-                "prompt": {
-                  "lc": 1,
-                  "type": "constructor",
-                  "id": [
-                    "langchain",
-                    "prompts",
-                    "prompt",
-                    "PromptTemplate"
-                  ],
-                  "kwargs": {
-                    "input_variables": [],
-                    "template_format": "f-string",
-                    "template": "Fly safe. I'll keep the lights on."
-                  }
-                }
-              }
             }
           ],
           "input_variables": [],
@@ -511,9 +403,9 @@
         }
       },
       "examples": [],
-      "description": "Draft from the repo, 2026-10-16: replace with the Hub version",
+      "description": null,
       "hub_model_config": {
-        "model": "gpt-6-sol",
+        "model": "gpt-6.1-sol",
         "extra_headers": {},
         "service_tier": "auto",
         "use_responses_api": true,
