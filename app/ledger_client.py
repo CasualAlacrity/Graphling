@@ -127,6 +127,13 @@ async def finalize_run(run_id: UUID) -> TradeRunOut:
         return TradeRunOut.model_validate(response.json())
 
 
+async def write_off_run(run_id: UUID) -> TradeRunOut:
+    async with await authenticated_client() as client:
+        response = await client.post(f"/trade-runs/{run_id}/write-off")
+        raise_for_status(response)
+        return TradeRunOut.model_validate(response.json())
+
+
 async def delete_run(run_id: UUID) -> None:
     async with await authenticated_client() as client:
         response = await client.delete(f"/trade-runs/{run_id}")

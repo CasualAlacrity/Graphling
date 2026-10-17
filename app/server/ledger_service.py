@@ -275,6 +275,52 @@ async def finalize_run(run_id: UUID, *, user_id: UUID) -> TradeRun:
         return run
 
 
+async def write_off_run(run_id: UUID, *, user_id: UUID) -> TradeRun:
+    """Closes a run whose cargo was lost after being bought (death, piracy, crash).
+    Abandon deletes a run, which would erase a real purchase; this keeps it and records
+    the loss instead: the sale leg is closed as 0 SCU at 0 aUEC, so run_profit comes out
+    as -(investment + fees) in the ledger. Refuses before any purchase (that's Abandon)
+    and once a sale is recorded (cargo was sold -- finalize normally)."""
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(TradeRun)
+            .where(TradeRun.id == run_id, TradeRun.user_id == user_id)
+            .options(selectinload(TradeRun.legs))
+        )
+        run = result.scalar_one_or_none()
+        if run is None or run.user_id != user_id:
+            raise NotFoundError(f"No trade run with id {run_id}")
+        if run.finalized_at is not None:
+            raise ValueError(f"Trade run {run_id} is already finalized")
+
+        acquisition = next((leg for leg in run.legs if leg.leg_type == LegType.ACQUISITION), None)
+        sale = next((leg for leg in run.legs if leg.leg_type == LegType.SALE), None)
+        if acquisition is None or acquisition.transaction_completed_at is None:
+            raise ValueError(f"Trade run {run_id} has no recorded purchase -- abandon it instead")
+        if sale is not None and sale.transaction_completed_at is not None:
+            raise ValueError(f"Trade run {run_id} already has a recorded sale -- finalize it instead")
+
+        now = datetime.now(UTC)
+        if sale is not None:
+            sale.quantity_scu = 0
+            sale.price_per_unit = 0
+            sale.cargo_transfer_fee = 0
+        for leg in (acquisition, sale):
+            if leg is None:
+                continue
+            for milestone in (
+                LegMilestone.REACHED_AT, LegMilestone.TRANSACTION_COMPLETED_AT,
+                LegMilestone.TRANSFERRED_AT, LegMilestone.FINALIZED_AT,
+            ):
+                if getattr(leg, milestone) is None:
+                    setattr(leg, milestone, now)
+            if leg.started_at is None:
+                leg.started_at = now
+        run.finalized_at = now
+        await session.commit()
+        return run
+
+
 async def delete_run(run_id: UUID, *, user_id: UUID) -> None:
     async with SessionLocal() as session:
         run = await session.get(TradeRun, run_id)

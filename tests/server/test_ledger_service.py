@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 import pytest
 
 from db.models import CargoTransferType, LegType, TradeLeg, TradeRun
+from db.trade_run_store import next_unset_field, run_profit
 from server import ledger_service
 
 OWNER = uuid.uuid4()
@@ -664,3 +665,53 @@ async def test_create_run_from_route_maps_auto_load_flags_to_cargo_transfer_type
     assert acquisition.quantity_scu == 40
     assert sale.quantity_scu == 40
     assert run.ship == "Railen"
+
+
+
+async def test_write_off_closes_the_run_as_a_total_loss(monkeypatch):
+    now = datetime.now(UTC)
+    bought = _make_leg(
+        LegType.ACQUISITION, started_at=now, reached_at=now, transaction_completed_at=now,
+        quantity_scu=640, price_per_unit=10, cargo_transfer_fee=19350,
+    )
+    sale = _make_leg(LegType.SALE, quantity_scu=640, price_per_unit=50)
+    run = _make_run([bought, sale])
+    session = _FakeSession(execute_value=run)
+    monkeypatch.setattr(ledger_service, "SessionLocal", lambda: session)
+
+    result = await ledger_service.write_off_run(run.id, user_id=OWNER)
+
+    assert result.finalized_at is not None
+    assert all(next_unset_field(leg) is None for leg in run.legs)
+    assert (sale.quantity_scu, sale.price_per_unit, sale.cargo_transfer_fee) == (0, 0, 0)
+    assert run_profit(run) == -(640 * 10 + 19350)
+    assert session.committed
+
+
+async def test_write_off_refuses_before_any_purchase(monkeypatch):
+    run = _make_run([_make_leg(LegType.ACQUISITION), _make_leg(LegType.SALE)])
+    monkeypatch.setattr(ledger_service, "SessionLocal", lambda: _FakeSession(execute_value=run))
+
+    with pytest.raises(ValueError, match="abandon"):
+        await ledger_service.write_off_run(run.id, user_id=OWNER)
+
+
+async def test_write_off_refuses_once_cargo_is_sold(monkeypatch):
+    now = datetime.now(UTC)
+    run = _make_run([
+        _make_leg(LegType.ACQUISITION, transaction_completed_at=now),
+        _make_leg(LegType.SALE, transaction_completed_at=now),
+    ])
+    monkeypatch.setattr(ledger_service, "SessionLocal", lambda: _FakeSession(execute_value=run))
+
+    with pytest.raises(ValueError, match="finalize"):
+        await ledger_service.write_off_run(run.id, user_id=OWNER)
+
+
+async def test_write_off_rejects_another_pilots_run(monkeypatch):
+    now = datetime.now(UTC)
+    run = _make_run([_make_leg(LegType.ACQUISITION, transaction_completed_at=now), _make_leg(LegType.SALE)])
+    monkeypatch.setattr(ledger_service, "SessionLocal", lambda: _FakeSession(execute_value=run))
+
+    with pytest.raises(ledger_service.NotFoundError):
+        await ledger_service.write_off_run(run.id, user_id=OTHER_PILOT)

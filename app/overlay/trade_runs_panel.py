@@ -210,6 +210,14 @@ def _can_abandon(run):
     )
 
 
+def _can_write_off(run):
+    # Cargo bought but not yet sold -- the only state where it can be lost. Before a
+    # purchase it's Abandon; after a recorded sale there's nothing left to lose.
+    if run.finalized_at is not None or _can_abandon(run):
+        return False
+    return not any(leg.leg_type == LegType.SALE and leg.transaction_completed_at is not None for leg in run.legs)
+
+
 def _is_ready_to_finalize(run):
     return all(leg.finalized_at is not None for leg in run.legs)
 
@@ -269,6 +277,8 @@ class TradeRunsPanel(HudWindow):
         # instead of freezing at whatever was true the first time it was ever seen.
         self._run_expanded = {}
         self._leg_expanded = {}
+        # Run ids whose Write off button has been clicked once and now asks to confirm.
+        self._write_off_armed = set()
         # Keyed by leg id — a leg with a recorded transaction, on an unfinalized run,
         # swaps its recap for an editable Buy/Sell form while its id is in here. Cleared
         # on Cancel or a successful save, same lifecycle as _draft_purchase below.
@@ -413,6 +423,16 @@ class TradeRunsPanel(HudWindow):
             abandon_button.setToolTip("Abandon run")
             abandon_button.clicked.connect(lambda checked=False, rid=run.id: self._on_abandon(rid))
             layout.addWidget(abandon_button)
+        elif _can_write_off(run):
+            # Two clicks, because it closes the run for good: the first arms the button,
+            # the second commits. Any re-render (panel refresh) disarms it again.
+            armed = run.id in self._write_off_armed
+            write_off_button = QPushButton(
+                parent=row, text="Confirm write off?" if armed else "Write off", objectName="writeOffButton"
+            )
+            write_off_button.setToolTip("Cargo lost: close this run as a total loss")
+            write_off_button.clicked.connect(lambda checked=False, rid=run.id: self._on_write_off_clicked(rid))
+            layout.addWidget(write_off_button)
 
         return row
 
@@ -708,6 +728,24 @@ class TradeRunsPanel(HudWindow):
             return
         await self.refresh()
         self.run_finalized.emit(run_id)
+
+    def _on_write_off_clicked(self, run_id):
+        if run_id not in self._write_off_armed:
+            self._write_off_armed.add(run_id)
+            self.render_runs(self._last_runs)
+            return
+        self._write_off_armed.discard(run_id)
+        self._on_write_off(run_id)
+
+    @asyncSlot(object)
+    async def _on_write_off(self, run_id):
+        try:
+            run = await ledger_client.write_off_run(run_id)
+        except Exception as exc:
+            self.show_message(f"Couldn't write off run — {exc}")
+            return
+        await self.refresh()
+        self.run_finalized.emit(run.id)
 
     @asyncSlot(object)
     async def _on_abandon(self, run_id):

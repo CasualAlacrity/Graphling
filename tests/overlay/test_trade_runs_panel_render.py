@@ -555,3 +555,43 @@ def test_clear_rows_hides_removed_widgets_immediately(qapp):
     # shown state (unlike isVisible(), which would be False here either way since
     # container was never shown) — this is what actually distinguishes the fix.
     assert widget.isHidden() is True
+
+
+def test_write_off_button_shown_once_cargo_is_bought_and_unsold(trade_runs_panel):
+    now = datetime.now(UTC)
+    bought_leg = make_trade_leg(LegType.ACQUISITION, transaction_completed_at=now)
+    run = make_trade_run(legs=[bought_leg, make_trade_leg(LegType.SALE)])
+    card = trade_runs_panel._build_run_card(run, 0)
+    assert card.findChild(QPushButton, "writeOffButton") is not None
+    assert card.findChild(QPushButton, "abandonRunButton") is None
+
+
+def test_write_off_button_hidden_before_a_purchase(trade_runs_panel):
+    run = make_trade_run(legs=[make_trade_leg(LegType.ACQUISITION), make_trade_leg(LegType.SALE)])
+    card = trade_runs_panel._build_run_card(run, 0)
+    assert card.findChild(QPushButton, "writeOffButton") is None
+
+
+def test_write_off_button_hidden_once_cargo_is_sold(trade_runs_panel):
+    now = datetime.now(UTC)
+    run = make_trade_run(legs=[
+        make_trade_leg(LegType.ACQUISITION, transaction_completed_at=now),
+        make_trade_leg(LegType.SALE, transaction_completed_at=now),
+    ])
+    card = trade_runs_panel._build_run_card(run, 0)
+    assert card.findChild(QPushButton, "writeOffButton") is None
+
+
+def test_write_off_needs_a_second_click(trade_runs_panel, monkeypatch):
+    now = datetime.now(UTC)
+    run = make_trade_run(legs=[
+        make_trade_leg(LegType.ACQUISITION, transaction_completed_at=now), make_trade_leg(LegType.SALE),
+    ])
+    committed = []
+    monkeypatch.setattr(trade_runs_panel, "_on_write_off", committed.append)
+    monkeypatch.setattr(trade_runs_panel, "render_runs", lambda runs: None)
+
+    trade_runs_panel._on_write_off_clicked(run.id)
+    assert committed == []
+    trade_runs_panel._on_write_off_clicked(run.id)
+    assert committed == [run.id]

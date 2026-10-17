@@ -520,6 +520,19 @@ QPushButton#abandonRunButton:hover {{
     background-color: {ERROR_MUTED};
     border-color: {ERROR};
 }}
+QPushButton#writeOffButton {{
+    border: 1px solid {ERROR};
+    background: transparent;
+    color: {ERROR};
+    font-family: {DISPLAY_FONT};
+    font-size: 12px;
+    padding: 2px 8px;
+    min-height: 24px;
+    max-height: 24px;
+}}
+QPushButton#writeOffButton:hover {{
+    background-color: {ERROR_MUTED};
+}}
 QLabel#ledgerCommodityBadge {{
     color: {TEXT_PRIMARY};
     font-family: {DISPLAY_FONT};

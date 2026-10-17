@@ -47,6 +47,16 @@ async def finalize_run(run_id: UUID, user: User = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@router.post("/{run_id}/write-off", response_model=TradeRunOut)
+async def write_off_run(run_id: UUID, user: User = Depends(get_current_user)):
+    try:
+        return await ledger_service.write_off_run(run_id, user_id=user.id)
+    except ledger_service.NotFoundError as exc:
+        raise _not_found(exc) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.delete("/{run_id}", status_code=204)
 async def delete_run(run_id: UUID, user: User = Depends(get_current_user)):
     try:
