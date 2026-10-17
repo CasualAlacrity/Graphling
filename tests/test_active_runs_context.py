@@ -125,3 +125,19 @@ def test_routed_models_only_carry_their_groups_tools():
     assert sorted(names) == ["check_timer", "start_timer"]
     assert graph._llm_for(["timers"]) is routed
     assert graph._llm_for(None) is graph.llm
+
+
+async def test_respond_retries_an_empty_reply_once_then_falls_back(monkeypatch):
+    answers = [AIMessage(""), AIMessage("")]
+
+    async def invoke(messages):
+        return answers.pop(0)
+
+    monkeypatch.setattr(graph, "llm", SimpleNamespace(ainvoke=invoke))
+    monkeypatch.setattr(graph, "_persona_messages", lambda: [SystemMessage("persona")])
+    _ledger(monkeypatch, matrix_scenarios.NO_RUN)
+
+    result = await graph.respond(State(messages=[HumanMessage("Yeah, do it")]))
+
+    assert answers == []
+    assert result["messages"][0].content == graph.reply_recovery.NOTHING_TO_SAY

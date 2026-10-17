@@ -13,6 +13,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from pydantic import BaseModel
 
 import ledger_client
+import reply_recovery
 import topic_client
 import topic_decision
 from db.models import LegType
@@ -420,6 +421,25 @@ async def _active_runs_note() -> str:
     return ACTIVE_RUNS_HEADER + "\n\n" + "\n\n".join(descriptions)
 
 
+_TOOL_NAMES = {tool.name for tool in tools}
+
+
+async def _reply(model, prompt: list[BaseMessage], conversation: list[BaseMessage]) -> AIMessage:
+    """The model's reply, repaired (reply_recovery.py): a tool call written out as text
+    becomes a real call, and an empty reply gets one retry, then the turn's short tool
+    result or a request to repeat, never silence."""
+    response = reply_recovery.recover_tool_call(await model.ainvoke(prompt), _TOOL_NAMES)
+    if not reply_recovery.is_empty(response):
+        return response
+    log.warning("empty reply from the model; retrying once")
+    retry = reply_recovery.recover_tool_call(await model.ainvoke(prompt), _TOOL_NAMES)
+    if not reply_recovery.is_empty(retry):
+        return retry
+    log.warning("empty reply twice; falling back")
+    return AIMessage(content=reply_recovery.fallback_line(conversation),
+                     response_metadata=retry.response_metadata)
+
+
 def _pilot_turn(messages: list[BaseMessage]) -> int:
     count = 0
     for message in messages:
@@ -457,11 +477,11 @@ async def respond(state: State) -> dict:
     model = _llm_for(tool_groups)
     if pending_confirmation:
         response, resolved_leg_id = await asyncio.gather(
-            model.ainvoke(messages),
+            _reply(model, messages, state.messages),
             _resolve_last_touched_leg_id(state.messages),
         )
     else:
-        response = await model.ainvoke(messages)
+        response = await _reply(model, messages, state.messages)
         resolved_leg_id = None
 
     last_touched_leg_id = resolved_leg_id if resolved_leg_id is not None else state.last_touched_leg_id
