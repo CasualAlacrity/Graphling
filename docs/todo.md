@@ -2,7 +2,7 @@
 
 ## Priorities (set by Jeff, 2026-10-16) — work these in order
 
-Context: 0.2.7 is out; the goal is the first outside pilots (10 by ~2026-10-23). Jeff
+Context: 0.2.8 is out (2026-10-17); the goal is the first outside pilots (10 by ~2026-10-23). Jeff
 playtests and cuts a promo video alongside this list.
 
 1. **Route search respects what the pilot can afford.** `find_best_route` never passes
@@ -100,7 +100,17 @@ the listed rows after each fix (`response_matrix.py --tools ...`).
 - Off-topic false positives on real requests (rows 62, 63, 71, 73, 77, 85, 86): the topic
   decision moved to Tev1, which calls these requests.
 
-**1. Active-run context ("this needs context pieces").** The biggest group: rows 55-58,
+**Status 2026-10-17 (0.2.8 is out):** items 1, 3 and 5 are fixed in code (`c2c1291`) and
+6 is mostly done (6a-6b below). Waiting on Jeff: put the two drafts into the Hub,
+`prompts/drafts/alice-persona.txt` (mirror the question, one answer, never claim what
+didn't happen, spoken prices; covers item 4) and `prompts/drafts/topic-reject-voice.txt`
+(a decline that doesn't push for work). Still open: 2, 7, and the rest of 4 (wording
+needs the Hub persona live).
+
+**1. Active-run context — FIXED 2026-10-17 (`c2c1291`, re-run to confirm).** `respond` now
+gets the pilot's active runs, read alongside the Tev1 topic call, so "Landed." and "Bought
+640 at 14.2" reach the trade tools. The matrix has scenarios for it (item 8). Original
+note: the biggest group: rows 55-58,
 60-62, 64, 65, 67, 68, 70, 79, 84. With one active trade run, "Landed.", "Bought 640 at
 14.2", "Got the copper", "Cargo's off", "Where am I going again?", "How much am I
 carrying?", "What crates do I buy?" should resolve against it without being asked; with
@@ -116,8 +126,9 @@ row answers "Which ship are you flying?"). This is priority 6's "fewer words": i
 ship from the ledger/last run, and let "I'm in the C2 today." set it (row 82, which she
 misread as a location).
 
-**3. "Nothing in Pyro" was treated as "in Pyro"** (row 49). An exclusion filter came out as
-an inclusion: the answer was a Pyro destination. Bug in how `best_route` reads negation.
+**3. "Nothing in Pyro" was treated as "in Pyro"** (row 49). **FIXED 2026-10-17
+(`c2c1291`):** `best_route` has `exclude_destination_region`. An exclusion filter had come
+out as an inclusion: the answer was a Pyro destination.
 
 **4. Say less, and mirror the question** (prompt changes, Jeff in the Hub):
 - Route answers too wordy (rows 50, 51). Wanted: "The best route I could find from Orison
@@ -130,7 +141,9 @@ an inclusion: the answer was a Pyro destination. Bug in how `best_route` reads n
   best place to buy a Cutlass Black is…", "A good deal on … is at…".
 
 **5. "UEX pricing API is temporarily unavailable" for things that aren't UEX** (rows 52-54,
-starting a run). `UplinkTool._safe_run` (`tools/uplink_tool.py`) returns that text for
+starting a run). **FIXED 2026-10-17 (`c2c1291`):** tool failures say what failed and that
+nothing was recorded. Still worth a look: row 80's claim of a write that didn't happen.
+Original note: `UplinkTool._safe_run` (`tools/uplink_tool.py`) returns that text for
 *any* exception. In these rows the cause was the matrix blocking the ledger write, but in
 real use a ledger or code error would also be reported to the pilot as a UEX outage. Say
 what actually failed. Also check row 80: with the delete blocked, she still said "The
@@ -190,12 +203,25 @@ correctly, and how Whisper writes them ("14.2 thousand" vs "14,200").
 **6c. Baseline (5 unchanged runs, 2026-10-17): judge changes against this.** Intended
 tool 91-96% per run (mean 93.3%, stdev 2.2 points), so a single-run change under ~5 points
 is noise; compare several runs (`evals/agent_eval/matrix_variation.py`). 98 lines always
-right, 2 always wrong ("How much is a Hull A in-game?" -> item lookup; "Just pick one for
-me." -> starts a run, against information-not-decisions), 17 flaky. Two real bugs show
-up as "no tool": gemma4 sometimes **writes the tool call out as text**
-(`commodity_price_lookup{commodity:<|"|>Laranite<|"|>}`, 5 times in 5 runs; a pilot would
-hear it read aloud), and **silent replies** (8 in 5 runs; "Loading takes 15, ping me",
-"Yeah, do it").
+right, 2 always wrong ("How much is a Hull A in-game?" -> item lookup, since fixed by
+`price_lookup`; "Just pick one for me." -> starts a run, against information-not-decisions),
+17 flaky. Two real bugs showed up as "no tool": gemma4 sometimes **writes the tool call out
+as text** (`commodity_price_lookup{commodity:<|"|>Laranite<|"|>}`, 5 times in 5 runs; a
+pilot would hear it read aloud), and **silent replies** (8 in 5 runs; "Loading takes 15,
+ping me", "Yeah, do it"). **Both repaired 2026-10-17 (`1d15379`, `app/reply_recovery.py`):**
+a written-out call naming one of ALICE's tools becomes a real call; an empty reply is
+retried once, then falls back to the tool result or a request to repeat. Re-run the matrix
+variation to confirm.
+
+**6d. Tool routing experiment (2026-10-17, `c2c1291`), off behind `ALICE_TOOL_ROUTING`.**
+Tev1 picks the tool groups a request needs in the same call as the topic, and `respond`
+binds only those: ~55% fewer tool tokens on 79 matrix lines, one miss covered by a
+companion rule. Comparison runs: off 092641, on 094546. Decide whether to turn it on
+(token cost and latency vs. the risk of a missing tool), judged against the 6c baseline.
+
+**6e. UI brought in line with the `alice-design` skill (2026-10-17):** overlay colours and
+In Progress tab, launcher, filter panel and results rows, ledger cargo icon. Anything left
+on the old look gets the same treatment.
 
 **7. New capabilities wanted:**
 - Time-budget routes: "Something short, I've got 20 minutes" (row 48).

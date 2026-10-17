@@ -35,7 +35,6 @@ from overlay.uex_lookup import (
     terminals_selling,
 )
 
-
 FILTER_LABEL_COLUMN_WIDTH = 128
 
 
@@ -290,6 +289,10 @@ class FilterPanel(HudWindow):
 
         self.reset_button = QPushButton(parent=self, text="Reset")
         self.search_button = QPushButton(parent=self, text="Search", objectName="primaryButton")
+        # Hold the width of the longer "SEARCHING…" label so the button doesn't clip it mid-search.
+        metrics = self.search_button.fontMetrics()
+        extra = metrics.horizontalAdvance("SEARCHING…") - metrics.horizontalAdvance("Search")
+        self.search_button.setMinimumWidth(self.search_button.sizeHint().width() + extra + 8)
         options_row.addWidget(self.reset_button)
         options_row.addWidget(self.search_button)
 
