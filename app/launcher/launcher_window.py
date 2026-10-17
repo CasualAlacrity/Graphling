@@ -12,8 +12,8 @@ import asyncio
 import os
 import sys
 
-from PySide6.QtCore import QPointF, QProcess, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPen, QRadialGradient
+from PySide6.QtCore import QPointF, QProcess, QRectF, QSize, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QColor, QDesktopServices, QFontMetrics, QIcon, QPainter, QPen, QRadialGradient
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -51,6 +51,8 @@ GRID_COLOR = "#1B1E20"
 # Room for a key/button name inside the launcher's fixed width.
 KEY_BUTTON_TEXT_WIDTH = 220
 
+STARTING_CHIP = ("◌ starting", "accent")
+
 ACRONYM = "Accidental Logistics Intelligence Coordination Engine"
 
 
@@ -83,17 +85,54 @@ QLabel#tagline {{
 }}
 QFrame#launcherCard {{
     background: {theme.SURFACE};
-    border: 1px solid {theme.BORDER};
+    border: 1px solid {theme.BORDER_SUBTLE};
+    border-left: 3px solid {theme.BORDER};
+    border-radius: 8px;
+}}
+QFrame#launcherCard[needsPilot="true"] {{
+    border-left: 3px solid {theme.ACCENT};
 }}
 QLabel#eyebrow {{
-    font-family: {theme.LABEL_FONT};
-    font-size: 11px;
+    font-family: {theme.MONO_FONT};
+    font-size: 10.5px;
     font-weight: 600;
-    letter-spacing: 3px;
+    letter-spacing: 2px;
     color: {theme.TEXT_SECONDARY};
 }}
-QLabel#statusDot {{
+QLabel#statusChip {{
+    font-family: {theme.MONO_FONT};
+    font-size: 10.5px;
+    padding: 2px 7px;
+    border: 1px solid {theme.BORDER};
     border-radius: 4px;
+    color: {theme.TEXT_DISABLED};
+}}
+QLabel#statusChip[tone="accent"] {{
+    color: {theme.ACCENT};
+    border-color: {theme.ACCENT};
+}}
+QLabel#statusChip[tone="success"] {{
+    color: {theme.SUCCESS};
+    border-color: {theme.SUCCESS};
+}}
+QLabel#statusChip[tone="error"] {{
+    color: {theme.ERROR};
+    border-color: {theme.ERROR};
+}}
+QLabel#controlsSummary {{
+    font-family: {theme.MONO_FONT};
+    font-size: 11.5px;
+    color: {theme.TEXT_PRIMARY};
+}}
+QLabel#controlsSummaryHint {{
+    font-family: {theme.LABEL_FONT};
+    font-size: 11.5px;
+    color: {theme.TEXT_DISABLED};
+}}
+QLabel#startHint {{
+    font-family: {theme.LABEL_FONT};
+    font-size: 12px;
+    color: {theme.TEXT_SECONDARY};
 }}
 QLabel#account {{
     font-family: {theme.DISPLAY_FONT};
@@ -116,8 +155,9 @@ QPushButton#keyButton[capturing="true"] {{
 }}
 QPushButton#startButton {{
     background: {theme.ACCENT};
-    color: {theme.BG};
+    color: {theme.ON_ACCENT};
     border: none;
+    border-radius: 6px;
     padding: 12px 22px;
     font-family: {theme.DISPLAY_FONT};
     font-size: 18px;
@@ -171,15 +211,10 @@ QProgressBar#voiceProgress {{
 QProgressBar#voiceProgress::chunk {{
     background: {theme.ACCENT};
 }}
-QCheckBox {{
-    font-family: {theme.LABEL_FONT};
-    font-size: 13px;
-    color: {theme.TEXT_PRIMARY};
-    spacing: 8px;
-}}
 QFrame#updateBanner {{
     background: {theme.ACCENT_MUTED};
     border: 1px solid {theme.ACCENT};
+    border-radius: 8px;
 }}
 QLabel#updateText {{
     font-family: {theme.LABEL_FONT};
@@ -194,6 +229,8 @@ QLabel#versionLabel {{
 QFrame#errorCard {{
     background: {theme.ERROR_MUTED};
     border: 1px solid {theme.ERROR};
+    border-left: 3px solid {theme.ERROR};
+    border-radius: 8px;
 }}
 """
 
@@ -202,9 +239,47 @@ def app_icon() -> QIcon:
     return QIcon(ICON_PATH)
 
 
+class _Switch(QCheckBox):
+    """A pill switch in place of a checkbox (the spec reserves checkboxes for nothing —
+    on/off settings are switches). Still a QCheckBox underneath, so toggled/isChecked/
+    setEnabled all work unchanged; only the painting differs."""
+
+    TRACK = QSize(34, 18)
+    GAP = 10
+
+    def sizeHint(self):
+        text_width = QFontMetrics(self.font()).horizontalAdvance(self.text())
+        return QSize(self.TRACK.width() + self.GAP + text_width, max(self.TRACK.height(), 22))
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        enabled = self.isEnabled()
+        on = self.isChecked()
+        track = QRectF(0.5, (self.height() - self.TRACK.height()) / 2 + 0.5,
+                       self.TRACK.width() - 1, self.TRACK.height() - 1)
+        if on:
+            fill = QColor(theme.ACCENT if enabled else theme.TEXT_DISABLED)
+            painter.setPen(Qt.PenStyle.NoPen)
+        else:
+            fill = QColor(theme.SURFACE_ALT)
+            painter.setPen(QPen(QColor(theme.BORDER), 1))
+        painter.setBrush(fill)
+        painter.drawRoundedRect(track, track.height() / 2, track.height() / 2)
+        knob = track.height() - 6
+        knob_x = track.right() - knob - 3 if on else track.left() + 3
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(theme.ON_ACCENT if on else theme.TEXT_SECONDARY))
+        painter.drawEllipse(QRectF(knob_x, track.top() + 3, knob, knob))
+        painter.setPen(QColor(theme.TEXT_PRIMARY if enabled else theme.TEXT_DISABLED))
+        text_rect = QRectF(self.TRACK.width() + self.GAP, 0, self.width() - self.TRACK.width() - self.GAP, self.height())
+        painter.drawText(text_rect, int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft), self.text())
+        painter.end()
+
+
 class _Card(QFrame):
-    """A brand card: eyebrow label with a status dot, then content. Same shape as the
-    login pages' card."""
+    """A brand card: eyebrow label with a status chip (glyph + word, never colour
+    alone), then content. Same shape as the login pages' card."""
 
     def __init__(self, eyebrow: str, parent=None):
         super().__init__(parent)
@@ -215,20 +290,33 @@ class _Card(QFrame):
 
         header = QHBoxLayout()
         header.setSpacing(10)
-        self.dot = QLabel()
-        self.dot.setObjectName("statusDot")
-        self.dot.setFixedSize(8, 8)
-        header.addWidget(self.dot)
         title = QLabel(eyebrow.upper())
         title.setObjectName("eyebrow")
         header.addWidget(title)
         header.addStretch()
+        self.chip = QLabel()
+        self.chip.setObjectName("statusChip")
+        self.chip.hide()
+        header.addWidget(self.chip)
         layout.addLayout(header)
         self.body = layout
-        self.set_tone(theme.TEXT_DISABLED)
 
-    def set_tone(self, color: str) -> None:
-        self.dot.setStyleSheet(f"background: {color}; border-radius: 4px;")
+    def set_chip(self, text: str | None, tone: str = "neutral") -> None:
+        """tone: neutral / accent / success / error. None hides the chip."""
+        if text is None:
+            self.chip.hide()
+            return
+        self.chip.setText(text)
+        self.chip.setProperty("tone", tone)
+        self.chip.style().unpolish(self.chip)
+        self.chip.style().polish(self.chip)
+        self.chip.show()
+
+    def set_needs_pilot(self, needs: bool) -> None:
+        """The orange left edge: whichever card needs the pilot right now."""
+        self.setProperty("needsPilot", needs)
+        self.style().unpolish(self)
+        self.style().polish(self)
 
 
 class LauncherWindow(QWidget):
@@ -359,8 +447,10 @@ class LauncherWindow(QWidget):
 
     def _build_settings_card(self) -> QFrame:
         card = _Card("Controls")
-        card.set_tone(theme.ACCENT)
-        grid = QGridLayout()
+        self.controls_card = card
+        self.controls_grid = QWidget()
+        grid = QGridLayout(self.controls_grid)
+        grid.setContentsMargins(0, 0, 0, 0)
         grid.setHorizontalSpacing(14)
         grid.setVerticalSpacing(10)
         grid.setColumnStretch(1, 1)
@@ -380,7 +470,7 @@ class LauncherWindow(QWidget):
         self.model_combo.setCurrentIndex(saved_model if saved_model >= 0 else 0)
         self.model_combo.currentIndexChanged.connect(self._on_model_changed)
 
-        self.sounds_check = QCheckBox("Chirp when recording starts and stops")
+        self.sounds_check = _Switch("Chirp when recording starts and stops")
         self.sounds_check.setChecked(self._settings.ptt_sounds)
         self.sounds_check.setCursor(Qt.PointingHandCursor)
         self.sounds_check.toggled.connect(self._on_sounds_toggled)
@@ -398,13 +488,40 @@ class LauncherWindow(QWidget):
             label.setObjectName("settingLabel")
             grid.addWidget(label, index, 0)
             grid.addWidget(widget, index, 1)
-        card.body.addLayout(grid)
+        card.body.addWidget(self.controls_grid)
+        self.controls_summary = QLabel()
+        self.controls_summary.setObjectName("controlsSummary")
+        self.controls_summary.setTextFormat(Qt.RichText)
+        self.controls_summary.setWordWrap(True)
+        card.body.addWidget(self.controls_summary)
+        self.controls_summary_hint = QLabel("Stop ALICE to change these.")
+        self.controls_summary_hint.setObjectName("controlsSummaryHint")
+        card.body.addWidget(self.controls_summary_hint)
+        self._show_controls(collapsed=False)
         self._settings_widgets = [
             self.ptt_button, self.overlay_button, self.mic_combo, self.speaker_combo, self.model_combo,
             self.sounds_check,
         ]
         self._refresh_keys()
         return card
+
+    def _show_controls(self, collapsed: bool) -> None:
+        """While running the controls are locked anyway, so they shrink to one summary
+        line (keys and devices) instead of a full-height block of disabled inputs."""
+        self.controls_grid.setVisible(not collapsed)
+        self.controls_summary.setVisible(collapsed)
+        self.controls_summary_hint.setVisible(collapsed)
+        self.controls_card.set_chip("locked while running" if collapsed else None)
+        if collapsed:
+            def keycap(text):
+                return (f'<span style="font-family:{theme.MONO_FONT}; background-color:{theme.SURFACE_ALT};'
+                        f' color:{theme.TEXT_PRIMARY};">&nbsp;{text}&nbsp;</span>')
+            self.controls_summary.setText(
+                f"{keycap(display_name(self._settings.ptt_hotkey))} talk &nbsp;·&nbsp; "
+                f"{keycap(display_name(self._settings.overlay_hotkey))} overlay<br>"
+                f"{self.mic_combo.currentText()} → {self.speaker_combo.currentText()}"
+            )
+        self.adjustSize()
 
     @staticmethod
     def _device_combo(kind: str, saved: str | None) -> QComboBox:
@@ -432,9 +549,9 @@ class LauncherWindow(QWidget):
         self.voice_card.hide()
         return self.voice_card
 
-    def _set_voice_state(self, tone: str, text: str, progress: tuple[int, int] | None = None) -> None:
+    def _set_voice_state(self, chip: tuple[str, str], text: str, progress: tuple[int, int] | None = None) -> None:
         """progress: (value, maximum) — (0, 0) is Qt's busy/indeterminate bar; None hides it."""
-        self.voice_card.set_tone(tone)
+        self.voice_card.set_chip(*chip)
         self.voice_text.setText(text)
         if progress is None:
             self.voice_progress.hide()
@@ -473,6 +590,9 @@ class LauncherWindow(QWidget):
         logs_button.clicked.connect(self._open_logs)
         actions.addWidget(logs_button)
         actions.addStretch()
+        self.start_hint = QLabel("Sign in first")
+        self.start_hint.setObjectName("startHint")
+        actions.addWidget(self.start_hint)
         self.start_button = QPushButton("START ALICE")
         self.start_button.setObjectName("startButton")
         self.start_button.setCursor(Qt.PointingHandCursor)
@@ -505,11 +625,13 @@ class LauncherWindow(QWidget):
         if self._session is not None:
             self.account_label.setText(self._session.username)
             self.sign_in_button.setText("Switch account")
-            self.pilot_card.set_tone(theme.SUCCESS)
+            self.pilot_card.set_chip("✓ signed in", "success")
+            self.pilot_card.set_needs_pilot(False)
         else:
             self.account_label.setText("Not signed in")
             self.sign_in_button.setText("Sign in with Discord")
-            self.pilot_card.set_tone(theme.WARNING)
+            self.pilot_card.set_chip("→ sign in", "accent")
+            self.pilot_card.set_needs_pilot(True)
         self.sign_in_button.setEnabled(not self._running)
 
     @asyncSlot()
@@ -621,7 +743,8 @@ class LauncherWindow(QWidget):
         else:
             self.start_button.setText("START ALICE")
             self.start_button.setEnabled(self._session is not None)
-            self.start_button.setToolTip("" if self._session else "Sign in with Discord first.")
+            self.start_button.setToolTip("")
+        self.start_hint.setVisible(not self._running and self._session is None)
 
     def _on_start_or_stop(self) -> None:
         if self._running:
@@ -655,9 +778,10 @@ class LauncherWindow(QWidget):
         self._running = True
         for widget in self._settings_widgets:
             widget.setEnabled(False)
+        self._show_controls(collapsed=True)
         self._refresh_pilot()
         self._refresh_start()
-        self._set_voice_state(theme.WARNING, "Connecting to ALICE's server…", (0, 0))
+        self._set_voice_state(STARTING_CHIP, "Connecting to ALICE's server…", (0, 0))
 
         settings.apply_to_env(self._settings)
         try:
@@ -669,7 +793,7 @@ class LauncherWindow(QWidget):
             return
 
         self._set_voice_state(
-            theme.WARNING,
+            STARTING_CHIP,
             f"The overlay is ready ({display_name(self._settings.overlay_hotkey)}). Starting ALICE's voice…",
             (0, 0),
         )
@@ -685,17 +809,17 @@ class LauncherWindow(QWidget):
                 text = f"{done_mb:.0f} MB"
                 progress = (0, 0)
             self._set_voice_state(
-                theme.WARNING,
+                ("◌ downloading", "accent"),
                 f"First launch: downloading the speech model ({text}).\n"
                 "This only happens once. ALICE can't hear you until it's done.",
                 progress,
             )
         elif stage == startup_status.LOADING_VOICE:
-            self._set_voice_state(theme.WARNING, "Loading the speech model…", (0, 0))
+            self._set_voice_state(STARTING_CHIP, "Loading the speech model…", (0, 0))
         elif stage == startup_status.READY:
             self._voice_ready = True
             self._set_voice_state(
-                theme.SUCCESS,
+                ("● live", "success"),
                 f"Ready. Hold {display_name(self._settings.ptt_hotkey)} to talk to ALICE; "
                 f"{display_name(self._settings.overlay_hotkey)} opens the overlay.",
             )
@@ -703,7 +827,7 @@ class LauncherWindow(QWidget):
 
     def _on_voice_failed(self, message: str) -> None:
         self._show_error(message + "\nPress Restart ALICE to try again.")
-        self._set_voice_state(theme.ERROR, "ALICE's voice stopped — see the message below.")
+        self._set_voice_state(("✕ stopped", "error"), "ALICE's voice stopped — see the message below.")
         self._voice_ready = False
         self._refresh_start()
         # Same button, same restart as Stop — just named for what it does here.
@@ -714,6 +838,7 @@ class LauncherWindow(QWidget):
         self.voice_card.hide()
         for widget in self._settings_widgets:
             widget.setEnabled(True)
+        self._show_controls(collapsed=False)
         self._refresh_pilot()
         self._refresh_start()
 
