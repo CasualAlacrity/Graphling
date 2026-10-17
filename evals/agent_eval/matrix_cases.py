@@ -10,7 +10,9 @@ Both can start from a scenario (matrix_scenarios.py): an active trade run, two r
 running timer. Without one, the pilot has no runs and no timers.
 
 `tool` is the tool ALICE should use: a tool name, "(none)" when no tool is right,
-"(gap)" when nothing handles it yet, "(clarify)" when she should ask first.
+"(gap)" when nothing handles it yet, "(clarify) X" when asking first is as right as
+calling X (something she needs wasn't said), "(context) X" when answering from what she
+already knows is as right as calling X (the active run is in her context).
 
 Started 2026-10-16 from Jeff's markup of the first matrix run: rows he flagged as unclear
 were rewritten or dropped (noted in place), and the rows that "need context pieces" now
@@ -57,13 +59,14 @@ SINGLE_TURNS: list[SingleTurn] = [
     SingleTurn("Vehicle rental", "Can I rent a Cat for a day near Lorville?", "vehicle_rental_lookup"),
     SingleTurn("Mining", "Where's Quantainium on Daymar?", "mining_location_lookup"),
     SingleTurn("Mining", "Hadanite spots in Stanton", "mining_location_lookup"),
-    SingleTurn("Refining", "Best refinery for Gold near me", "refinery_yield_lookup"),
+    # No location given: asking for one is right (baseline, 2026-10-17).
+    SingleTurn("Refining", "Best refinery for Gold near me", "(clarify) refinery_yield_lookup"),
     # --- routes ---------------------------------------------------------------------------
     SingleTurn("Route finding", "Find me the best route from Orison in my Railen", "best_route"),
     SingleTurn("Route finding", "Find me a route from Oreson in my railing", "best_route"),
-    SingleTurn("Route finding", "I've got 96 SCU and 400k, what should I haul?", "best_route"),
+    SingleTurn("Route finding", "I've got 96 SCU and 400k, what should I haul?", "(clarify) best_route"),
     SingleTurn("Route finding", "Something short, I've got 20 minutes", "(gap) best_route time budget"),
-    SingleTurn("Route finding", "Morning ALICE, what's good to haul?", "best_route"),
+    SingleTurn("Route finding", "Morning ALICE, what's good to haul?", "(clarify) best_route"),
     SingleTurn("Route finding", "I'm in the C2 today.", "(gap) set the ship"),
     # --- an active run: the rows that "need context pieces" --------------------------------
     SingleTurn("Arrival", "Landed.", "mark_arrived", BUYING),
@@ -81,9 +84,9 @@ SINGLE_TURNS: list[SingleTurn] = [
     SingleTurn("Sell", "Sold it all, 4,567 a unit", "mark_cargo_sold", SELLING),
     SingleTurn("Sell", "Sold it all at 45 hundred", "mark_cargo_sold", SELLING),
     SingleTurn("Sell", "Sold 300, keeping the rest for Area18.", "mark_cargo_sold", SELLING),
-    SingleTurn("Run status", "Where am I going again?", "trade_run_status", SELLING),
-    SingleTurn("Run status", "What's after this?", "trade_run_status", BUYING),
-    SingleTurn("Run status", "How much am I carrying?", "trade_run_status", SELLING),
+    SingleTurn("Run status", "Where am I going again?", "(context) trade_run_status", SELLING),
+    SingleTurn("Run status", "What's after this?", "(context) trade_run_status", BUYING),
+    SingleTurn("Run status", "How much am I carrying?", "(context) trade_run_status", SELLING),
     SingleTurn("Run status", "Where am I going again?", "trade_run_status"),
     SingleTurn("Reassess a run", "Is it still worth going to Pyro?", "trade_advisor", SELLING),
     # Was "Did I pick badly?" (row 66): unclear on its own; with a run it means "reassess".
@@ -120,22 +123,23 @@ def on_script(intended: str, called: str) -> bool | None:
     tool can't be checked ("(gap)": nothing handles it yet, so any answer is a guess).
 
     - "(none)" (also "(none) social"): no tool called.
-    - "(clarify) X": asking first (no tool) or calling X both count.
+    - "(clarify) X" / "(context) X": no tool (asking first, or answering from what she
+      already knows) or calling X both count.
     - otherwise: at least one intended tool name was called ("a + b", "x (compare)")."""
     called_tools = set()
-    if called != "(none)":
+    if called and called != "(none)":
         called_tools = set(called.split(" + "))
     if intended.startswith("(gap)"):
         return None
     if intended.startswith("(none)"):
         return not called_tools
-    clarify = intended.startswith("(clarify)")
+    either = intended.startswith(("(clarify)", "(context)"))
     wanted = set()
-    for part in intended.removeprefix("(clarify)").split(" + "):
+    for part in intended.removeprefix("(clarify)").removeprefix("(context)").split(" + "):
         name = part.strip().split(" ")[0]
         if name:
             wanted.add(name)
-    if clarify and not called_tools:
+    if either and not called_tools:
         return True
     return bool(wanted & called_tools)
 
@@ -153,11 +157,11 @@ CONVERSATIONS: list[Conversation] = [
             Turn("Landed.", "mark_arrived"),
             Turn("Bought 640 at 14.2 thousand", "mark_cargo_acquired"),
             Turn("Loaded.", "confirm_cargo_loaded"),
-            Turn("Where am I going again?", "trade_run_status"),
+            Turn("Where am I going again?", "(context) trade_run_status"),
             Turn("I'm at the buyer.", "mark_arrived"),
             Turn("Cargo's off", "confirm_cargo_unloaded"),
             Turn("Sold it all, 4,567 a unit", "mark_cargo_sold"),
-            Turn("How did that run go?", "trade_run_status"),
+            Turn("How did that run go?", "(context) trade_run_status"),
         ),
     ),
     Conversation(
@@ -167,7 +171,7 @@ CONVERSATIONS: list[Conversation] = [
         turns=(
             Turn(ROUTE_FROM_ORISON, "best_route"),
             Turn("Let's do the second one, but only 500 SCU", "start_trade_run"),
-            Turn("How much am I carrying?", "trade_run_status"),
+            Turn("How much am I carrying?", "(context) trade_run_status"),
         ),
     ),
     Conversation(

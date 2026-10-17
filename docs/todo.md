@@ -158,6 +158,16 @@ thousands (1,247 checked, none with decimals). Pilots say the unit: "14.2 thousa
 not being a whole number; the matrix now says prices this way. Check that these convert
 correctly, and how Whisper writes them ("14.2 thousand" vs "14,200").
 
+**6c. Baseline (5 unchanged runs, 2026-10-17): judge changes against this.** Intended
+tool 91-96% per run (mean 93.3%, stdev 2.2 points), so a single-run change under ~5 points
+is noise; compare several runs (`evals/agent_eval/matrix_variation.py`). 98 lines always
+right, 2 always wrong ("How much is a Hull A in-game?" -> item lookup; "Just pick one for
+me." -> starts a run, against information-not-decisions), 17 flaky. Two real bugs show
+up as "no tool": gemma4 sometimes **writes the tool call out as text**
+(`commodity_price_lookup{commodity:<|"|>Laranite<|"|>}`, 5 times in 5 runs; a pilot would
+hear it read aloud), and **silent replies** (8 in 5 runs; "Loading takes 15, ping me",
+"Yeah, do it").
+
 **7. New capabilities wanted:**
 - Time-budget routes: "Something short, I've got 20 minutes" (row 48).
 - Ledger history: "How much did I make today?", "What was my last run?" (rows 85, 86;

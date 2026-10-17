@@ -22,6 +22,9 @@ from matrix_cases import CONVERSATIONS, on_script  # noqa: E402
     ("(clarify) best_route", "best_route", True),
     ("(clarify) best_route", "start_trade_run", False),
     ("(gap) correct_trade_value", "mark_cargo_acquired", None),
+    ("(context) trade_run_status", "(none)", True),
+    ("(context) trade_run_status", "trade_run_status", True),
+    ("best_route", "", False),
 ])
 def test_on_script(intended, called, expected):
     assert on_script(intended, called) is expected
