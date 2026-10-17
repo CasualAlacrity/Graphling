@@ -16,10 +16,11 @@ def results_panel(qapp, monkeypatch):
         results_panel_module, "commodity_code_for",
         lambda commodity_id, fallback: {10: "AGRI", 20: "LRNT"}.get(commodity_id, fallback),
     )
+    monkeypatch.setattr(results_panel_module, "route_terminal_name", lambda terminal_id, fallback: fallback)
     monkeypatch.setattr(
-        results_panel_module, "route_breadcrumb",
-        lambda system, planet, terminal_id, fallback: "/".join(
-            part for part in ({"Stanton": "ST", "Pyro": "PYR"}.get(system, system), planet, fallback) if part
+        results_panel_module, "route_location",
+        lambda system, planet: " › ".join(
+            part for part in ({"Stanton": "ST", "Pyro": "PYR"}.get(system, system), planet) if part
         ),
     )
     return results_panel_module.ResultsPanel()
@@ -97,7 +98,7 @@ def test_estimated_profit_for_uses_container_aware_scu(results_panel):
     assert results_panel.estimated_profit_for(route) == 10.0 * 176
 
 
-def test_breadcrumb_and_commodity_code_used_instead_of_raw_names(results_panel):
+def test_row_shows_commodity_code_and_terminal_name_over_location(results_panel):
     route = make_route(
         commodity_id=10, commodity_name="Agricium",
         origin_name="Orison Terminal Delivery Depot", origin_system="Stanton",
@@ -107,12 +108,13 @@ def test_breadcrumb_and_commodity_code_used_instead_of_raw_names(results_panel):
 
     row_widget = results_panel.results_list.itemWidget(results_panel.results_list.item(0))
     commodity_label = row_widget.findChild(QLabel, "routeCommodity")
-    assert "AGRI" in commodity_label.text()
-    assert "Agricium" not in commodity_label.text()
-    assert commodity_label.toolTip() == "Agricium"
+    assert commodity_label.text() == "Agricium"
+    code_label = row_widget.findChild(QLabel, "routeCommodityCode")
+    assert code_label.text() == "AGRI"
 
     origin_label = row_widget.findChild(QLabel, "routeTerminalName")
-    assert origin_label.text() == "ST/Crusader/Orison Terminal Delivery Depot"
+    assert origin_label.text() == "Orison Terminal Delivery Depot"
+    assert row_widget.findChild(QLabel, "routeBreadcrumb").text() == "ST › Crusader"
 
 
 def test_unknown_volatility_renders_as_unknown_not_stable(results_panel):

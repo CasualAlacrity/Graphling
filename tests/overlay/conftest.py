@@ -99,9 +99,10 @@ def wired_panels(qasync_loop, monkeypatch, fake_cache):
     monkeypatch.setattr(filter_panel_module, "search_routes", fake_search_routes)
 
     monkeypatch.setattr(results_panel_module, "commodity_code_for", lambda commodity_id, fallback: fallback)
+    monkeypatch.setattr(results_panel_module, "route_terminal_name", lambda terminal_id, fallback: fallback)
     monkeypatch.setattr(
-        results_panel_module, "route_breadcrumb",
-        lambda system, planet, terminal_id, fallback: "/".join(p for p in (system, planet, fallback) if p),
+        results_panel_module, "route_location",
+        lambda system, planet: " › ".join(p for p in (system, planet) if p),
     )
     monkeypatch.setattr(results_panel_module, "commodity_volatility", fake_commodity_volatility)
 

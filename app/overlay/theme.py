@@ -129,24 +129,42 @@ QLabel#panelHeader {{
 }}
 QLabel#fieldLabel {{
     font-size: 10.5px;
-    min-width: 90px;
-    max-width: 90px;
 }}
 
-QFrame#sectionRow {{
-    background-color: transparent;
-    border: none;
-    border-bottom: 1px solid {BORDER_SUBTLE};
-    padding-bottom: 3px;
-    margin-bottom: 3px;
+QFrame#filterCard {{
+    background-color: {SURFACE_ALT};
+    border: 1px solid {BORDER_SUBTLE};
+    border-left: 3px solid {BORDER};
+    border-radius: 8px;
+}}
+QFrame#filterCard[edge="accent"] {{
+    border-left: 3px solid {ACCENT};
+}}
+QFrame#filterCard QLineEdit, QFrame#filterCard QComboBox, QFrame#filterCard QSpinBox {{
+    background-color: {SURFACE};
 }}
 QLabel#sectionLabel {{
-    color: {ACCENT};
+    color: {TEXT_PRIMARY};
     font-family: {DISPLAY_FONT};
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 600;
-    min-width: 128px;
-    max-width: 128px;
+}}
+QLabel#inputBreadcrumb {{
+    color: {TEXT_DISABLED};
+    font-family: {MONO_FONT};
+    font-size: 10px;
+    background: transparent;
+    border: none;
+}}
+QLabel#routeConnectorCircle {{
+    background-color: {SURFACE_ALT};
+    border: 1px solid {ACCENT};
+    border-radius: 10px;
+}}
+QLabel#routeConnectorText {{
+    color: {TEXT_DISABLED};
+    font-family: {MONO_FONT};
+    font-size: 10px;
 }}
 
 QLineEdit, QComboBox, QSpinBox {{
@@ -189,12 +207,6 @@ QPushButton#filterIconToggle:hover {{
 QPushButton#filterIconToggle:checked {{
     border-color: {ACCENT};
     background-color: {ACCENT_MUTED};
-}}
-QLabel#filterOptionsCaption {{
-    color: {TEXT_DISABLED};
-    font-family: {MONO_FONT};
-    font-size: 10.5px;
-    padding-left: 4px;
 }}
 
 QPushButton {{
@@ -275,19 +287,29 @@ QFrame#routeRow {{
 QLabel#routeCommodity {{
     color: {TEXT_PRIMARY};
     font-family: {DISPLAY_FONT};
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
 }}
-QLabel#routeScu {{
-    color: {TEXT_PRIMARY};
+QLabel#routeCommodityCode {{
+    color: {TEXT_DISABLED};
     font-family: {MONO_FONT};
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 10.5px;
+}}
+QLabel#routeBreadcrumb {{
+    color: {TEXT_DISABLED};
+    font-family: {MONO_FONT};
+    font-size: 10px;
+}}
+QLabel#routeScu {{
+    color: {TEXT_SECONDARY};
+    font-family: {MONO_FONT};
+    font-size: 12px;
+    font-weight: 500;
 }}
 QLabel#routeTerminalName {{
     color: {TEXT_PRIMARY};
     font-family: {DISPLAY_FONT};
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
 }}
 QLabel#routeTerminalPrice {{

@@ -2,6 +2,7 @@ import asyncio
 
 import requests
 from PySide6.QtCore import QEvent, QObject, QSize, Qt, Signal
+from PySide6.QtGui import QFontMetrics
 from PySide6.QtWidgets import (
     QComboBox,
     QCompleter,
@@ -31,6 +32,9 @@ from overlay.uex_lookup import (
 )
 
 
+FILTER_LABEL_COLUMN_WIDTH = 128
+
+
 class CompleterFocusFilter(QObject):
     """Shows a field's full completer popup on focus, instead of waiting for a keystroke."""
 
@@ -40,6 +44,46 @@ class CompleterFocusFilter(QObject):
             if completer is not None:
                 completer.complete()
         return False
+
+
+class BreadcrumbLineEdit(QLineEdit):
+    """A QLineEdit that can show a dim, right-aligned breadcrumb ("ArcCorp › Wala")
+    inside the field once its text resolves to a terminal. The text margin keeps typing
+    from running underneath it; the clear button stays at the far right."""
+
+    CLEAR_BUTTON_ALLOWANCE = 26
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._breadcrumb = QLabel(self, objectName="inputBreadcrumb")
+        self._breadcrumb.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._breadcrumb.hide()
+
+    def set_breadcrumb(self, text):
+        if not text:
+            self._breadcrumb.hide()
+            self.setTextMargins(0, 0, 0, 0)
+            return
+        # Drop the star system (the field is already a terminal) and elide to at most
+        # half the field so a long chain never hides what the pilot typed.
+        parts = text.split(">")
+        shown = " › ".join(parts[1:] if len(parts) > 2 else parts)
+        metrics = QFontMetrics(self._breadcrumb.font())
+        self._breadcrumb.setText(metrics.elidedText(shown, Qt.ElideRight, max(60, self.width() // 2)))
+        self._breadcrumb.adjustSize()
+        self.setTextMargins(0, 0, self._breadcrumb.width() + self.CLEAR_BUTTON_ALLOWANCE, 0)
+        self._place_breadcrumb()
+        self._breadcrumb.show()
+
+    def _place_breadcrumb(self):
+        x = self.width() - self._breadcrumb.width() - self.CLEAR_BUTTON_ALLOWANCE
+        y = (self.height() - self._breadcrumb.height()) // 2
+        self._breadcrumb.move(max(0, x), y)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self._breadcrumb.isVisible():
+            self._place_breadcrumb()
 
 
 class FilterPanel(HudWindow):
@@ -67,44 +111,69 @@ class FilterPanel(HudWindow):
 
     @staticmethod
     def _field_column(label_text, widget):
-        """A label beside its one widget — one item in a section row's horizontal group
-        of fields. Inline (not stacked above) to keep the whole panel short; terminal
-        breadcrumbs live in the field's tooltip instead of their own line for the same
-        reason."""
+        """A field with its label stacked above it — one item in a card's row of fields."""
         column = QWidget()
-        layout = QHBoxLayout(column)
+        layout = QVBoxLayout(column)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
         layout.addWidget(QLabel(parent=column, text=label_text, objectName="fieldLabel"))
-        layout.addWidget(widget, 1)
+        layout.addWidget(widget)
         return column
 
     @staticmethod
-    def _section_row(label_text, *field_columns):
-        """A section label sitting beside a horizontal row of its fields, instead of
-        QGroupBox's title-above-content — matches the wide-panel prototype's layout."""
-        row = QFrame(objectName="sectionRow")
-        row_layout = QHBoxLayout(row)
-        row_layout.setContentsMargins(0, 1, 0, 1)
+    def _card(label_text, icon_name, edge, *field_columns):
+        """A Cargo Manifest card: icon + label on the left, its fields on the right. The
+        orange edge ("accent") marks the two ends of the route; the neutral one is the
+        ship and cargo."""
+        card = QFrame(objectName="filterCard")
+        card.setProperty("edge", edge)
+        layout = QHBoxLayout(card)
+        layout.setContentsMargins(14, 10, 14, 12)
+        layout.setSpacing(14)
 
-        row_layout.addWidget(QLabel(parent=row, text=label_text, objectName="sectionLabel"))
+        label = QWidget(parent=card)
+        label.setFixedWidth(FILTER_LABEL_COLUMN_WIDTH)
+        label_layout = QHBoxLayout(label)
+        label_layout.setContentsMargins(0, 0, 0, 0)
+        label_layout.setSpacing(8)
+        icon = QLabel(parent=label)
+        icon.setPixmap(theme.load_icon(icon_name, theme.TEXT_SECONDARY, size=16).pixmap(QSize(16, 16)))
+        label_layout.addWidget(icon)
+        label_layout.addWidget(QLabel(parent=label, text=label_text, objectName="sectionLabel"))
+        label_layout.addStretch()
+        layout.addWidget(label, 0, Qt.AlignTop)
 
-        fields = QWidget(parent=row)
+        fields = QWidget(parent=card)
         fields_layout = QHBoxLayout(fields)
         fields_layout.setContentsMargins(0, 0, 0, 0)
+        fields_layout.setSpacing(14)
         for column in field_columns:
             column.setParent(fields)
             fields_layout.addWidget(column)
-        row_layout.addWidget(fields, 1)
+        layout.addWidget(fields, 1)
 
+        return card
+
+    @staticmethod
+    def _route_connector():
+        """The ROUTE marker between Source and Destination: the route reads top to bottom."""
+        row = QWidget()
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(14 + FILTER_LABEL_COLUMN_WIDTH, 0, 0, 0)
+        layout.setSpacing(8)
+        circle = QLabel(parent=row, objectName="routeConnectorCircle")
+        circle.setFixedSize(20, 20)
+        circle.setAlignment(Qt.AlignCenter)
+        circle.setPixmap(theme.load_icon("arrow-down", theme.ACCENT, size=12).pixmap(QSize(12, 12)))
+        layout.addWidget(circle)
+        layout.addWidget(QLabel(parent=row, text="ROUTE", objectName="routeConnectorText"))
+        layout.addStretch()
         return row
 
     def _build_ui(self):
         self._main_layout = QVBoxLayout(self)
         self._main_layout.setContentsMargins(12, 5, 12, 6)
-        self._main_layout.setSpacing(2)
-
-        filter_header = QLabel(parent=self, text="▸ FILTERS", objectName="panelHeader")
-        self._main_layout.addWidget(filter_header)
+        self._main_layout.setSpacing(8)
 
         # --- Ship, Cargo & Commodity ---
         self.ship_input = QLineEdit(placeholderText="Search ship...")
@@ -132,15 +201,15 @@ class FilterPanel(HudWindow):
         self.commodity_input.setClearButtonEnabled(True)
         # self.commodity_input.installEventFilter(CompleterFocusFilter(parent=self.commodity_input))
 
-        self._main_layout.addWidget(self._section_row(
-            "SHIP AND CARGO",
+        self._main_layout.addWidget(self._card(
+            "Ship & Cargo", "cargo", "neutral",
             self._field_column("Ship", self.ship_input),
-            self._field_column("Cargo Volume", self.cargo_input),
+            self._field_column("Cargo", self.cargo_input),
             self._field_column("Commodity", self.commodity_input),
         ))
 
         # --- Source ---
-        self.source_terminal_input = QLineEdit(placeholderText="Search terminal...")
+        self.source_terminal_input = BreadcrumbLineEdit(placeholderText="Search terminal...")
         self.source_terminal_completer = QCompleter(
             uex_lookup.terminal_names,
             parent=self.source_terminal_input,
@@ -155,14 +224,15 @@ class FilterPanel(HudWindow):
         self.min_source_inventory_input = QComboBox()
         self.min_source_inventory_input.addItems(["Select..."] + uex_lookup.SOURCE_INVENTORY_LEVELS)
 
-        self._main_layout.addWidget(self._section_row(
-            "SOURCE",
+        self._main_layout.addWidget(self._card(
+            "Source", "pin", "accent",
             self._field_column("Terminal", self.source_terminal_input),
-            self._field_column("Min Inventory", self.min_source_inventory_input),
+            self._field_column("Min inventory", self.min_source_inventory_input),
         ))
+        self._main_layout.addWidget(self._route_connector())
 
         # --- Destination ---
-        self.destination_terminal_input = QLineEdit(placeholderText="Search terminal...")
+        self.destination_terminal_input = BreadcrumbLineEdit(placeholderText="Search terminal...")
         self.destination_terminal_completer = QCompleter(
             uex_lookup.terminal_names,
             parent=self.destination_terminal_input,
@@ -179,23 +249,23 @@ class FilterPanel(HudWindow):
         self.max_destination_inventory_input = QComboBox()
         self.max_destination_inventory_input.addItems(["Select..."] + uex_lookup.DESTINATION_INVENTORY_LEVELS)
 
-        self._main_layout.addWidget(self._section_row(
-            "DESTINATION",
+        self._main_layout.addWidget(self._card(
+            "Destination", "pin", "accent",
             self._field_column("Terminal", self.destination_terminal_input),
-            self._field_column("Max Inventory", self.max_destination_inventory_input),
+            self._field_column("Max inventory", self.max_destination_inventory_input),
         ))
 
         # --- Options ---
         options_row = QHBoxLayout()
         self.space_only_filter_toggle = QPushButton(parent=self, objectName="filterIconToggle")
         self.space_only_filter_toggle.setCheckable(True)
-        self.space_only_filter_toggle.setIcon(theme.load_icon("plane-up", theme.TEXT_DISABLED))
+        self.space_only_filter_toggle.setIcon(theme.load_icon("station", theme.TEXT_DISABLED))
         self.space_only_filter_toggle.setIconSize(QSize(16, 16))
         self.space_only_filter_toggle.setToolTip("Space stations only")
 
         self.autoload_filter_toggle = QPushButton(parent=self, objectName="filterIconToggle")
         self.autoload_filter_toggle.setCheckable(True)
-        self.autoload_filter_toggle.setIcon(theme.load_icon("cart-flatbed", theme.TEXT_DISABLED))
+        self.autoload_filter_toggle.setIcon(theme.load_icon("loader", theme.TEXT_DISABLED))
         self.autoload_filter_toggle.setIconSize(QSize(16, 16))
         self.autoload_filter_toggle.setToolTip("Autoload-capable terminals only")
 
@@ -205,27 +275,17 @@ class FilterPanel(HudWindow):
         self.nqa_filter_toggle.setIconSize(QSize(16, 16))
         self.nqa_filter_toggle.setToolTip("No-questions-asked terminals only (sells hot cargo)")
 
-        self.options_caption = QLabel(parent=self, objectName="filterOptionsCaption")
-
         options_row.addWidget(self.space_only_filter_toggle)
         options_row.addWidget(self.autoload_filter_toggle)
         options_row.addWidget(self.nqa_filter_toggle)
-        options_row.addWidget(self.options_caption)
         options_row.addStretch()
-
-        self._main_layout.addLayout(options_row)
-        self._update_options_caption()
-
-        # --- Buttons ---
-        button_row = QHBoxLayout()
-        button_row.addStretch()
 
         self.reset_button = QPushButton(parent=self, text="Reset")
         self.search_button = QPushButton(parent=self, text="Search", objectName="primaryButton")
-        button_row.addWidget(self.reset_button)
-        button_row.addWidget(self.search_button)
+        options_row.addWidget(self.reset_button)
+        options_row.addWidget(self.search_button)
 
-        self._main_layout.addLayout(button_row)
+        self._main_layout.addLayout(options_row)
 
     def _wire_signals(self):
         self.ship_completer.activated[str].connect(self._on_ship_selected)
@@ -234,11 +294,11 @@ class FilterPanel(HudWindow):
         self.source_terminal_completer.activated[str].connect(lambda _: self.refresh_filters())
         self.destination_terminal_completer.activated[str].connect(lambda _: self.refresh_filters())
         self.space_only_filter_toggle.toggled.connect(
-            lambda checked: self._on_toggle_changed(self.space_only_filter_toggle, "plane-up", checked)
+            lambda checked: self._on_toggle_changed(self.space_only_filter_toggle, "station", checked)
         )
         self.space_only_filter_toggle.toggled.connect(lambda _: self.refresh_filters())
         self.autoload_filter_toggle.toggled.connect(
-            lambda checked: self._on_toggle_changed(self.autoload_filter_toggle, "cart-flatbed", checked)
+            lambda checked: self._on_toggle_changed(self.autoload_filter_toggle, "loader", checked)
         )
         self.nqa_filter_toggle.toggled.connect(
             lambda checked: self._on_toggle_changed(self.nqa_filter_toggle, "mask", checked)
@@ -271,18 +331,6 @@ class FilterPanel(HudWindow):
         # has to happen here rather than via a :checked selector.
         color = theme.ACCENT if checked else theme.TEXT_DISABLED
         button.setIcon(theme.load_icon(icon_name, color))
-        self._update_options_caption()
-
-    def _update_options_caption(self):
-        space_only = self.space_only_filter_toggle.isChecked()
-        autoload_only = self.autoload_filter_toggle.isChecked()
-        nqa_only = self.nqa_filter_toggle.isChecked()
-        terminal_clause = "Space stations only" if space_only else "Any terminal"
-        loading_clause = "autoload-capable only" if autoload_only else "any loading type"
-        caption = f"{terminal_clause}, {loading_clause}"
-        if nqa_only:
-            caption += ", NQA sell only"
-        self.options_caption.setText(caption)
 
     def _on_ship_selected(self, name):
         vehicle = find_vehicle(name)
@@ -292,14 +340,14 @@ class FilterPanel(HudWindow):
     @staticmethod
     def _apply_validation_style(field, valid_names, reachable_names=None, breadcrumb_for=None):
         text = field.text()
+        breadcrumb = ""
 
         if not text:
             style, tooltip = "", ""
         elif text in valid_names:
-            # A resolved selection — the terminal breadcrumb (if any) lives in the
-            # tooltip instead of its own line, to keep the panel short.
             style = ""
-            tooltip = breadcrumb_for(text) if breadcrumb_for else ""
+            breadcrumb = breadcrumb_for(text) if breadcrumb_for else ""
+            tooltip = breadcrumb
         elif reachable_names is not None and text in reachable_names:
             # A real, reachable terminal — just not one that satisfies Space Only.
             style = f"border: 2px solid {theme.WARNING};"
@@ -311,6 +359,8 @@ class FilterPanel(HudWindow):
 
         field.setStyleSheet(style)
         field.setToolTip(tooltip)
+        if hasattr(field, "set_breadcrumb"):
+            field.set_breadcrumb(breadcrumb)
 
     # --- Smart filtering: each of Commodity/Source/Destination narrows the other
     # two's completer suggestions, based on the last *selected* (not typed) value.

@@ -54,14 +54,24 @@ def init():
     _star_system_codes = {system.name: system.code for system in uex_cache.star_systems}
 
 
-def route_breadcrumb(system_name, planet_name, terminal_id, fallback_terminal_name):
-    # Only the system gets abbreviated to its official UEX code (e.g. "Stanton" -> "ST")
-    # — planet stays full. Terminal uses its reference-cache nickname (short, human —
-    # "Everus Harbor") rather than the routes endpoint's own terminal_name, which is the
-    # full official name ("Admin - Everus Harbor") and far too long for a list row.
+def route_terminal_name(terminal_id, fallback_terminal_name):
+    # Terminal uses its reference-cache nickname (short, human — "Everus Harbor") rather
+    # than the routes endpoint's own terminal_name, which is the full official name
+    # ("Admin - Everus Harbor") and far too long for a list row.
     terminal = find_terminal_by_id(terminal_id)
-    terminal_name = terminal.nickname if terminal else fallback_terminal_name
-    parts = [_star_system_codes.get(system_name, system_name), planet_name, terminal_name]
+    return terminal.nickname if terminal else fallback_terminal_name
+
+
+def route_location(system_name, planet_name):
+    # Only the system gets abbreviated to its official UEX code (e.g. "Stanton" -> "ST")
+    # — planet stays full.
+    parts = [_star_system_codes.get(system_name, system_name), planet_name]
+    return " › ".join(part for part in parts if part)
+
+
+def route_breadcrumb(system_name, planet_name, terminal_id, fallback_terminal_name):
+    parts = [_star_system_codes.get(system_name, system_name), planet_name,
+             route_terminal_name(terminal_id, fallback_terminal_name)]
     return "/".join(part for part in parts if part)
 
 
