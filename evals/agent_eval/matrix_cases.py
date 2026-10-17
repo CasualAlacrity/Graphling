@@ -49,14 +49,14 @@ class Conversation:
 
 SINGLE_TURNS: list[SingleTurn] = [
     # --- prices and lookups -------------------------------------------------------------
-    SingleTurn("Commodity prices", "Who's paying the most for quant right now?", "commodity_price_lookup"),
+    SingleTurn("Commodity prices", "Who's paying the most for quant right now?", "price_lookup"),
     # Was "RMC at Grim Hex" (row 38): no context, unclear what it tested.
-    SingleTurn("Commodity prices", "What's RMC going for at Grim Hex?", "commodity_price_lookup"),
-    SingleTurn("Items", "Where do I get a Pyro RYT multitool?", "item_price_lookup"),
-    SingleTurn("Items", "Cheapest size 3 quantum drive", "item_price_lookup"),
-    SingleTurn("Items", "Can I sell my old FS-9 anywhere?", "item_price_lookup"),
-    SingleTurn("Vehicle purchase", "How much is a Hull A in-game?", "vehicle_purchase_lookup"),
-    SingleTurn("Vehicle rental", "Can I rent a Cat for a day near Lorville?", "vehicle_rental_lookup"),
+    SingleTurn("Commodity prices", "What's RMC going for at Grim Hex?", "price_lookup"),
+    SingleTurn("Items", "Where do I get a Pyro RYT multitool?", "price_lookup"),
+    SingleTurn("Items", "Cheapest size 3 quantum drive", "price_lookup"),
+    SingleTurn("Items", "Can I sell my old FS-9 anywhere?", "price_lookup"),
+    SingleTurn("Vehicle purchase", "How much is a Hull A in-game?", "price_lookup"),
+    SingleTurn("Vehicle rental", "Can I rent a Cat for a day near Lorville?", "price_lookup"),
     SingleTurn("Mining", "Where's Quantainium on Daymar?", "mining_location_lookup"),
     SingleTurn("Mining", "Hadanite spots in Stanton", "mining_location_lookup"),
     # No location given: asking for one is right (baseline, 2026-10-17).
@@ -198,8 +198,8 @@ CONVERSATIONS: list[Conversation] = [
         area="Follow-up",
         purpose="A follow-up narrows the last question instead of starting over.",
         turns=(
-            Turn("Who's paying the most for quant right now?", "commodity_price_lookup"),
-            Turn("What about in Pyro?", "commodity_price_lookup"),
+            Turn("Who's paying the most for quant right now?", "price_lookup"),
+            Turn("What about in Pyro?", "price_lookup"),
         ),
     ),
     Conversation(
@@ -208,7 +208,7 @@ CONVERSATIONS: list[Conversation] = [
         purpose="Was a single row (36) that needed the origin; now the pilot gives it first.",
         turns=(
             Turn("I'm at Seraphim in my Railen.", "(gap) set location and ship"),
-            Turn("Is Laranite worth taking to Hurston?", "commodity_price_lookup"),
+            Turn("Is Laranite worth taking to Hurston?", "price_lookup"),
         ),
     ),
     Conversation(

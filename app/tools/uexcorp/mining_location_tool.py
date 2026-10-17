@@ -53,7 +53,7 @@ class MiningLocationTool(UEXBackedTool):
         "Look up where a Star Citizen raw ore or harvestable material can actually be found/mined "
         "in the world — planets, moons, Lagrange-point orbital sites, and points of interest "
         "(asteroid belts, etc.) it spawns at. This is about physical spawn locations, not where to "
-        "buy or sell it — use commodity_price_lookup for trading. Not every commodity is mineable; "
+        "buy or sell it — use price_lookup for trading. Not every commodity is mineable; "
         "manufactured or refined-only goods won't have results here."
     )
     args_schema: type[BaseModel] = MiningLocationArgs

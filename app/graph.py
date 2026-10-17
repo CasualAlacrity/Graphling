@@ -40,12 +40,9 @@ from tools.trade_run.trade_advisor_tool import TradeAdvisorTool
 from tools.trade_run.trade_run_status_tool import TradeRunStatusTool
 from tools.travel_time_tool import TravelTimeTool
 from tools.uexcorp.client import UEXCorpClient
-from tools.uexcorp.commodity_tool import CommodityPriceTool
-from tools.uexcorp.item_tool import ItemPriceTool
 from tools.uexcorp.mining_location_tool import MiningLocationTool
+from tools.uexcorp.price_lookup_tool import PriceLookupTool
 from tools.uexcorp.refinery_yield_tool import RefineryYieldTool
-from tools.uexcorp.vehicle_purchase_tool import VehiclePurchaseTool
-from tools.uexcorp.vehicle_rental_tool import VehicleRentalTool
 from voice.timer_tool import CheckTimerTool, StartTimerTool
 
 
@@ -112,15 +109,13 @@ uex_client = UEXCorpClient(via_server=True)  # no UEX key on the client; lookups
 scw_client = StarCitizenWikiClient()
 
 # UEX Backed Tools
-commodity_price_tool = CommodityPriceTool(client=uex_client)
-item_price_tool = ItemPriceTool(client=uex_client)
-vehicle_purchase_tool = VehiclePurchaseTool(client=uex_client)
-vehicle_rental_tool = VehicleRentalTool(client=uex_client)
+# One tool for every buy / sell / rent price question (replaced four per-catalogue
+# lookups 2026-10-17: tools/uexcorp/price_lookup_tool.py).
+price_lookup_tool = PriceLookupTool(client=uex_client)
 refinery_yield_tool = RefineryYieldTool(client=uex_client)
 mining_location_tool = MiningLocationTool(client=uex_client)
 
-uex_backed_tools = [commodity_price_tool, item_price_tool, vehicle_purchase_tool, vehicle_rental_tool,
-                    refinery_yield_tool, mining_location_tool]
+uex_backed_tools = [price_lookup_tool, refinery_yield_tool, mining_location_tool]
 
 # Trade Run Voice Tools
 mark_arrived_tool = MarkArrivedTool()
@@ -344,7 +339,7 @@ async def _resolve_last_touched_leg_id(messages: list[BaseMessage]) -> UUID | No
 # HISTORY_FULL_TOOL_RESULT_TURNS is how many of those keep tool results verbatim -- older
 # ones get STALE_TOOL_RESULT instead. Never below 1: the current turn's own results must
 # survive its respond<->tools loop, and 2 keeps "what about in Pyro?" follow-ups working
-# off the previous turn's all_results (commodity_price_lookup's description relies on it).
+# off the previous turn's results.
 # CLASSIFY_HISTORY_TURNS is classify_topic's own, smaller window -- it judges the latest
 # utterance, needing only enough before it for "Let's do it." to read as on-topic.
 HISTORY_TURNS = int(os.getenv("HISTORY_TURNS", "6"))

@@ -25,8 +25,7 @@ from dotenv import load_dotenv
 from tools.starcitizenwiki.client import StarCitizenWikiClient
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.reference_cache import UexReferenceCache
-from tools.uexcorp.trade_data import UEXTradeData, UEXTradeRoute
-from tools.uexcorp.vehicle_rental_tool import VehicleRentalData
+from tools.uexcorp.trade_data import UEXTradeData, UEXTradeRoute, VehicleRentalData
 
 # Old, game-launch-era entities, picked specifically because they're unlikely to ever
 # be removed outright the way a brand-new ship/commodity might be — a failure here

@@ -94,7 +94,7 @@ TOOL_GROUPS = {
         "confirm_cargo_unloaded", "mark_cargo_sold", "trade_run_status", "trade_advisor",
         "cargo_packing_suggestion",
     ),
-    "prices": ("commodity_price_lookup", "item_price_lookup", "vehicle_purchase_lookup", "vehicle_rental_lookup"),
+    "prices": ("price_lookup",),
     "routes": ("best_route",),
     "travel": ("estimate_travel_time",),
     "timers": ("start_timer", "check_timer"),

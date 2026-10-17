@@ -152,7 +152,15 @@ when it didn't.
 - "Best refinery for Gold near me" (row 46): she answered without knowing the pilot's
   location. Ask, or use a known location; never imply "near you" without one.
 
-**6a. One price lookup with a resolution helper (designed with Jeff, 2026-10-17).** Hull A
+**6a. One price lookup with a resolution helper (designed with Jeff, 2026-10-17). BUILT
+2026-10-17:** `tools/uexcorp/price_lookup_tool.py` on `catalog_resolution.py`; the four
+old tools are deleted (19 -> 16 tools, tool descriptions ~9,650 -> ~7,375 tokens). Live:
+Hull A -> the ship (1,615,950 aUEC), "quant" -> one answer, FS-9 sell -> "no terminal buys
+the FS-9 LMG", "Cat" -> Caterpillar (no rental terminal has one in UEX). Still open:
+category + size search ("cheapest size 3 quantum drive" now says it can't find it rather
+than answering about Quantainium), and location filters fail on "Grim Hex" ("What's RMC
+going for at Grim Hex?": the location alias rewrites it to the station's legal name,
+which no terminal is named). Original plan: Hull A
 goes to item lookup every run (its five liveries match "Hull A" better than the ship, and
 none of them is sold anywhere; UEX does sell many other liveries in-game, e.g. at Dumper's
 Depot), and "FS-9" lists a magazine plus four skins of the LMG. Plan, in two steps:

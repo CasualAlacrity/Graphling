@@ -64,3 +64,14 @@ class UEXTradeRoute(BaseModel):
         if isinstance(value, list):
             return value
         return [int(part) for part in value.split(",") if part]
+
+
+class VehicleRentalData(BaseModel):
+    """One rental terminal's daily rate for a vehicle (UEX vehicles_rentals_prices)."""
+    terminal_id: int | None = Field(default=None, validation_alias="id_terminal")
+    terminal_name: str
+    star_system_name: str | None
+    orbit_name: str | None
+    moon_name: str | None
+    planet_name: str | None
+    price_per_day: float = Field(validation_alias="price_rent")

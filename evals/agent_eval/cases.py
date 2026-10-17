@@ -59,9 +59,9 @@ CASES: list[HarnessCase] = [
             "I need to buy some Laranite, where's it cheap?",
             "Where can I get a good deal on Laranite?"
         ],
-        expected_tool="commodity_price_lookup",
-        expected_args={"commodity": "Laranite"},
-        exact_args=True,  # commodity_price_lookup has no buy/sell or sort arg; no location was spoken
+        expected_tool="price_lookup",
+        expected_args={"what": "Laranite", "action": "buy"},
+        exact_args=True,  # no location was spoken
         expected_location="Baijini Point", expected_price=3.15, expected_unit="SCU",
         expected_outcome=(
             "Should report Baijini Point as the cheapest terminal to buy Laranite, around 3.15 aUEC per SCU."
@@ -76,8 +76,8 @@ CASES: list[HarnessCase] = [
             "What's the best place to get Agricium?",
             "I need to buy some Agricium, where's it cheap?",
         ],
-        expected_tool="commodity_price_lookup",
-        expected_args={"commodity": "Agricium"},
+        expected_tool="price_lookup",
+        expected_args={"what": "Agricium", "action": "buy"},
         exact_args=True,
         # The reply may mention Baijini (cheaper but empty); what matters is which it recommends.
         expected_location="Port Tressler", expected_price=26.10, expected_unit="SCU",
@@ -95,8 +95,8 @@ CASES: list[HarnessCase] = [
             "I want to buy a Cutlass Black, what's the best price?",
             "Find me a good deal on a Cutlass Black.",
         ],
-        expected_tool="vehicle_purchase_lookup",
-        expected_args={"vehicle": "Cutlass Black"},
+        expected_tool="price_lookup",
+        expected_args={"what": "Cutlass Black", "action": "buy"},
         exact_args=True,
         expected_location="Baijini Point", expected_price=1_190_000,  # ships have no per-SCU price
         expected_outcome=(

@@ -17,33 +17,31 @@ import asyncio
 from harness import world
 from harness.fakes import install_fakes
 from tools.uexcorp.client import UEXCorpClient
-from tools.uexcorp.commodity_tool import CommodityPriceTool
+from tools.uexcorp.price_lookup_tool import PriceLookupTool
 
 
 async def main() -> int:
     # Fake credentials — install_fakes() means these never reach a real request.
     client = UEXCorpClient(api_key="fake", bearer_token="fake")
-    tool = CommodityPriceTool(client=client)
+    tool = PriceLookupTool(client=client)
 
     with install_fakes():
-        result = await tool._arun(commodity="Laranite")
+        result = await tool._arun(what="Laranite", action="buy")
 
-    cheapest = result["cheapest_to_buy"]
-    best_sell = result["best_to_sell"]
+    cheapest = result["best"] if isinstance(result, dict) else None
 
-    print("commodity_price_lookup(commodity='Laranite') ->")
-    print(f"  cheapest_to_buy: {cheapest}")
-    print(f"  best_to_sell:    {best_sell}")
+    print("price_lookup(what='Laranite', action='buy') ->")
+    print(f"  best: {cheapest}")
 
-    expected_terminal = world.BAIJINI_POINT.name  # the cheaper of the two fake rows
-    actual_terminal = cheapest["terminal_name"] if cheapest else None
+    expected_terminal = world.BAIJINI_POINT.id  # the cheaper of the two fake rows
+    actual_terminal = cheapest["terminal_id"] if cheapest else None
 
     print()
     if actual_terminal != expected_terminal:
-        print(f"FAIL: expected cheapest_to_buy at {expected_terminal!r}, got {actual_terminal!r}")
+        print(f"FAIL: expected best at terminal {expected_terminal!r}, got {actual_terminal!r}")
         return 1
 
-    print(f"PASS: cheapest_to_buy correctly resolved to {expected_terminal!r} — no network access used.")
+    print(f"PASS: best correctly resolved to terminal {expected_terminal!r} — no network access used.")
     return 0
 
 
