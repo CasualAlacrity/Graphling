@@ -117,3 +117,39 @@ def test_api_failure_is_caught_and_surfaced(qasync_loop, wired_panels, monkeypat
     assert rejection_messages and "Search failed" in rejection_messages[-1]
     assert filter_panel.search_button.isEnabled()
     assert filter_panel.search_button.text() == "Search"
+
+
+def test_location_names_resolve_to_their_terminals(wired_panels, fake_cache):
+    from overlay import uex_lookup
+
+    terminal = fake_cache.terminals[0]
+    system = terminal.star_system_name
+    assert system, "fake terminal needs a star system for this test"
+
+    location = uex_lookup.find_location(system.lower())
+    assert location is not None
+    assert location.name == system
+    assert terminal.id in location.terminal_ids
+    assert uex_lookup.find_location("Not A Place") is None
+    assert system in uex_lookup.location_names()
+
+
+def test_region_in_source_and_destination_reaches_search_routes(qasync_loop, wired_panels, fake_cache):
+    filter_panel, _results_panel, call_log = wired_panels
+    system = fake_cache.terminals[0].star_system_name
+
+    async def scenario():
+        filter_panel.source_terminal_input.setText(system)
+        filter_panel.destination_terminal_input.setText(system)
+        await asyncio.sleep(0.05)
+
+        filter_panel._on_search_clicked()
+        await asyncio.sleep(0.05)
+
+    qasync_loop.run_until_complete(scenario())
+
+    searches = [entry[1] for entry in call_log if entry[0] == "search_routes"]
+    assert searches
+    kwargs = searches[-1]
+    assert kwargs["source_terminal_id"] is None and kwargs["destination_terminal_id"] is None
+    assert kwargs["source_scope_ids"] and kwargs["destination_scope_ids"]

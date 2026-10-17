@@ -180,3 +180,32 @@ async def test_fanout_concurrency_is_bounded(monkeypatch):
     # 12 candidate commodities against a limit of 5 should actually saturate the limit,
     # not just stay under it — otherwise the bound could be a no-op.
     assert max_in_flight == uex_lookup.ROUTE_FANOUT_CONCURRENCY
+
+
+async def test_source_region_matches_any_terminal_in_it(call_log):
+    # A star system / planet / moon / orbit arrives as a set of terminal ids: the search
+    # keeps routes starting at any of them, fanning out across every commodity they sell.
+    routes = await uex_lookup.search_routes(
+        commodity_id=None, source_terminal_id=None, destination_terminal_id=None,
+        source_scope_ids={100, 101}, **SEARCH_DEFAULTS,
+    )
+    assert sorted(call_log) == [1, 2, 3]
+    assert len(routes) == 4
+    assert {route.origin_terminal_id for route in routes} == {100, 101}
+
+
+async def test_source_and_destination_regions_together(call_log):
+    routes = await uex_lookup.search_routes(
+        commodity_id=None, source_terminal_id=None, destination_terminal_id=None,
+        source_scope_ids={100, 101}, destination_scope_ids={200, 202}, **SEARCH_DEFAULTS,
+    )
+    assert {(r.origin_terminal_id, r.destination_terminal_id) for r in routes} == {(100, 200), (100, 202), (101, 200)}
+
+
+async def test_destination_region_with_commodity_is_a_single_cached_fetch(call_log):
+    routes = await uex_lookup.search_routes(
+        commodity_id=1, source_terminal_id=None, destination_terminal_id=None,
+        destination_scope_ids={200, 201}, **SEARCH_DEFAULTS,
+    )
+    assert call_log == [1]
+    assert len(routes) == 2

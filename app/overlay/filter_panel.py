@@ -22,10 +22,12 @@ from overlay.theme import HudWindow
 from overlay.uex_lookup import (
     commodity_ids_at,
     find_commodity,
+    find_location,
     find_terminal,
     find_vehicle,
     inventory_code_for,
     is_space_terminal,
+    location_names,
     search_routes,
     terminal_breadcrumb,
     terminal_ids_for,
@@ -95,12 +97,16 @@ class FilterPanel(HudWindow):
         self.setStyleSheet(theme.STYLESHEET)
 
         self.current_commodity_candidates = list(uex_lookup.commodity_names)
-        self.current_source_candidates = list(uex_lookup.terminal_names)
-        self.current_destination_candidates = list(uex_lookup.terminal_names)
+        # Star systems, planets, moons and orbits are accepted wherever a terminal is — a
+        # region stands for every terminal inside it. Appended after any narrowing, since
+        # a region is never "unreachable" the way a single terminal can be.
+        self._location_names = location_names()
+        self.current_source_candidates = list(uex_lookup.terminal_names) + self._location_names
+        self.current_destination_candidates = list(uex_lookup.terminal_names) + self._location_names
         # Unfiltered-by-space-only versions, used only to tell "not reachable at all"
         # (red) apart from "reachable but not Space Only" (orange) once narrowed.
-        self.current_source_reachable = list(uex_lookup.terminal_names)
-        self.current_destination_reachable = list(uex_lookup.terminal_names)
+        self.current_source_reachable = list(self.current_source_candidates)
+        self.current_destination_reachable = list(self.current_destination_candidates)
         # Only one filter refresh should ever be in flight — a newer trigger (another
         # completer selection, a checkbox toggle) cancels whatever's still running
         # instead of letting two overlapping fetches race to overwrite the candidates.
@@ -209,9 +215,9 @@ class FilterPanel(HudWindow):
         ))
 
         # --- Source ---
-        self.source_terminal_input = BreadcrumbLineEdit(placeholderText="Search terminal...")
+        self.source_terminal_input = BreadcrumbLineEdit(placeholderText="Terminal, system or planet...")
         self.source_terminal_completer = QCompleter(
-            uex_lookup.terminal_names,
+            self.current_source_candidates,
             parent=self.source_terminal_input,
             caseSensitivity=Qt.CaseInsensitive,
             filterMode=Qt.MatchFlag.MatchContains,
@@ -232,9 +238,9 @@ class FilterPanel(HudWindow):
         self._main_layout.addWidget(self._route_connector())
 
         # --- Destination ---
-        self.destination_terminal_input = BreadcrumbLineEdit(placeholderText="Search terminal...")
+        self.destination_terminal_input = BreadcrumbLineEdit(placeholderText="Terminal, system or planet...")
         self.destination_terminal_completer = QCompleter(
-            uex_lookup.terminal_names,
+            self.current_destination_candidates,
             parent=self.destination_terminal_input,
             caseSensitivity=Qt.CaseInsensitive,
             filterMode=Qt.MatchFlag.MatchContains,
@@ -365,23 +371,38 @@ class FilterPanel(HudWindow):
     # --- Smart filtering: each of Commodity/Source/Destination narrows the other
     # two's completer suggestions, based on the last *selected* (not typed) value.
 
+    @staticmethod
+    def _scope_ids(text):
+        """Terminal ids a Source/Destination field stands for — the one terminal it names,
+        or every terminal in the system/planet/moon/orbit it names. None if unresolved."""
+        terminal = find_terminal(text)
+        if terminal is not None:
+            return {terminal.id}
+        location = find_location(text)
+        return set(location.terminal_ids) if location is not None else None
+
+    @staticmethod
+    async def _commodity_ids_at_any(terminal_ids, side):
+        results = await asyncio.gather(*(commodity_ids_at(terminal_id, side) for terminal_id in terminal_ids))
+        return set().union(*results)
+
     async def _refresh_filters_async(self):
         commodity = find_commodity(self.commodity_input.text())
-        source = find_terminal(self.source_terminal_input.text())
-        destination = find_terminal(self.destination_terminal_input.text())
+        source_ids = self._scope_ids(self.source_terminal_input.text())
+        destination_ids = self._scope_ids(self.destination_terminal_input.text())
 
         # Commodity candidates: narrowed by whichever of source/destination are set.
-        if source is not None and destination is not None:
-            source_ids, dest_ids = await asyncio.gather(
-                commodity_ids_at(source.id, "buy"), commodity_ids_at(destination.id, "sell")
+        if source_ids is not None and destination_ids is not None:
+            bought_at_source, sold_at_destination = await asyncio.gather(
+                self._commodity_ids_at_any(source_ids, "buy"), self._commodity_ids_at_any(destination_ids, "sell")
             )
-            commodity_ids = source_ids & dest_ids
+            commodity_ids = bought_at_source & sold_at_destination
             commodity_candidates = [c.name for c in uex_lookup.uex_cache.commodities if c.id in commodity_ids]
-        elif source is not None:
-            commodity_ids = await commodity_ids_at(source.id, "buy")
+        elif source_ids is not None:
+            commodity_ids = await self._commodity_ids_at_any(source_ids, "buy")
             commodity_candidates = [c.name for c in uex_lookup.uex_cache.commodities if c.id in commodity_ids]
-        elif destination is not None:
-            commodity_ids = await commodity_ids_at(destination.id, "sell")
+        elif destination_ids is not None:
+            commodity_ids = await self._commodity_ids_at_any(destination_ids, "sell")
             commodity_candidates = [c.name for c in uex_lookup.uex_cache.commodities if c.id in commodity_ids]
         else:
             commodity_candidates = list(uex_lookup.commodity_names)
@@ -392,11 +413,12 @@ class FilterPanel(HudWindow):
         if commodity is not None:
             terminal_ids = await terminal_ids_for(commodity.id, "buy")
             source_reachable = [t.nickname for t in uex_lookup.uex_cache.terminals if t.id in terminal_ids]
-        elif destination is not None:
-            reachable_commodity_ids = await commodity_ids_at(destination.id, "sell")
+        elif destination_ids is not None:
+            reachable_commodity_ids = await self._commodity_ids_at_any(destination_ids, "sell")
             results = await asyncio.gather(*(terminal_ids_for(cid, "buy") for cid in reachable_commodity_ids))
             terminal_ids = set().union(*results)
-            terminal_ids.discard(destination.id)
+            if len(destination_ids) == 1:  # a lone terminal can't be its own source; a region can
+                terminal_ids -= destination_ids
             source_reachable = [t.nickname for t in uex_lookup.uex_cache.terminals if t.id in terminal_ids]
         else:
             source_reachable = list(uex_lookup.terminal_names)
@@ -406,11 +428,12 @@ class FilterPanel(HudWindow):
         if commodity is not None:
             terminal_ids = await terminal_ids_for(commodity.id, "sell")
             destination_reachable = [t.nickname for t in uex_lookup.uex_cache.terminals if t.id in terminal_ids]
-        elif source is not None:
-            available_commodity_ids = await commodity_ids_at(source.id, "buy")
+        elif source_ids is not None:
+            available_commodity_ids = await self._commodity_ids_at_any(source_ids, "buy")
             results = await asyncio.gather(*(terminal_ids_for(cid, "sell") for cid in available_commodity_ids))
             terminal_ids = set().union(*results)
-            terminal_ids.discard(source.id)
+            if len(source_ids) == 1:
+                terminal_ids -= source_ids
             destination_reachable = [t.nickname for t in uex_lookup.uex_cache.terminals if t.id in terminal_ids]
         else:
             destination_reachable = list(uex_lookup.terminal_names)
@@ -422,8 +445,8 @@ class FilterPanel(HudWindow):
         # A field that already holds a resolved value is pinned, not still being
         # searched — narrowing (and thus space-only filtering) only makes sense for
         # whichever field is still open, same principle as search_routes' pinning.
-        source_narrowed = source is None and (commodity is not None or destination is not None)
-        destination_narrowed = destination is None and (commodity is not None or source is not None)
+        source_narrowed = source_ids is None and (commodity is not None or destination_ids is not None)
+        destination_narrowed = destination_ids is None and (commodity is not None or source_ids is not None)
 
         if space_only and source_narrowed:
             source_candidates = [n for n in source_reachable if is_space_terminal(find_terminal(n))]
@@ -434,6 +457,13 @@ class FilterPanel(HudWindow):
             destination_candidates = [n for n in destination_reachable if is_space_terminal(find_terminal(n))]
         else:
             destination_candidates = destination_reachable
+
+        # Regions go on last: they're a way to name several terminals at once, so
+        # narrowing by what a single terminal can reach doesn't apply to them.
+        source_candidates = source_candidates + self._location_names
+        destination_candidates = destination_candidates + self._location_names
+        source_reachable = source_reachable + self._location_names
+        destination_reachable = destination_reachable + self._location_names
 
         return commodity_candidates, source_candidates, destination_candidates, source_reachable, destination_reachable
 
@@ -480,7 +510,13 @@ class FilterPanel(HudWindow):
 
     @staticmethod
     def _terminal_breadcrumb_for(name):
-        return terminal_breadcrumb(find_terminal(name))
+        terminal = find_terminal(name)
+        if terminal is not None:
+            return terminal_breadcrumb(terminal)
+        location = find_location(name)
+        if location is not None:
+            return f"{len(location.terminal_ids)} terminals"
+        return ""
 
     def _on_field_edited(self, field, valid_names, reachable_names=None, breadcrumb_for=None):
         # Clearing a field that was driving narrowing (e.g. Source) needs the other
@@ -496,13 +532,17 @@ class FilterPanel(HudWindow):
         commodity = find_commodity(self.commodity_input.text())
         source_terminal = find_terminal(self.source_terminal_input.text())
         destination_terminal = find_terminal(self.destination_terminal_input.text())
+        # A system/planet/moon/orbit instead of a terminal: search every terminal in it.
+        source_location = None if source_terminal else find_location(self.source_terminal_input.text())
+        destination_location = None if destination_terminal else find_location(self.destination_terminal_input.text())
 
-        if commodity is None and source_terminal is None and destination_terminal is None:
+        if (commodity is None and source_terminal is None and destination_terminal is None
+                and source_location is None and destination_location is None):
             # UEX's own API requires a commodity or a source terminal for a direct query
             # (verified live — destination alone 400s), but search_routes() now works
             # around that with a cached per-commodity fan-out, so destination-only is a
             # valid search from here — only reject when nothing at all is set.
-            self.search_rejected.emit("Select a commodity, source terminal, or destination terminal to search.")
+            self.search_rejected.emit("Select a commodity, source, or destination to search.")
             return
 
         min_source_code = inventory_code_for(self.min_source_inventory_input.currentText(), "buy")
@@ -518,6 +558,8 @@ class FilterPanel(HudWindow):
                 commodity_id=commodity.id if commodity else None,
                 source_terminal_id=source_terminal.id if source_terminal else None,
                 destination_terminal_id=destination_terminal.id if destination_terminal else None,
+                source_scope_ids=set(source_location.terminal_ids) if source_location else None,
+                destination_scope_ids=set(destination_location.terminal_ids) if destination_location else None,
                 min_source_code=min_source_code,
                 max_destination_code=max_destination_code,
                 space_only=space_only,

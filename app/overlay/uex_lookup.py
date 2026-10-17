@@ -1,4 +1,5 @@
 import asyncio
+from typing import NamedTuple
 
 from langsmith import tracing_context
 
@@ -131,6 +132,60 @@ def find_terminal_by_id(terminal_id):
     return _find(uex_cache.terminals, "id", terminal_id)
 
 
+class Location(NamedTuple):
+    name: str  # display form, e.g. "Crusader"
+    terminal_ids: frozenset[int]
+
+
+def _location_index():
+    """Every star system, planet, moon and orbit name that has at least one commodity
+    terminal, mapped (case-folded) to the terminals inside it. Derived from the terminal
+    records themselves rather than the star-system/planet reference tables, so a name is
+    only offered if it can actually yield a route. Rebuilt per call — a few hundred
+    terminals, and it keeps this correct whichever cache is loaded."""
+    display_names = {}
+    ids_by_name = {}
+    for terminal in uex_cache.terminals:
+        if terminal.type != TerminalType.COMMODITY:
+            continue
+        places = (terminal.star_system_name, terminal.planet_name, terminal.moon_name, terminal.orbit_name)
+        for place in places:
+            if not place:
+                continue
+            key = place.casefold()
+            display_names.setdefault(key, place)
+            ids_by_name.setdefault(key, set()).add(terminal.id)
+    return display_names, ids_by_name
+
+
+def location_names():
+    display_names, _ids_by_name = _location_index()
+    return sorted(display_names.values())
+
+
+def find_location(text):
+    """The region a pilot typed ("Stanton", "Crusader", "Daymar"), or None. Terminal
+    nicknames win over regions — callers check find_terminal first."""
+    key = (text or "").strip().casefold()
+    if not key:
+        return None
+    display_names, ids_by_name = _location_index()
+    if key not in display_names:
+        return None
+    return Location(display_names[key], frozenset(ids_by_name[key]))
+
+
+def terminal_ids_in(text):
+    """Terminal ids a Source/Destination field's text stands for: the one terminal it
+    names, or every terminal in the star system / planet / moon / orbit it names. None
+    when the text resolves to neither."""
+    terminal = find_terminal(text)
+    if terminal is not None:
+        return frozenset({terminal.id})
+    location = find_location(text)
+    return location.terminal_ids if location is not None else None
+
+
 def _terminal_is_auto_load(terminal_id):
     terminal = find_terminal_by_id(terminal_id)
     return terminal.is_auto_load if terminal else 0
@@ -236,12 +291,17 @@ async def _fanout_route_rows(commodity_ids) -> list[dict]:
     return [row for rows in results for row in rows]
 
 
-def _filter_by_origin(rows, terminal_id):
-    return [row for row in rows if row.get("id_terminal_origin") == terminal_id]
+def _filter_by_origin(rows, terminal_ids):
+    return [row for row in rows if row.get("id_terminal_origin") in terminal_ids]
 
 
-def _filter_by_destination(rows, terminal_id):
-    return [row for row in rows if row.get("id_terminal_destination") == terminal_id]
+def _filter_by_destination(rows, terminal_ids):
+    return [row for row in rows if row.get("id_terminal_destination") in terminal_ids]
+
+
+async def _commodity_ids_at_any(terminal_ids, side):
+    results = await asyncio.gather(*(commodity_ids_at(terminal_id, side) for terminal_id in terminal_ids))
+    return set().union(*results)
 
 
 async def search_routes(
@@ -253,6 +313,8 @@ async def search_routes(
     space_only,
     require_autoload,
     nqa_only=False,
+    source_scope_ids=None,
+    destination_scope_ids=None,
 ) -> list[UEXTradeRoute]:
     # Tracing off for the whole overlay path. These fetches run from Qt, outside any graph
     # invocation, so every traced client call becomes its own *root* trace with no
@@ -264,6 +326,7 @@ async def search_routes(
         return await _search_routes(
             commodity_id, source_terminal_id, destination_terminal_id,
             min_source_code, max_destination_code, space_only, require_autoload, nqa_only,
+            source_scope_ids, destination_scope_ids,
         )
 
 
@@ -276,31 +339,38 @@ async def _search_routes(
     space_only,
     require_autoload,
     nqa_only=False,
+    source_scope_ids=None,
+    destination_scope_ids=None,
 ) -> list[UEXTradeRoute]:
+    # A region (star system / planet / moon / orbit) is just a set of terminals — a single
+    # pinned terminal is the one-element case, so both go through the same set filtering.
+    source_ids = {source_terminal_id} if source_terminal_id is not None else source_scope_ids
+    destination_ids = {destination_terminal_id} if destination_terminal_id is not None else destination_scope_ids
+
     if commodity_id is not None:
         # The full route set for a commodity is cached as one unit regardless of origin/
         # destination — reused here instead of asking UEX to filter server-side, so a
         # repeat search that only changes source/destination (very common while narrowing
         # filters) is a cache hit instead of a fresh live call.
         raw_routes = await uex_cache_client.get_commodity_route_rows(commodity_id)
-        if source_terminal_id is not None:
-            raw_routes = _filter_by_origin(raw_routes, source_terminal_id)
-        if destination_terminal_id is not None:
-            raw_routes = _filter_by_destination(raw_routes, destination_terminal_id)
-    elif source_terminal_id is not None:
-        commodity_ids = await commodity_ids_at(source_terminal_id, "buy")
+        if source_ids is not None:
+            raw_routes = _filter_by_origin(raw_routes, source_ids)
+        if destination_ids is not None:
+            raw_routes = _filter_by_destination(raw_routes, destination_ids)
+    elif source_ids is not None:
+        commodity_ids = await _commodity_ids_at_any(source_ids, "buy")
         raw_routes = await _fanout_route_rows(commodity_ids)
-        raw_routes = _filter_by_origin(raw_routes, source_terminal_id)
+        raw_routes = _filter_by_origin(raw_routes, source_ids)
         # source+destination-with-no-commodity lands here (source is checked first) —
-        # without this, destination_terminal_id was silently ignored whenever a source
-        # was also set, returning every destination reachable from that source instead
-        # of just the one the pilot picked.
-        if destination_terminal_id is not None:
-            raw_routes = _filter_by_destination(raw_routes, destination_terminal_id)
-    elif destination_terminal_id is not None:
-        commodity_ids = await commodity_ids_at(destination_terminal_id, "sell")
+        # without this, destination was silently ignored whenever a source was also set,
+        # returning every destination reachable from that source instead of the one(s)
+        # the pilot picked.
+        if destination_ids is not None:
+            raw_routes = _filter_by_destination(raw_routes, destination_ids)
+    elif destination_ids is not None:
+        commodity_ids = await _commodity_ids_at_any(destination_ids, "sell")
         raw_routes = await _fanout_route_rows(commodity_ids)
-        raw_routes = _filter_by_destination(raw_routes, destination_terminal_id)
+        raw_routes = _filter_by_destination(raw_routes, destination_ids)
     else:
         raw_routes = []
 
