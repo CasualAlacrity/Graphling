@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Uplink — Trade Route List Items</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0D0F10; --surface:#17191B; --surface-alt:#1F2224;
+    --border:#33373A; --border-subtle:#24272A;
+    --text-primary:#EDEAE4; --text-secondary:#9AA0A6; --text-disabled:#5C6266;
+    --accent:#F2650C; --accent-hover:#FF7A1F; --accent-active:#C94F00;
+    --success:#4CAF6D; --warning:#E8B23A; --error:#E5484D;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(74,144,217,0.10), transparent 60%),
+      radial-gradient(1000px 500px at 90% 20%, rgba(242,101,12,0.08), transparent 55%),
+      #08090A;
+    color:var(--text-primary);
+    font-family:'Rajdhani',sans-serif;
+    padding:60px 20px 110px;
+  }
+  .page-head{max-width:700px;margin:0 auto 40px;text-align:center;}
+  .page-head .kicker{color:var(--accent);font:600 13px 'JetBrains Mono',monospace;letter-spacing:.16em;text-transform:uppercase;margin-bottom:10px;}
+  .page-head h1{font:700 27px 'Rajdhani',sans-serif;margin:0 0 10px;}
+  .page-head p{color:var(--text-secondary);font:400 14px/1.55 -apple-system,Segoe UI,sans-serif;margin:0;}
+
+  .panel{
+    max-width:940px;margin:0 auto;
+    background:var(--surface);border:1px solid var(--border);border-radius:10px;
+    overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.45);
+  }
+
+  .grid-row{
+    display:grid;
+    grid-template-columns: minmax(150px,1.5fr) 64px minmax(170px,1.3fr) 22px minmax(170px,1.3fr) minmax(140px,1.05fr) 44px;
+    align-items:center;
+    gap:14px;
+    padding:0 20px;
+  }
+
+  .head-row{
+    padding-top:14px;padding-bottom:14px;
+    border-bottom:1px solid var(--border-subtle);
+    font:600 10.5px 'JetBrains Mono',monospace;
+    color:var(--text-disabled);letter-spacing:.08em;text-transform:uppercase;
+  }
+  .head-row .scu-h, .head-row .profit-h{text-align:right;}
+
+  .item-row{
+    padding-top:14px;padding-bottom:14px;
+    border-bottom:1px solid var(--border-subtle);
+    position:relative;
+    transition:background .12s ease;
+  }
+  .item-row:last-child{border-bottom:none;}
+  .item-row:hover{background:var(--surface-alt);}
+  .item-row::before{
+    content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+    background:transparent;transition:background .12s ease;
+  }
+  .item-row:hover::before{background:var(--accent);}
+
+  .commodity{display:flex;align-items:center;gap:10px;min-width:0;}
+  .commodity .icon{width:17px;height:17px;color:var(--text-secondary);flex-shrink:0;}
+  .commodity .names{min-width:0;}
+  .commodity .full{font:600 14px 'Rajdhani',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .commodity .code{font:500 10.5px 'JetBrains Mono',monospace;color:var(--text-disabled);letter-spacing:.03em;}
+
+  .scu{text-align:right;font:600 15px 'JetBrains Mono',monospace;color:var(--text-primary);}
+  .scu .unit{font:500 10px 'JetBrains Mono',monospace;color:var(--text-disabled);margin-left:2px;}
+
+  .terminal{display:flex;align-items:center;gap:8px;min-width:0;}
+  .terminal svg.pulse{width:22px;height:13px;flex-shrink:0;cursor:default;}
+  .terminal .t-info{min-width:0;}
+  .terminal .t-name{font:600 13px 'Rajdhani',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .terminal .t-price{font:500 11px 'JetBrains Mono',monospace;color:var(--text-secondary);}
+  .terminal .t-price .lbl{color:var(--text-disabled);margin-right:3px;}
+
+  .arrow{color:var(--text-disabled);font-size:14px;text-align:center;}
+
+  .profit{text-align:right;}
+  .profit .val{font:700 15px 'JetBrains Mono',monospace;color:var(--text-primary);white-space:nowrap;}
+  .profit .val .cur{font:500 11px 'JetBrains Mono',monospace;color:var(--text-secondary);margin-left:4px;}
+  .profit .margin{font:500 11px 'JetBrains Mono',monospace;color:var(--text-secondary);margin-top:3px;}
+
+  .terminal .t-price .cur{font:500 10px 'JetBrains Mono',monospace;color:var(--text-disabled);margin-left:3px;}
+
+  .action{display:flex;justify-content:center;}
+  .add-btn{
+    width:32px;height:32px;border-radius:50%;
+    border:1px solid var(--border);background:transparent;
+    color:var(--text-secondary);display:flex;align-items:center;justify-content:center;
+    cursor:pointer;transition:all .12s ease;
+  }
+  .add-btn svg{width:15px;height:15px;}
+  .add-btn:hover{background:var(--accent);border-color:var(--accent);color:#1A1200;transform:scale(1.06);}
+  .add-btn:active{background:var(--accent-active);border-color:var(--accent-active);transform:scale(.98);}
+
+  .note{text-align:center;max-width:700px;margin:36px auto 0;font:400 12.5px -apple-system,Segoe UI,sans-serif;color:var(--text-disabled);line-height:1.6;}
+  .note b{color:var(--text-secondary);}
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <div class="kicker">Uplink — Trade Route Search — Results</div>
+  <h1>Trade Route List Items</h1>
+  <p>All currency values are aUEC, all quantities are SCU — both units are labeled inline rather than assumed. Hover any row — the accent tick on the left and the row highlight are the same interaction language Qt gives you for free on a styled QTableView/QListWidget row.</p>
+</div>
+
+<div class="panel">
+  <div class="grid-row head-row">
+    <div>Commodity</div>
+    <div class="scu-h">SCU</div>
+    <div>Origin — Buy/SCU</div>
+    <div></div>
+    <div>Destination — Sell/SCU</div>
+    <div class="profit-h">Profit / Margin</div>
+    <div></div>
+  </div>
+
+  <!-- ROW 1 — volatile leg -->
+  <div class="grid-row item-row">
+    <div class="commodity">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8l9-4 9 4-9 4-9-4z"/><path d="M3 8v9l9 4 9-4V8"/><path d="M12 12v9"/></svg>
+      <div class="names">
+        <div class="full">Refined Metal Composite</div>
+        <div class="code">RMC</div>
+      </div>
+    </div>
+    <div class="scu">178<span class="unit">SCU</span></div>
+    <div class="terminal">
+      <svg class="pulse" viewBox="0 0 26 14" title="Origin volatility: 6.4% (stable)"><path d="M0 7 L8 7 L11 6.3 L14 7.5 L26 7" fill="none" stroke="var(--success)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="t-info">
+        <div class="t-name">Orison TDD</div>
+        <div class="t-price"><span class="lbl">buy</span>9.85 <span class="cur">aUEC</span></div>
+      </div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="terminal">
+      <svg class="pulse" viewBox="0 0 26 14" title="Destination volatility: 31.2% (volatile)"><path d="M0 7 L3 7 L5 1 L7 13 L9 3 L11 11 L13 5 L15 9 L17 6 L26 7" fill="none" stroke="var(--error)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="t-info">
+        <div class="t-name">Ruin Station</div>
+        <div class="t-price"><span class="lbl">sell</span>18.20 <span class="cur">aUEC</span></div>
+      </div>
+    </div>
+    <div class="profit">
+      <div class="val">123,456 <span class="cur">aUEC</span></div>
+      <div class="margin">(26.5%)</div>
+    </div>
+    <div class="action"><button class="add-btn" title="Add to Active Routes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button></div>
+  </div>
+
+  <!-- ROW 2 — stable both legs -->
+  <div class="grid-row item-row">
+    <div class="commodity">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8l9-4 9 4-9 4-9-4z"/><path d="M3 8v9l9 4 9-4V8"/><path d="M12 12v9"/></svg>
+      <div class="names">
+        <div class="full">Agricium</div>
+        <div class="code">AGRI</div>
+      </div>
+    </div>
+    <div class="scu">96<span class="unit">SCU</span></div>
+    <div class="terminal">
+      <svg class="pulse" viewBox="0 0 26 14" title="Origin volatility: 5.1% (stable)"><path d="M0 7 L8 7 L11 6.3 L14 7.5 L26 7" fill="none" stroke="var(--success)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="t-info">
+        <div class="t-name">Baijini Point</div>
+        <div class="t-price"><span class="lbl">buy</span>14.10 <span class="cur">aUEC</span></div>
+      </div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="terminal">
+      <svg class="pulse" viewBox="0 0 26 14" title="Destination volatility: 7.8% (stable)"><path d="M0 7 L8 7 L11 6.3 L14 7.5 L26 7" fill="none" stroke="var(--success)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="t-info">
+        <div class="t-name">Levski</div>
+        <div class="t-price"><span class="lbl">sell</span>22.75 <span class="cur">aUEC</span></div>
+      </div>
+    </div>
+    <div class="profit">
+      <div class="val">84,000 <span class="cur">aUEC</span></div>
+      <div class="margin">(18.2%)</div>
+    </div>
+    <div class="action"><button class="add-btn" title="Add to Active Routes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button></div>
+  </div>
+
+  <!-- ROW 3 — moderate both legs -->
+  <div class="grid-row item-row">
+    <div class="commodity">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8l9-4 9 4-9 4-9-4z"/><path d="M3 8v9l9 4 9-4V8"/><path d="M12 12v9"/></svg>
+      <div class="names">
+        <div class="full">Laranite</div>
+        <div class="code">LRNT</div>
+      </div>
+    </div>
+    <div class="scu">132<span class="unit">SCU</span></div>
+    <div class="terminal">
+      <svg class="pulse" viewBox="0 0 26 14" title="Origin volatility: 16.7% (moderate)"><path d="M0 7 Q6.5 1 13 7 T26 7" fill="none" stroke="var(--warning)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="t-info">
+        <div class="t-name">Area18</div>
+        <div class="t-price"><span class="lbl">buy</span>11.40 <span class="cur">aUEC</span></div>
+      </div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="terminal">
+      <svg class="pulse" viewBox="0 0 26 14" title="Destination volatility: 19.4% (moderate)"><path d="M0 7 Q6.5 1 13 7 T26 7" fill="none" stroke="var(--warning)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="t-info">
+        <div class="t-name">Grim HEX</div>
+        <div class="t-price"><span class="lbl">sell</span>16.90 <span class="cur">aUEC</span></div>
+      </div>
+    </div>
+    <div class="profit">
+      <div class="val">67,320 <span class="cur">aUEC</span></div>
+      <div class="margin">(12.9%)</div>
+    </div>
+    <div class="action"><button class="add-btn" title="Add to Active Routes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button></div>
+  </div>
+
+</div>
+
+<p class="note">Dropped the route confidence rollup — you're right that it was redundant with the origin/destination pulse icons sitting right there. Every aUEC value and the SCU quantity now carries its unit explicitly rather than relying on the header row alone. The "+" button is still a plain add-to-active-routes action; if you want something more distinctive tied to the ship/route theme (a waypoint pin, a "plot course" glyph) I can swap it, this was the lowest-risk universal choice.</p>
+
+</body>
+</html>

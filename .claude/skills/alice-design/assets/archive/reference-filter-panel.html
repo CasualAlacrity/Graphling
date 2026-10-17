@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Uplink — Filter Panel (E) — Responsive Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0D0F10; --surface:#17191B; --surface-alt:#1F2224;
+    --border:#33373A; --border-subtle:#24272A;
+    --text-primary:#EDEAE4; --text-secondary:#9AA0A6; --text-disabled:#5C6266;
+    --accent:#F2650C; --accent-hover:#FF7A1F; --accent-active:#C94F00; --focus-ring:#FF9142;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(74,144,217,0.10), transparent 60%),
+      radial-gradient(1000px 500px at 90% 20%, rgba(242,101,12,0.08), transparent 55%),
+      #08090A;
+    color:var(--text-primary);
+    font-family:'Rajdhani',sans-serif;
+    padding:56px 20px 100px;
+  }
+  .page-head{max-width:680px;margin:0 auto 40px;text-align:center;}
+  .page-head .kicker{color:var(--accent);font:600 13px 'JetBrains Mono',monospace;letter-spacing:.16em;text-transform:uppercase;margin-bottom:10px;}
+  .page-head h1{font:700 28px 'Rajdhani',sans-serif;margin:0 0 10px;}
+  .page-head p{color:var(--text-secondary);font:400 14.5px/1.55 -apple-system,Segoe UI,sans-serif;margin:0;}
+
+  .toolbar{
+    max-width:1200px;margin:0 auto 22px;
+    display:flex;align-items:center;justify-content:center;gap:14px;
+    font:500 12px 'JetBrains Mono',monospace;color:var(--text-secondary);
+  }
+  .toolbar .readout{
+    display:flex;align-items:center;gap:8px;
+    border:1px solid var(--border);border-radius:20px;padding:6px 14px;
+    background:var(--surface);
+  }
+  .toolbar .readout .bp{
+    color:var(--accent);font-weight:700;letter-spacing:.04em;
+  }
+  .toolbar .hint{color:var(--text-disabled);}
+
+  .stage{
+    display:flex;justify-content:center;padding:56px 20px;border-radius:4px;border:1px solid var(--border-subtle);
+    background:
+      radial-gradient(2px 2px at 20% 30%, rgba(255,255,255,.35), transparent),
+      radial-gradient(1.5px 1.5px at 70% 60%, rgba(255,255,255,.25), transparent),
+      radial-gradient(1.5px 1.5px at 40% 80%, rgba(255,255,255,.2), transparent),
+      radial-gradient(700px 400px at 50% 0%, rgba(242,101,12,0.05), transparent 70%);
+  }
+
+  .resizable-frame{
+    resize:horizontal;
+    overflow:hidden;
+    width:920px;
+    max-width:100%;
+    min-width:300px;
+    border:1px dashed var(--border);
+    border-radius:10px;
+    padding:2px;
+    container-type:inline-size;
+    container-name:panel;
+  }
+  .resize-note{
+    text-align:center;font:500 11px 'JetBrains Mono',monospace;color:var(--text-disabled);
+    margin-top:10px;letter-spacing:.02em;
+  }
+
+  .icon{width:1em;height:1em;display:inline-block;vertical-align:-0.15em;fill:none;stroke:currentColor;stroke-width:1.6;flex-shrink:0;}
+
+  /* ============ MODAL / PANEL ============ */
+  .modal{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:22px 24px 20px;
+    box-shadow:0 20px 60px rgba(0,0,0,.45);
+  }
+  .head{display:flex;align-items:center;gap:12px;margin-bottom:18px;}
+  .head .icon{width:22px;height:22px;color:var(--accent);}
+  .head-text .title{font:600 19px 'Rajdhani',sans-serif;}
+  .head-text .sub{font:400 12px -apple-system,Segoe UI,sans-serif;color:var(--text-secondary);}
+
+  .sec-row{
+    display:flex;gap:20px;
+    background:var(--surface-alt);border:1px solid var(--border-subtle);
+    border-left:3px solid var(--accent);border-radius:8px;
+    padding:14px 18px;margin-bottom:4px;
+  }
+  .sec-row.muted{border-left-color:var(--border);}
+  .sec-label{width:140px;flex-shrink:0;padding-top:1px;transition:width .15s ease;}
+  .sec-label .name{font:600 13.5px 'Rajdhani',sans-serif;display:flex;align-items:center;gap:8px;letter-spacing:.02em;}
+  .sec-label .name .icon{width:14px;height:14px;color:var(--accent);}
+  .sec-row.muted .sec-label .name .icon{color:var(--text-secondary);}
+
+  .sec-fields{flex:1;display:flex;gap:14px;min-width:0;}
+  .field{flex:1;min-width:0;}
+  .field label{font:500 10.5px -apple-system,Segoe UI,sans-serif;color:var(--text-secondary);margin-bottom:5px;display:block;}
+
+  .box-wrap{
+    background:var(--surface);border:1px solid var(--border);border-radius:6px;
+    padding:0 11px;display:flex;align-items:center;gap:6px;height:36px;
+    position:relative;
+  }
+  .box-wrap:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(242,101,12,.18);}
+  .box-wrap input, .box-wrap select{
+    flex:1;min-width:0;background:transparent;border:none;outline:none;
+    color:var(--text-primary);font:500 12.5px 'JetBrains Mono',monospace;
+    height:100%;padding:0;
+  }
+  .box-wrap input::placeholder{color:var(--text-disabled);}
+  .box-wrap select{appearance:none;-webkit-appearance:none;padding-right:14px;cursor:pointer;}
+  .box-wrap select:invalid{color:var(--text-disabled);}
+  .box-wrap .unit{color:var(--text-disabled);font:500 11px 'JetBrains Mono',monospace;flex-shrink:0;}
+  .box-wrap .chev{position:absolute;right:10px;color:var(--text-disabled);font-size:10px;pointer-events:none;}
+
+  .crumb{font:500 10px 'JetBrains Mono',monospace;color:var(--text-disabled);margin-top:6px;}
+  .crumb b{color:var(--text-secondary);font-weight:600;}
+
+  .route-link{display:flex;align-items:center;gap:10px;margin:2px 0 2px 38px;transition:margin .15s ease;}
+  .route-link .dot{
+    width:20px;height:20px;border-radius:50%;background:var(--surface-alt);
+    border:1px solid var(--accent);display:flex;align-items:center;justify-content:center;
+    color:var(--accent);flex-shrink:0;
+  }
+  .route-link .dot .icon{width:10px;height:10px;transform:rotate(90deg);}
+  .route-link .line{width:1px;height:14px;background:var(--border);}
+  .route-link .label{font:500 10px 'JetBrains Mono',monospace;color:var(--text-disabled);letter-spacing:.04em;text-transform:uppercase;}
+
+  .footer{display:flex;justify-content:flex-end;gap:10px;margin-top:16px;}
+  .footer button{
+    font:600 13px 'Rajdhani',sans-serif;padding:9px 20px;border-radius:6px;
+    border:1px solid var(--border);background:transparent;color:var(--text-secondary);cursor:pointer;
+  }
+  .footer button.primary{background:var(--accent);border-color:var(--accent);color:#1A1200;}
+  .footer button:hover{border-color:var(--text-secondary);}
+  .footer button.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover);}
+
+  /* ============ MEDIUM: label stacks above fields ============ */
+  @container panel (max-width: 700px){
+    .sec-row{flex-direction:column;gap:10px;}
+    .sec-label{width:auto;}
+    .route-link{margin-left:2px;}
+    .head-text .sub{display:none;}
+  }
+
+  /* ============ COMPACT: fields stack too (mirrors the original vertical layout) ============ */
+  @container panel (max-width: 460px){
+    .sec-fields{flex-direction:column;gap:10px;}
+    .modal{padding:18px 16px 16px;}
+    .head .icon{width:19px;height:19px;}
+    .head-text .title{font-size:17px;}
+    .footer{flex-direction:column-reverse;}
+    .footer button{width:100%;}
+  }
+</style>
+</head>
+<body>
+
+<svg style="display:none">
+  <defs>
+    <symbol id="icon-rocket" viewBox="0 0 24 24">
+      <path d="M12 2c2.5 2 4 5.5 4 9.5 0 2-1 4-1 4l-3 2-3-2s-1-2-1-4c0-4 1.5-7.5 4-9.5z"/>
+      <path d="M9 15l-3 1 1-3M15 15l3 1-1-3"/>
+      <circle cx="12" cy="10" r="1.4"/>
+    </symbol>
+    <symbol id="icon-box" viewBox="0 0 24 24">
+      <path d="M3 8l9-4 9 4-9 4-9-4z"/>
+      <path d="M3 8v9l9 4 9-4V8"/>
+      <path d="M12 12v9"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="page-head">
+  <div class="kicker">Uplink — Trade Route Search</div>
+  <h1>Filter Panel — Option E — Responsive Prototype</h1>
+  <p>Real inputs, real reflow. Drag the bottom-right corner of the dashed box to resize it and watch the section rows adapt — this is meant to simulate the panel living in a variable-width Qt dock rather than a fixed modal.</p>
+</div>
+
+<div class="toolbar">
+  <div class="readout">width: <span id="widthVal">920</span>px — <span class="bp" id="bpVal">WIDE</span></div>
+  <span class="hint">breakpoints at 700px and 460px</span>
+</div>
+
+<div class="stage">
+  <div>
+    <div class="resizable-frame" id="frame">
+      <div class="modal">
+        <div class="head">
+          <svg class="icon"><use href="#icon-rocket"/></svg>
+          <div class="head-text">
+            <div class="title">Filter Trade Routes</div>
+            <div class="sub">Adjust criteria, then apply</div>
+          </div>
+        </div>
+
+        <div class="sec-row muted">
+          <div class="sec-label"><div class="name"><svg class="icon"><use href="#icon-box"/></svg>Ship &amp; Cargo</div></div>
+          <div class="sec-fields">
+            <div class="field">
+              <label for="f-ship">Ship</label>
+              <div class="box-wrap"><input id="f-ship" type="text" placeholder="Search ship..."></div>
+            </div>
+            <div class="field">
+              <label for="f-cargo">Cargo</label>
+              <div class="box-wrap"><input id="f-cargo" type="number" value="0"><span class="unit">units</span></div>
+            </div>
+            <div class="field">
+              <label for="f-commodity">Commodity</label>
+              <div class="box-wrap"><input id="f-commodity" type="text" placeholder="Search commodity..."></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec-row">
+          <div class="sec-label"><div class="name">Source</div></div>
+          <div class="sec-fields">
+            <div class="field">
+              <label for="f-source">Source Terminal</label>
+              <div class="box-wrap"><input id="f-source" type="text" value="Orison TDD"></div>
+              <div class="crumb"><b>Stanton</b> › <b>Crusader</b> › Orison</div>
+            </div>
+            <div class="field">
+              <label for="f-min">Min Source Inventory</label>
+              <div class="box-wrap">
+                <select id="f-min">
+                  <option value="" selected>Select...</option>
+                  <option>1,000+</option>
+                  <option>5,000+</option>
+                  <option>10,000+</option>
+                </select>
+                <span class="chev">▾</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="route-link">
+          <div class="dot"><svg class="icon"><use href="#icon-rocket"/></svg></div>
+          <div class="line"></div>
+          <div class="label">route</div>
+        </div>
+
+        <div class="sec-row">
+          <div class="sec-label"><div class="name">Destination</div></div>
+          <div class="sec-fields">
+            <div class="field">
+              <label for="f-dest">Destination Terminal</label>
+              <div class="box-wrap"><input id="f-dest" type="text" value="Ruin Station"></div>
+              <div class="crumb"><b>Pyro</b> › Pyro V</div>
+            </div>
+            <div class="field">
+              <label for="f-max">Max Destination Inventory</label>
+              <div class="box-wrap">
+                <select id="f-max">
+                  <option value="" selected>Select...</option>
+                  <option>1,000-</option>
+                  <option>5,000-</option>
+                  <option>10,000-</option>
+                </select>
+                <span class="chev">▾</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">
+          <button type="button">Cancel</button>
+          <button type="button" class="primary">Apply Filters</button>
+        </div>
+      </div>
+    </div>
+    <div class="resize-note">↘ drag the corner of the dashed box to resize</div>
+  </div>
+</div>
+
+<script>
+  const frame = document.getElementById('frame');
+  const widthVal = document.getElementById('widthVal');
+  const bpVal = document.getElementById('bpVal');
+  const ro = new ResizeObserver(entries => {
+    const w = Math.round(entries[0].contentRect.width);
+    widthVal.textContent = w;
+    bpVal.textContent = w <= 460 ? 'COMPACT' : (w <= 700 ? 'MEDIUM' : 'WIDE');
+  });
+  ro.observe(frame);
+</script>
+
+</body>
+</html>
