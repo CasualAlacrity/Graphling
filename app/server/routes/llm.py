@@ -33,6 +33,8 @@ def _check_rate(user: User) -> None:
 class TopicRequest(BaseModel):
     # One spoken utterance; Tev1 works in ~2,000 tokens, and a pilot never says this much.
     utterance: str = Field(min_length=1, max_length=2000)
+    # The tool-routing experiment: also pick which tool groups respond needs.
+    groups: bool = False
 
 
 @router.post("/decide/topic")
@@ -42,7 +44,7 @@ async def decide_topic(body: TopicRequest, user: User = Depends(get_current_user
     chat model instead."""
     _check_rate(user)
     try:
-        return await topic_decision_service.decide(body.utterance, user.id)
+        return await topic_decision_service.decide(body.utterance, user.id, with_groups=body.groups)
     except topic_decision_service.TopicDecisionUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 

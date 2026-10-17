@@ -242,3 +242,12 @@ async def test_when_nothing_comes_back_the_fetch_failure_is_the_answer(monkeypat
 
     with pytest.raises(RuntimeError):
         await _route_rows_for([0, 1])
+
+
+async def test_an_excluded_destination_is_never_picked(monkeypatch):
+    """'Nothing in Pyro' (response matrix row 49, 2026-10-16): the best route's
+    destination is ruled out, so the next one wins instead of the Pyro one coming back."""
+    result = await _rank(monkeypatch, [WINNER, RUNNER_UP], excluded_destination_terminal_ids={200})
+
+    assert result.best.destination_terminal_name == "Lean Dest"
+    assert result.runner_up is None

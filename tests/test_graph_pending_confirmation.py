@@ -254,3 +254,12 @@ async def test_resolve_last_touched_leg_id_none_on_value_error(monkeypatch):
         ToolMessage(content="No matching leg.", tool_call_id="call_1"),
     ]
     assert await _resolve_last_touched_leg_id(messages) is None
+
+
+def test_state_holds_a_real_leg_id():
+    """Leg ids are UUIDs. State typed this field as int, so storing a real one after a
+    successful voice purchase crashed the turn (response matrix, 2026-10-17)."""
+    import uuid
+
+    leg_id = uuid.uuid4()
+    assert State(messages=[], last_touched_leg_id=leg_id).last_touched_leg_id == leg_id

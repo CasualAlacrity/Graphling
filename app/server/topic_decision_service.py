@@ -39,8 +39,10 @@ class TopicDecisionUnavailable(RuntimeError):
     pass
 
 
-async def decide(utterance: str, user_id: uuid.UUID) -> dict:
-    """{"kind": request|social|off_topic, "choice": Tev1's raw pick, "confidence": ...}."""
+async def decide(utterance: str, user_id: uuid.UUID, with_groups: bool = False) -> dict:
+    """{"kind": request|social|off_topic, "choice": Tev1's raw pick, "confidence": ...}, plus
+    "tool_groups" (a list, or None for every tool) when with_groups: the tool-routing
+    experiment (topic_decision.GROUP_QUESTION), asked in the same call."""
     model = settings.heket_topic_model
     if not model:
         raise TopicDecisionUnavailable("no topic model configured")
@@ -53,12 +55,17 @@ async def decide(utterance: str, user_id: uuid.UUID) -> dict:
     usage = {}
     try:
         async with gateway._http_client(base_url=settings.heket_url, timeout=TIMEOUT_S) as client:
-            response = await client.post("/v1/systemone", json=topic_decision.request_body(model, utterance))
+            if with_groups:
+                body = topic_decision.request_body_with_groups(model, utterance)
+            else:
+                body = topic_decision.request_body(model, utterance)
+            response = await client.post("/v1/systemone", json=body)
         if response.status_code >= 400:
             raise TopicDecisionUnavailable(f"heket answered {response.status_code}")
         body = response.json()
         usage = body.get("usage") or {}
         choice, confidence = topic_decision.read_answer(body)
+        group_probabilities = topic_decision.read_group_probabilities(body) if with_groups else {}
         status = "ok"
     except httpx.HTTPError as exc:
         raise TopicDecisionUnavailable(f"heket unreachable ({type(exc).__name__})") from exc
@@ -73,11 +80,14 @@ async def decide(utterance: str, user_id: uuid.UUID) -> dict:
             cost_usd=local_energy_cost_usd(latency_ms), inflight_at_start=gateway.state.inflight,
         )
 
-    return {
+    result = {
         "kind": topic_decision.apply_floors(choice, confidence),
         "choice": choice,
         "confidence": confidence,
     }
+    if with_groups:
+        result["tool_groups"] = topic_decision.chosen_groups(group_probabilities)
+    return result
 
 
 async def warm_if_cold() -> None:

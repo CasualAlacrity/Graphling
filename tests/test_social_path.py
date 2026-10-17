@@ -3,10 +3,20 @@ thanks, a farewell) gets a short line from the social-reply prompt instead of th
 off-topic decline, which used to answer "Good morning." with "Stick to the manifests."."""
 from types import SimpleNamespace
 
+import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 import graph
 from graph import State, route_topic, social_reply
+
+
+@pytest.fixture(autouse=True)
+def no_ledger(monkeypatch):
+    """classify_topic reads the active runs alongside the topic decision; never the real ledger here."""
+    async def no_runs():
+        return ""
+
+    monkeypatch.setattr(graph, "_active_runs_note", no_runs)
 
 
 def test_social_talk_goes_to_the_social_reply_even_if_classified_off_topic():
@@ -20,10 +30,10 @@ def test_requests_and_off_topic_still_route_as_before():
 
 
 def _topic(monkeypatch, kind):
-    async def topic_kind(utterance):
-        return kind
+    async def decide(utterance):
+        return None if kind is None else graph.topic_client.TopicDecision(kind)
 
-    monkeypatch.setattr(graph.topic_client, "topic_kind", topic_kind)
+    monkeypatch.setattr(graph.topic_client, "decide", decide)
 
 
 def _classifier(monkeypatch, on_topic):

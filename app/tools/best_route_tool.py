@@ -61,7 +61,15 @@ class BestRouteArgs(BaseModel):
                     "this to the same value as `origin`), or because they specifically "
                     "said 'ending in X' / 'to X' / 'selling in X' (destination only — "
                     "set this without necessarily constraining origin the same way). "
-                    "Leave unset for the ordinary case of an open destination."
+                    "Leave unset for the ordinary case of an open destination. Never use it "
+                    "for a place the pilot rules out: that's exclude_destination_region."
+    )
+    exclude_destination_region: str | None = Field(
+        default=None,
+        description="Set this when the pilot rules a region out as the destination: "
+                    "'nothing in Pyro', 'not Pyro', 'avoid Pyro', 'anywhere but Pyro', "
+                    "'stay out of Pyro' -> 'Pyro'. The route must not end there. Never also "
+                    "set destination_region to the same place."
     )
     rank_by: Literal["profit", "per_hour"] = Field(
         default="profit",
@@ -128,7 +136,7 @@ class BestRouteTool(UplinkTool):
             self, origin: str, origin_mode: str = "exact", ship: str | None = None, commodity: str | None = None,
             destination_region: str | None = None, rank_by: str = "profit",
             exclude_ground_stations: bool = False, require_autoload: bool = False,
-            sell_at_nqa_only: bool = False,
+            sell_at_nqa_only: bool = False, exclude_destination_region: str | None = None,
             *args: Any, **kwargs: Any,
     ) -> Any:
         if ship is None:
@@ -145,7 +153,7 @@ class BestRouteTool(UplinkTool):
         return await self._safe_run(
             self._find_and_report(
                 origin, origin_mode, ship, commodity, destination_region, rank_by,
-                exclude_ground_stations, require_autoload, sell_at_nqa_only,
+                exclude_ground_stations, require_autoload, sell_at_nqa_only, exclude_destination_region,
             )
         )
 
@@ -214,7 +222,7 @@ class BestRouteTool(UplinkTool):
     async def _find_and_report(
             self, origin: str, origin_mode: str, ship: str, commodity: str | None, destination_region: str | None,
             rank_by: str = "profit", exclude_ground_stations: bool = False, require_autoload: bool = False,
-            sell_at_nqa_only: bool = False,
+            sell_at_nqa_only: bool = False, exclude_destination_region: str | None = None,
     ) -> str:
         cache = await self.uex_client.get_uex_cache()
 
@@ -261,11 +269,22 @@ class BestRouteTool(UplinkTool):
             destination_region = destination.name
             destination_terminal_ids = {t.id for t in destination.terminals}
 
+        excluded_terminal_ids = None
+        if exclude_destination_region is not None:
+            excluded, error = self._resolve_region(exclude_destination_region, cache)
+            if error:
+                return error
+            exclude_destination_region = excluded.name
+            excluded_terminal_ids = set()
+            for terminal in excluded.terminals:
+                excluded_terminal_ids.add(terminal.id)
+
         result = await find_best_route(
             self.uex_client, self.scw_client, [t.id for t in origin_terminals], ship, vehicle.scu, cache,
             commodity_id=commodity_id, exclude_ground=exclude_ground_stations, require_autoload=require_autoload,
             require_nqa=sell_at_nqa_only,
             destination_terminal_ids=destination_terminal_ids, rank_by=rank_by,
+            excluded_destination_terminal_ids=excluded_terminal_ids,
         )
         if result is None:
             qualifiers = []
@@ -277,6 +296,8 @@ class BestRouteTool(UplinkTool):
                 qualifiers.append("selling at no-questions-asked terminals only")
             if destination_region is not None:
                 qualifiers.append(f"staying within {destination_region}")
+            if exclude_destination_region is not None:
+                qualifiers.append(f"avoiding {exclude_destination_region}")
             suffix = f" ({', '.join(qualifiers)})" if qualifiers else ""
             return f"No usable in-system route turned up {origin_label}{suffix}."
 

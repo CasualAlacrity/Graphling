@@ -1,6 +1,8 @@
 import asyncio
+import logging
 import os
 from typing import Annotated
+from uuid import UUID
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
@@ -10,9 +12,11 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 from pydantic import BaseModel
 
+import ledger_client
 import topic_client
 import topic_decision
 from db.models import LegType
+from db.trade_run_store import trade_run_info
 from llm import (
     anthropic_cache_control,
     anthropic_cache_mode,
@@ -51,6 +55,15 @@ class State(BaseModel):
     # classify_topic's TopicClassification.social for this turn: pure social talk gets
     # social_reply instead of respond or the off-topic decline.
     social: bool = False
+    # The pilot's in-progress trade runs as a note for respond (_active_runs_note), and the
+    # pilot turn it was read for (_pilot_turn), so the tool loop reuses it within a turn and
+    # the next turn reads it fresh.
+    active_runs: str = ""
+    active_runs_turn: int = -1
+    # The tool-routing experiment (ALICE_TOOL_ROUTING): the tool groups respond binds this
+    # pilot turn, or None for every tool. Same per-turn marker as active_runs.
+    tool_groups: list[str] | None = None
+    tool_groups_turn: int = -1
     # Set by respond() whenever a readback-producing tool (mark_cargo_acquired,
     # mark_cargo_sold -- stated numbers are always read back, docs/intent/voice-latency.md)
     # just ran, so the pilot's next utterance (a correction like "no, 614") skips
@@ -67,7 +80,9 @@ class State(BaseModel):
     # ambiguous exactly when the pilot gives no commodity/terminal hint and has more than
     # one active run -- see docs/intent/run-model.md's leg-resolution note), not a
     # one-turn flag, so it persists until a newer confirmation-prone call overwrites it.
-    last_touched_leg_id: int | None = None
+    # A UUID, like every leg id. It was typed int, so the first successful voice purchase
+    # crashed the turn when the graph stored it (response matrix, 2026-10-17).
+    last_touched_leg_id: UUID | None = None
 
 
 class TopicClassification(BaseModel):
@@ -143,9 +158,33 @@ tools = uex_backed_tools + trade_run_tools + general_tools
 # marks the last eligible block of each request; the fixed one is _persona_messages().
 CACHE_MODE = anthropic_cache_mode()
 
-llm = get_chat_llm().bind_tools(tools)
+chat_model = get_chat_llm()
+llm = chat_model.bind_tools(tools)
 if CACHE_MODE == "full":
     llm = llm.bind(cache_control=anthropic_cache_control())
+
+# Tool-routing experiment: respond bound to only some tool groups, built once per set of
+# groups (TOOL_GROUPS order, so a set is always the same prompt and caches).
+_routed_llms: dict[tuple[str, ...], object] = {}
+
+
+def _llm_for(groups: list[str] | None):
+    if groups is None:
+        return llm
+    key = tuple(groups)
+    if key not in _routed_llms:
+        names = set()
+        for group in groups:
+            names.update(topic_decision.TOOL_GROUPS[group])
+        subset = []
+        for tool in tools:
+            if tool.name in names:
+                subset.append(tool)
+        routed = chat_model.bind_tools(subset)
+        if CACHE_MODE == "full":
+            routed = routed.bind(cache_control=anthropic_cache_control())
+        _routed_llms[key] = routed
+    return _routed_llms[key]
 classifier_llm = get_classification_llm().with_structured_output(TopicClassification)
 # The decline and social reply are ALICE talking, not classifying: a small chat model,
 # so get_classification_llm() can become a pure classifier without breaking them.
@@ -268,7 +307,7 @@ _LEG_TYPE_BY_CONFIRMATION_TOOL = {
 }
 
 
-async def _resolve_last_touched_leg_id(messages: list[BaseMessage]) -> int | None:
+async def _resolve_last_touched_leg_id(messages: list[BaseMessage]) -> UUID | None:
     """Best-effort re-resolution of the exact leg the triggering confirmation-prone tool
     call just touched, using that call's own commodity/terminal args -- the tool itself
     already resolved this same leg a moment ago (resolver.resolve_leg(), same args) but
@@ -352,8 +391,56 @@ def _persona_messages() -> list[BaseMessage]:
     return messages[:-1] + [SystemMessage(content=[block])]
 
 
+log = logging.getLogger(__name__)
+
+ACTIVE_RUNS_HEADER = (
+    "The pilot's active trade runs, as of their last message. When they report progress "
+    "without naming the commodity or terminal ('Landed.', 'Bought 640 at 14.2', 'Cargo's off'), "
+    "it's about the run whose current step fits: call the tool for it rather than asking. If "
+    "more than one run fits, ask which. Never say anything was recorded unless a tool just did it."
+)
+
+
+async def _active_runs_note() -> str:
+    """The in-progress runs for respond's context, or "" when there are none or they can't
+    be read (respond then works as it did before this existed). Jeff's matrix markup,
+    2026-10-16: without it ALICE never called a trade tool for "Landed." or "Bought 640 at
+    14.2", asking which commodity and terminal instead, although the tools resolve the
+    active run by themselves."""
+    try:
+        runs = await ledger_client.get_in_progress_runs()
+    except Exception:
+        log.warning("couldn't read the active trade runs; answering without them", exc_info=True)
+        return ""
+    if not runs:
+        return ""
+    descriptions = []
+    for run in runs:
+        descriptions.append(trade_run_info(run))
+    return ACTIVE_RUNS_HEADER + "\n\n" + "\n\n".join(descriptions)
+
+
+def _pilot_turn(messages: list[BaseMessage]) -> int:
+    count = 0
+    for message in messages:
+        if isinstance(message, HumanMessage):
+            count += 1
+    return count
+
+
 async def respond(state: State) -> dict:
-    messages = _persona_messages() + _windowed_history(
+    # Read alongside the topic decision (classify_topic) on most turns. When the topic
+    # check was skipped (the pilot answering ALICE's own question), read it here, once per
+    # turn: the tool loop reuses it.
+    active_runs = state.active_runs
+    pilot_turn = _pilot_turn(state.messages)
+    if state.active_runs_turn != pilot_turn:
+        active_runs = await _active_runs_note()
+    context = []
+    if active_runs:
+        context.append(SystemMessage(content=active_runs))
+    # After the persona, so its prompt-cache prefix stays the same from turn to turn.
+    messages = _persona_messages() + context + _windowed_history(
         state.messages, HISTORY_TURNS, HISTORY_FULL_TOOL_RESULT_TURNS,
     )
     pending_confirmation = _just_ran_confirmation_prone_tool(state.messages)
@@ -364,13 +451,17 @@ async def respond(state: State) -> dict:
     # pending_confirmation exists at all is to save time on this exact turn. An LLM
     # completion is reliably slower than one HTTP call to our own ledger server, so
     # running them concurrently adds ~0 wall-clock time instead of adding it serially.
+    # Routed tool groups only for the turn they were decided for; a turn that skipped the
+    # topic check gets every tool.
+    tool_groups = state.tool_groups if state.tool_groups_turn == pilot_turn else None
+    model = _llm_for(tool_groups)
     if pending_confirmation:
         response, resolved_leg_id = await asyncio.gather(
-            llm.ainvoke(messages),
+            model.ainvoke(messages),
             _resolve_last_touched_leg_id(state.messages),
         )
     else:
-        response = await llm.ainvoke(messages)
+        response = await model.ainvoke(messages)
         resolved_leg_id = None
 
     last_touched_leg_id = resolved_leg_id if resolved_leg_id is not None else state.last_touched_leg_id
@@ -378,7 +469,34 @@ async def respond(state: State) -> dict:
         "messages": [response],
         "pending_confirmation": pending_confirmation,
         "last_touched_leg_id": last_touched_leg_id,
+        "active_runs": active_runs,
+        "active_runs_turn": pilot_turn,
     }
+
+
+def _with_last_turns_groups(groups: list[str] | None, messages: list[BaseMessage]) -> list[str] | None:
+    """Routed groups plus the groups of every tool ALICE used in the previous turn, so a
+    follow-up keeps its tools: "Yeah, do it" after a route search says nothing about routes
+    or trade runs on its own, and Tev1 sees only that line."""
+    if groups is None:
+        return None
+    used = []
+    pilot_messages_seen = 0
+    for message in reversed(messages):
+        if isinstance(message, HumanMessage):
+            pilot_messages_seen += 1
+            if pilot_messages_seen == 2:
+                break
+            continue
+        if pilot_messages_seen == 1 and isinstance(message, AIMessage):
+            for call in message.tool_calls:
+                used.append(call["name"])
+    wanted = set(groups) | topic_decision.groups_of_tools(used)
+    ordered = []
+    for group in topic_decision.TOOL_GROUPS:
+        if group in wanted:
+            ordered.append(group)
+    return ordered
 
 
 # What decline_topic is told about why, when the decision model said off-topic (it gives
@@ -390,20 +508,29 @@ async def classify_topic(state: State) -> dict:
     """Request, social talk or off-topic. Asks the topic decision model first (Tev1 via
     topic_client.py: ~30 ms on heket, and it tells a greeting from a request wrapped in
     one); falls back to the chat-model classifier, which only decides on- or off-topic."""
-    kind = await topic_client.topic_kind(_text_of(state.messages[-1]))
-    if kind is not None:
+    # The active runs are read alongside the decision, so respond gets them without
+    # waiting; social and off-topic turns just don't use them.
+    decision, active_runs = await asyncio.gather(
+        topic_client.decide(_text_of(state.messages[-1])), _active_runs_note(),
+    )
+    pilot_turn = _pilot_turn(state.messages)
+    runs_context = {"active_runs": active_runs, "active_runs_turn": pilot_turn}
+    if decision is not None:
+        kind = decision.kind
+        runs_context["tool_groups"] = _with_last_turns_groups(decision.tool_groups, state.messages)
+        runs_context["tool_groups_turn"] = pilot_turn
         # Social talk is never off-topic: _alice_just_asked reads on_topic as "the last
         # turn wasn't a decline".
         on_topic = kind != topic_decision.OFF_TOPIC
         reason = OFF_TOPIC_REASON if not on_topic else kind
-        return {"on_topic": on_topic, "reason": reason, "social": kind == topic_decision.SOCIAL}
+        return {"on_topic": on_topic, "reason": reason, "social": kind == topic_decision.SOCIAL, **runs_context}
 
     messages = list(CLASSIFY_MESSAGES)
     # full_result_turns=1: classify runs before this turn's tools, so every tool result
     # it sees is a previous turn's -- all stubbed, none needed to judge topic.
     history = _windowed_history(state.messages, CLASSIFY_HISTORY_TURNS, 1)
     response = await classifier_llm.ainvoke(messages + history)
-    return {"on_topic": response.on_topic, "reason": response.reason, "social": False}
+    return {"on_topic": response.on_topic, "reason": response.reason, "social": False, **runs_context}
 
 
 # A greeting that takes longer than this gets SOCIAL_FALLBACK_LINE instead: it's meant to

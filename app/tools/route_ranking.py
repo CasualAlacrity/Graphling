@@ -164,6 +164,7 @@ async def find_best_route(
         commodity_id: int | None = None, exclude_destination_terminal_name: str | None = None,
         exclude_ground: bool = False, require_autoload: bool = False, require_nqa: bool = False,
         destination_terminal_ids: set[int] | None = None, rank_by: str = "profit",
+        excluded_destination_terminal_ids: set[int] | None = None,
 ) -> RouteSearch | None:
     """Searches commodity routes from every terminal in origin_terminal_ids and ranks
     the union by profit per hour — narrowed to one commodity if commodity_id is given,
@@ -204,7 +205,9 @@ async def find_best_route(
     overlay's filter — it's about where the pilot sells hot cargo, not where they bought it.
     destination_terminal_ids is the analogous containment constraint for a bare "in X"/
     "on X" request where BOTH ends stay in the named region — None means destination is
-    open, same as before this existed.
+    open, same as before this existed. excluded_destination_terminal_ids is its opposite:
+    "nothing in Pyro" rules those destinations out (2026-10-16: with only the containment
+    filter available, that request came back as a Pyro route).
 
     Shared by trade_advisor (comparing against a committed leg, hence
     exclude_destination_terminal_name to skip the committed choice itself) and any tool
@@ -235,6 +238,8 @@ async def find_best_route(
         if exclude_destination_terminal_name and route.destination_terminal_name == exclude_destination_terminal_name:
             continue
         if destination_terminal_ids is not None and route.destination_terminal_id not in destination_terminal_ids:
+            continue
+        if excluded_destination_terminal_ids and route.destination_terminal_id in excluded_destination_terminal_ids:
             continue
         if exclude_ground and route.is_on_ground_destination:
             continue
