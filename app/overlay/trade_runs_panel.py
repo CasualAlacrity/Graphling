@@ -875,9 +875,14 @@ class TradeLedgerPanel(HudWindow):
         description_layout.setContentsMargins(0, 0, 0, 0)
         description_layout.setSpacing(8)
         commodity_code = uex_lookup.commodity_code_for_name(commodity_name)
-        badge = QLabel(
-            parent=description, text=f"\N{PACKAGE} {commodity_code}", objectName="ledgerCommodityBadge",
-        )
+        badge = QWidget(parent=description)
+        badge_layout = QHBoxLayout(badge)
+        badge_layout.setContentsMargins(0, 0, 0, 0)
+        badge_layout.setSpacing(4)
+        cargo_icon = QLabel(parent=badge)
+        cargo_icon.setPixmap(theme.load_icon("cargo", theme.TEXT_SECONDARY, size=16).pixmap(QSize(16, 16)))
+        badge_layout.addWidget(cargo_icon)
+        badge_layout.addWidget(QLabel(parent=badge, text=commodity_code, objectName="ledgerCommodityBadge"))
         badge.setToolTip(commodity_name)
         description_layout.addWidget(badge, 0, Qt.AlignmentFlag.AlignTop)
         route_label = QLabel(
