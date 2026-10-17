@@ -62,9 +62,11 @@ class PriceLookupTool(UEXBackedTool):
         "for X', 'can I sell X', 'can I rent X'. Returns `best`, the one terminal to name (cheapest to "
         "buy or rent, highest paying to sell); answer with it alone. `others` are for when the pilot "
         "asks for alternatives. `understood_as` is what their words were taken to mean: say it when "
-        "it isn't obvious ('The Hull A ship is ...'). If `ask_where` is set, the thing is sold in many "
-        "places: give the best one and offer the nearest if they say where they are. For a narrower "
-        "follow-up ('what about in Pyro?'), call again with the filter set."
+        "it isn't obvious ('The Hull A ship is ...'). `judgement_call` is set only when picking what "
+        "they meant took judgement: say it, as written or in your own words, as one short aside "
+        "after the answer, never as a percentage. Without it, just answer. If `ask_where` is set, "
+        "the thing is sold in many places: give the best one and offer the nearest if they say "
+        "where they are. For a narrower follow-up ('what about in Pyro?'), call again with the filter set."
     ) + LOCATION_GUIDANCE
     args_schema: type[BaseModel] = PriceLookupArgs
     progress_label: str = "UEX to check prices"
@@ -130,6 +132,8 @@ class PriceLookupTool(UEXBackedTool):
             result["price_unit"] = "aUEC per day"
         if resolution.understood_as:
             result["understood_as"] = resolution.understood_as
+        if resolution.judgement_call:
+            result["judgement_call"] = resolution.judgement_call
         no_place_given = not any((star_system, orbit, terminal, moon, near))
         if no_place_given and len(offering) > MANY_TERMINALS:
             result["ask_where"] = True

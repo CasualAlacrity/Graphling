@@ -165,3 +165,42 @@ async def test_when_the_meant_thing_has_no_buyer_say_so_instead_of_switching():
 
     assert resolution.chosen is None
     assert resolution.message == "No terminal currently buys FS-9 LMG."
+
+
+# ---- judgement calls ----------------------------------------------------------------
+
+async def test_an_exact_name_is_never_a_judgement_call():
+    """'Hull A' is the ship's own name: nobody means the liveries that also match."""
+    resolution = await catalog_resolution.resolve("Hull A", "buy", _cache(), _sold("Hull A"))
+
+    assert resolution.chosen.name == "Hull A"
+    assert resolution.judgement_call is None
+
+
+async def test_preferring_the_base_item_over_its_variants_is_a_judgement_call():
+    everything = _sold("FS-9 LMG", 'FS-9 "Finish Line" LMG', 'FS-9 "Stoneface" LMG', "FS-9 Magazine (75 Cap)",
+                       action="sell")
+    resolution = await catalog_resolution.resolve("FS-9", "sell", _cache(), everything)
+
+    assert resolution.chosen.name == "FS-9 LMG"
+    assert resolution.judgement_call == "Taking that as FS-9 LMG, not one of its skins or accessories."
+
+
+async def test_an_obvious_match_is_not_narrated():
+    resolution = await catalog_resolution.resolve("Laranite", "buy", _cache(), _sold("Laranite"))
+
+    assert resolution.chosen.name == "Laranite"
+    assert resolution.judgement_call is None
+
+
+
+async def test_rivals_nobody_sells_make_a_judgement_call():
+    only_the_lmg = _sold("FS-9 LMG")
+    resolution = await catalog_resolution.resolve("FS-9", "buy", _cache(), only_the_lmg)
+
+    assert resolution.judgement_call == "Taking that as FS-9 LMG; the rest isn't sold anywhere."
+
+
+def test_underscored_paint_names_count_as_variants():
+    paint = catalog_resolution.Candidate("item", SimpleNamespace(name="paint_cutlass_black_procyon"), 90)
+    assert catalog_resolution._penalty(paint) == catalog_resolution.VARIANT_PENALTY

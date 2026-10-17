@@ -50,7 +50,9 @@ MIN_SCORE = 60
 # match is sure (an exact name scores 100).
 CONTAINED_SCORE = 90
 
-_VARIANT_WORDS = re.compile(r"\b(livery|paint|skin)\b", re.IGNORECASE)
+# Not \b: UEX also names paints like "paint_cutlass_black_procyon", where "_" is a word
+# character and \b never matches.
+_VARIANT_WORDS = re.compile(r"(?<![a-z])(livery|paint|skin)(?![a-z])", re.IGNORECASE)
 _NAMED_EDITION = re.compile(r'"[^"]+"')
 _ACCESSORY_WORDS = re.compile(r"\b(magazine|battery|ammo)\b", re.IGNORECASE)
 
@@ -91,6 +93,9 @@ class Resolution:
     # Said alongside the answer when the choice isn't obvious from the words alone, so a
     # wrong guess is easy to catch: "the Hull A ship, not one of its liveries".
     understood_as: str | None = None
+    # Set only when picking took judgement (judgement_call): why this one, for ALICE to say
+    # in one dry aside. None for an obvious match, which she should just answer.
+    judgement_call: str | None = None
 
 
 def _penalty(candidate: Candidate) -> float:
@@ -197,4 +202,63 @@ async def resolve(query: str, action: str, cache,
 
     # Something else matched the words too: say what was understood.
     understood_as = _spoken_kind(top) if len(checked) > 1 else None
-    return Resolution(chosen=top, understood_as=understood_as)
+    return Resolution(chosen=top, understood_as=understood_as,
+                      judgement_call=judgement_call(top, runner_up, checked, available, action))
+
+
+# Below this lead over the runner-up (but above CONFIDENT_MARGIN, where ALICE would ask),
+# the pick was close enough to be worth saying why.
+CLOSE_MARGIN = 25
+
+
+def _listed(candidates: list[Candidate]) -> str:
+    names = []
+    for candidate in candidates:
+        names.append(candidate.name)
+    if len(names) == 1:
+        return names[0]
+    if len(names) == 2:
+        return f"{names[0]} and {names[1]}"
+    return f"{names[0]} and {len(names) - 1} others"
+
+
+def judgement_call(top: Candidate, runner_up: Candidate | None, checked: list[Candidate],
+                   available: list[Candidate], action: str) -> str | None:
+    """A short aside, in ALICE's voice, saying what was picked and why, but only when
+    picking took judgement; None otherwise, so she doesn't narrate easy calls.
+
+    Never for an exact name: "Hull A" and "Cutlass Black" are ships' own names, and nobody
+    asking about them means the paint job or the "Cutlass Black Plushie" that also match.
+    Only genuine rivals count, things matching every word said; loose fuzzy matches
+    ("Starlite" for Laranite) don't. Tried live 2026-10-17: flagging every pick with any
+    rival fired on nearly every answer, and ALICE mostly ignored it; written as a line she
+    can say as-is, it reads naturally. The genuine case is FS-9: the LMG, its skins and its
+    magazine all match the words equally well."""
+    if top.matched_by == EXACT:
+        return None
+    rivals = []
+    for candidate in checked:
+        if candidate is not top and candidate.matched_by in (EXACT, CONTAINED):
+            rivals.append(candidate)
+    close = runner_up is not None and top.score - runner_up.score < CLOSE_MARGIN
+    if not rivals and not close:
+        return None
+
+    picked = _spoken_kind(top)
+    unsold = []
+    for candidate in rivals:
+        if candidate not in available:
+            unsold.append(candidate)
+    if unsold and len(unsold) == len(rivals):
+        nowhere = {BUY: "isn't sold anywhere", SELL: "has no buyers", RENT: "isn't rented out"}[action]
+        return f"Taking that as {picked}; the rest {nowhere}."
+    if rivals and not _penalty(top):
+        variants = []
+        for candidate in rivals:
+            if _penalty(candidate):
+                variants.append(candidate)
+        if variants:
+            return f"Taking that as {picked}, not one of its skins or accessories."
+    if close:
+        return f"Close call between {top.name} and {runner_up.name}; went with {top.name}."
+    return None
