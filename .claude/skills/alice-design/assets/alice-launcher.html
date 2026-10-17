@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ALICE Launcher Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0D0F10; --surface: #17191B; --surface-alt: #1F2224;
+  --border: #33373A; --border-subtle: #24272A;
+  --text-primary: #EDEAE4; --text-secondary: #9AA0A6; --text-disabled: #5C6266;
+  --accent: #F2650C; --accent-hover: #FF7A1F; --accent-muted: rgba(242,101,12,.16);
+  --success: #4CAF6D; --warning: #E8B23A; --error: #E5484D; --error-muted: rgba(229,72,77,.14);
+  --on-accent: #1A1200; --grid: #1B1E20;
+  --display: "Rajdhani", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", Menlo, Consolas, monospace;
+  --label: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; color: var(--text-primary); font-family: var(--label);
+  background: radial-gradient(900px 500px at 8% -5%, rgba(74,144,217,.10), transparent 60%), radial-gradient(800px 500px at 95% 0%, rgba(242,101,12,.08), transparent 60%), #08090A; }
+.page { max-width: 1100px; margin: 0 auto; padding: 40px 16px 80px; }
+.kicker { font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: .16em; color: var(--accent); text-transform: uppercase; }
+h1 { font-family: var(--display); font-weight: 700; font-size: 34px; margin: 6px 0 8px; }
+.lede { color: var(--text-secondary); max-width: 860px; font-size: 14px; line-height: 1.55; }
+.lede b { color: var(--text-primary); font-weight: 600; }
+.states { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 1fr)); gap: 40px 32px; margin-top: 32px; justify-items: center; }
+.state-head { width: 100%; max-width: 480px; margin-bottom: 10px; }
+.tag { display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing: .1em; color: var(--accent); border: 1px solid var(--accent); padding: 2px 7px; margin-right: 8px; }
+.state-name { font-family: var(--display); font-weight: 600; font-size: 17px; }
+.state-note { font-size: 12px; color: var(--text-secondary); margin-top: 4px; line-height: 1.45; }
+
+/* window */
+.win { width: 100%; max-width: 480px; border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(0,0,0,.45); overflow: hidden; }
+.titlebar { height: 30px; background: #111314; display: flex; align-items: center; padding-left: 10px; gap: 8px; font-size: 12px; color: var(--text-secondary); border-bottom: 1px solid var(--border-subtle); }
+.titlebar .ico { width: 14px; height: 14px; border-radius: 3px; background: var(--bg); border: 1px solid var(--border); display: grid; place-items: center; }
+.titlebar .ico i { width: 2px; height: 7px; background: var(--accent); box-shadow: -3px 1px 0 -0.5px var(--accent), 3px 1px 0 -0.5px var(--accent); }
+.titlebar .ctl { margin-left: auto; display: flex; height: 100%; }
+.titlebar .ctl span { width: 44px; display: grid; place-items: center; color: var(--text-disabled); font-size: 13px; }
+.body { position: relative; padding: 28px 30px 16px; display: flex; flex-direction: column; gap: 16px;
+  background:
+    radial-gradient(circle at 85% 10%, rgba(242,101,12,.20), rgba(242,101,12,0) 60%),
+    repeating-linear-gradient(90deg, var(--grid) 0 1px, transparent 1px 60px),
+    repeating-linear-gradient(0deg, var(--grid) 0 1px, transparent 1px 52px),
+    var(--bg); }
+
+/* brand */
+.wordmark { font-family: var(--display); font-weight: 700; font-size: 52px; letter-spacing: 6px; line-height: 1; }
+.bar { width: 52px; height: 4px; background: var(--accent); margin-top: 4px; }
+.tagline { font-size: 10.5px; font-weight: 600; letter-spacing: 1px; color: var(--text-secondary); margin-top: 12px; }
+.tagline b { color: var(--accent); font-weight: 600; }
+
+/* cargo manifest cards */
+.card { background: rgba(23,25,27,.92); border: 1px solid var(--border-subtle); border-left: 3px solid var(--border); border-radius: 8px; padding: 12px 16px 14px; }
+.card.now { border-left-color: var(--accent); }
+.card.err { border-left-color: var(--error); background: rgba(40,22,24,.92); }
+.card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.eyebrow { font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing: .16em; color: var(--text-secondary); }
+.chip { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 10px; padding: 2px 7px; border: 1px solid var(--border); border-radius: 4px; color: var(--text-disabled); }
+.chip svg { width: 11px; height: 11px; }
+.chip.ok { color: var(--success); border-color: var(--success); }
+.chip.todo { color: var(--accent); border-color: var(--accent); }
+.chip.warn { color: var(--warning); border-color: var(--warning); }
+.chip.bad { color: var(--error); border-color: var(--error); }
+.chip.live { color: var(--success); border-color: var(--success); }
+.chip.live::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px rgba(76,175,109,.2); }
+
+.pilot { display: flex; align-items: center; gap: 12px; }
+.avatar { width: 34px; height: 34px; border-radius: 50%; background: #2A2E31; display: grid; place-items: center; font-family: var(--display); font-weight: 700; color: var(--text-secondary); flex: none; }
+.account { font-family: var(--display); font-weight: 600; font-size: 21px; line-height: 1.1; }
+.account.none { color: var(--text-secondary); }
+.account-sub { font-family: var(--mono); font-size: 10px; color: var(--text-disabled); }
+.pilot .btn { margin-left: auto; }
+
+.btn { font-family: var(--display); font-weight: 600; font-size: 13.5px; padding: 7px 16px; border-radius: 6px; border: 1px solid var(--border); color: var(--text-secondary); background: transparent; white-space: nowrap; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+
+.rows { display: grid; grid-template-columns: 104px 1fr; gap: 8px 14px; align-items: center; }
+.rlabel { font-size: 12.5px; color: var(--text-secondary); }
+.input { height: 32px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0 10px; display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; min-width: 0; }
+.input span.v { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.input .chev { margin-left: auto; color: var(--text-disabled); font-size: 11px; }
+.input.capture { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(242,101,12,.18); color: var(--accent); }
+.key { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; background: var(--surface-alt); font-family: var(--mono); font-size: 11px; font-weight: 600; }
+.key + .hint { font-size: 10.5px; color: var(--text-disabled); font-family: var(--label); }
+.hint.warn { color: var(--warning); }
+.switchrow { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-primary); }
+.switch { width: 30px; height: 16px; border-radius: 8px; background: var(--accent); position: relative; flex: none; }
+.switch::after { content: ""; position: absolute; right: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--on-accent); }
+.summary-line { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 12px; color: var(--text-secondary); }
+.summary-line .sep { color: var(--text-disabled); }
+.edit-hint { font-size: 11px; color: var(--text-disabled); margin-top: 8px; }
+
+.vtext { font-size: 13px; line-height: 1.45; }
+.vtext .sub { display: block; color: var(--text-secondary); font-size: 12px; margin-top: 2px; }
+.progress { height: 4px; background: var(--surface-alt); border-radius: 2px; margin-top: 10px; overflow: hidden; }
+.progress i { display: block; height: 100%; background: var(--accent); }
+.progress.busy i { width: 30%; margin-left: 35%; opacity: .8; }
+.pmeta { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: var(--text-disabled); margin-top: 5px; }
+.steps { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
+.step { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); }
+.step svg { width: 13px; height: 13px; flex: none; }
+.step.done { color: var(--text-secondary); }
+.step.cur { color: var(--text-primary); }
+.step.todo { color: var(--text-disabled); }
+.ring { width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--accent); border-right-color: transparent; flex: none; }
+.dash { width: 13px; height: 13px; border-radius: 50%; border: 1.5px dashed var(--border); flex: none; }
+
+.banner { display: flex; align-items: center; gap: 12px; background: var(--accent-muted); border: 1px solid var(--accent); border-radius: 8px; padding: 10px 10px 10px 14px; font-size: 12.5px; line-height: 1.4; }
+.banner b { font-family: var(--mono); font-weight: 600; }
+
+.errtext { font-size: 13px; line-height: 1.45; }
+.errtext .sub { display: block; color: var(--text-secondary); font-size: 12px; margin-top: 4px; }
+
+.actions { display: flex; gap: 10px; align-items: stretch; margin-top: 4px; }
+.actions .logs { padding: 0 16px; }
+.start { flex: 1; font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: 2px; padding: 12px 0; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent); text-align: center; }
+.start.disabled { background: var(--surface-alt); border-color: var(--surface-alt); color: var(--text-disabled); }
+.start.running { background: transparent; border-color: var(--text-secondary); color: var(--text-primary); }
+.start.live { background: transparent; border-color: var(--success); color: var(--success); }
+.start.hoverstop { background: var(--error-muted); border-color: var(--error); color: var(--error); }
+.start .why { display: block; font-family: var(--label); font-weight: 500; font-size: 10.5px; letter-spacing: 0; margin-top: 2px; }
+.footer { display: flex; justify-content: space-between; gap: 12px; font-family: var(--mono); font-size: 10.5px; color: var(--text-disabled); padding-top: 2px; }
+.footer .line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.notes { margin: 48px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px 28px; }
+.notes li { font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; padding-left: 14px; position: relative; }
+.notes li::before { content: ""; position: absolute; left: 0; top: 7px; width: 6px; height: 6px; border: 1px solid var(--accent); }
+.notes b { color: var(--text-primary); font-weight: 600; }
+h2 { font-family: var(--display); font-weight: 600; font-size: 22px; margin: 48px 0 0; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-need" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.3" r=".7" fill="currentColor"/></g></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+  </defs>
+</svg>
+
+<div class="page">
+  <div class="kicker">ALICE · Launcher · merged style · draft 1</div>
+  <h1>The launcher, restyled</h1>
+  <p class="lede">The launcher's actual states, from first open to running, redrawn with the merged style: <b>Cargo Manifest cards, rounded corners, mono for values, an orange edge on whatever needs you right now, green only for "done/ok"</b>. Brand pieces carry over unchanged: the wordmark, the orange bar, the acronym tagline and the grid with its orange glow. Every window is the real fixed 480 px width.</p>
+
+  <div class="states">
+
+    <!-- 1. First open -->
+    <div>
+      <div class="state-head"><span class="tag">1</span><span class="state-name">First open, not signed in</span>
+        <div class="state-note">Signing in is the only thing to do, so it's the only orange. START explains why it's unavailable instead of just greying out.</div></div>
+      <div class="win">
+        <div class="titlebar"><span class="ico"><i></i></span>ALICE<span class="ctl"><span>–</span><span>□</span><span>✕</span></span></div>
+        <div class="body">
+          <div><div class="wordmark">ALICE</div><div class="bar"></div>
+            <div class="tagline"><b>A</b>CCIDENTAL <b>L</b>OGISTICS <b>I</b>NTELLIGENCE <b>C</b>OORDINATION <b>E</b>NGINE</div></div>
+          <div class="card now">
+            <div class="card-head"><span class="eyebrow">PILOT</span><span class="chip todo"><svg><use href="#i-arrow"/></svg>sign in</span></div>
+            <div class="pilot"><div><div class="account none">Not signed in</div><div class="account-sub">Your Discord account is your ALICE login</div></div><button class="btn primary">Sign in with Discord</button></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><span class="eyebrow">CONTROLS</span><span class="chip">defaults</span></div>
+            <div class="rows">
+              <div class="rlabel">Push to talk</div><div class="input"><span class="key">Right Shift</span><span class="hint warn">also types capitals</span></div>
+              <div class="rlabel">Overlay</div><div class="input"><span class="key">F3</span></div>
+              <div class="rlabel">Microphone</div><div class="input"><span class="v">System default</span><span class="chev">▾</span></div>
+              <div class="rlabel">Speaker</div><div class="input"><span class="v">System default</span><span class="chev">▾</span></div>
+              <div class="rlabel">Speech model</div><div class="input"><span class="v">Small · best with names</span><span class="chev">▾</span></div>
+              <div class="rlabel">PTT sounds</div><div class="switchrow"><span class="switch"></span>Chirp when recording starts and stops</div>
+            </div>
+          </div>
+          <div class="actions"><button class="btn logs">Open logs</button><div class="start disabled">START ALICE<span class="why">Sign in first</span></div></div>
+          <div class="footer"><span class="line"></span><span>v0.9.4</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Ready -->
+    <div>
+      <div class="state-head"><span class="tag">2</span><span class="state-name">Signed in, ready, update available</span>
+        <div class="state-note">The update banner uses the same rounded card language. START is now the one orange action. This shows key capture in progress on the Overlay row.</div></div>
+      <div class="win">
+        <div class="titlebar"><span class="ico"><i></i></span>ALICE<span class="ctl"><span>–</span><span>□</span><span>✕</span></span></div>
+        <div class="body">
+          <div><div class="wordmark">ALICE</div><div class="bar"></div>
+            <div class="tagline"><b>A</b>CCIDENTAL <b>L</b>OGISTICS <b>I</b>NTELLIGENCE <b>C</b>OORDINATION <b>E</b>NGINE</div></div>
+          <div class="banner"><span>ALICE <b>0.9.5</b> is available. You have <b>0.9.4</b>. Install it over this one; your settings and logs stay.</span><button class="btn primary">Download</button></div>
+          <div class="card">
+            <div class="card-head"><span class="eyebrow">PILOT</span><span class="chip ok"><svg><use href="#i-check"/></svg>signed in</span></div>
+            <div class="pilot"><div class="avatar">P</div><div><div class="account">pilot_ignis</div><div class="account-sub">beta access</div></div><button class="btn">Switch account</button></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><span class="eyebrow">CONTROLS</span></div>
+            <div class="rows">
+              <div class="rlabel">Push to talk</div><div class="input"><span class="key">Button 12</span><span class="hint">VKB Gladiator NXT</span></div>
+              <div class="rlabel">Overlay</div><div class="input capture">Press a key or button…</div>
+              <div class="rlabel">Microphone</div><div class="input"><span class="v">Headset Microphone (Arctis Nova 7)</span><span class="chev">▾</span></div>
+              <div class="rlabel">Speaker</div><div class="input"><span class="v">System default</span><span class="chev">▾</span></div>
+              <div class="rlabel">Speech model</div><div class="input"><span class="v">Small · best with names</span><span class="chev">▾</span></div>
+              <div class="rlabel">PTT sounds</div><div class="switchrow"><span class="switch"></span>Chirp when recording starts and stops</div>
+            </div>
+          </div>
+          <div class="actions"><button class="btn logs">Open logs</button><div class="start">START ALICE</div></div>
+          <div class="footer"><span class="line"></span><span>v0.9.4</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Starting -->
+    <div>
+      <div class="state-head"><span class="tag">3</span><span class="state-name">Starting: first-launch download</span>
+        <div class="state-note">Controls collapse to one summary line, since they're locked while ALICE runs anyway. The Voice card gets the orange edge and shows the startup as steps, so the long download reads as progress rather than a hang.</div></div>
+      <div class="win">
+        <div class="titlebar"><span class="ico"><i></i></span>ALICE<span class="ctl"><span>–</span><span>□</span><span>✕</span></span></div>
+        <div class="body">
+          <div><div class="wordmark">ALICE</div><div class="bar"></div>
+            <div class="tagline"><b>A</b>CCIDENTAL <b>L</b>OGISTICS <b>I</b>NTELLIGENCE <b>C</b>OORDINATION <b>E</b>NGINE</div></div>
+          <div class="card">
+            <div class="card-head"><span class="eyebrow">PILOT</span><span class="chip ok"><svg><use href="#i-check"/></svg>signed in</span></div>
+            <div class="pilot"><div class="avatar">P</div><div><div class="account">pilot_ignis</div></div></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><span class="eyebrow">CONTROLS</span><span class="chip">locked while running</span></div>
+            <div class="summary-line"><span class="key">Button 12</span> talk <span class="sep">·</span> <span class="key">F3</span> overlay <span class="sep">·</span> Arctis Nova 7 <span class="sep">·</span> Small model</div>
+          </div>
+          <div class="card now">
+            <div class="card-head"><span class="eyebrow">VOICE</span><span class="chip todo"><span class="ring" style="width:10px;height:10px;border-width:1.5px"></span>starting</span></div>
+            <div class="steps">
+              <div class="step done"><svg style="color:var(--success)"><use href="#i-check"/></svg>Connected to ALICE's server</div>
+              <div class="step done"><svg style="color:var(--success)"><use href="#i-check"/></svg>Overlay ready</div>
+              <div class="step cur"><span class="ring"></span>Downloading the speech model (first launch only)</div>
+              <div class="step todo"><span class="dash"></span>Listening</div>
+            </div>
+            <div class="progress"><i style="width:38%"></i></div>
+            <div class="pmeta"><span>178 / 466 MB</span><span>ALICE can't hear you until this finishes</span></div>
+          </div>
+          <div class="actions"><button class="btn logs">Open logs</button><div class="start running">STOP ALICE</div></div>
+          <div class="footer"><span class="line">[voice] downloading speech model 38%</span><span>v0.9.4</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Live -->
+    <div>
+      <div class="state-head"><span class="tag">4</span><span class="state-name">Live</span>
+        <div class="state-note">Nothing needs the pilot now, so no orange edge anywhere. The Voice card says which keys to use. STOP is outlined green while live and turns red on hover (shown below the window).</div></div>
+      <div class="win">
+        <div class="titlebar"><span class="ico"><i></i></span>ALICE<span class="ctl"><span>–</span><span>□</span><span>✕</span></span></div>
+        <div class="body">
+          <div><div class="wordmark">ALICE</div><div class="bar"></div>
+            <div class="tagline"><b>A</b>CCIDENTAL <b>L</b>OGISTICS <b>I</b>NTELLIGENCE <b>C</b>OORDINATION <b>E</b>NGINE</div></div>
+          <div class="card">
+            <div class="card-head"><span class="eyebrow">PILOT</span><span class="chip ok"><svg><use href="#i-check"/></svg>signed in</span></div>
+            <div class="pilot"><div class="avatar">P</div><div><div class="account">pilot_ignis</div></div></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><span class="eyebrow">CONTROLS</span><span class="chip">locked while running</span></div>
+            <div class="summary-line"><span class="key">Button 12</span> talk <span class="sep">·</span> <span class="key">F3</span> overlay <span class="sep">·</span> Arctis Nova 7 <span class="sep">·</span> Small model</div>
+            <div class="edit-hint">Stop ALICE to change these.</div>
+          </div>
+          <div class="card">
+            <div class="card-head"><span class="eyebrow">VOICE</span><span class="chip live">live</span></div>
+            <div class="vtext">Hold <span class="key">Button 12</span> to talk to ALICE.<span class="sub"><span class="key">F3</span> opens the workbench. You can minimise this window, but closing it quits ALICE.</span></div>
+          </div>
+          <div class="actions"><button class="btn logs">Open logs</button><div class="start live">STOP ALICE</div></div>
+          <div class="actions" style="margin-top:-6px"><div style="width:96px;font-size:10.5px;color:var(--text-disabled);display:flex;align-items:center">on hover →</div><div class="start hoverstop" style="padding:8px 0;font-size:15px">STOP ALICE</div></div>
+          <div class="footer"><span class="line">[voice] listening</span><span>v0.9.4</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Voice stopped -->
+    <div>
+      <div class="state-head"><span class="tag">5</span><span class="state-name">Voice stopped</span>
+        <div class="state-note">The error is its own card with a red edge and a triangle glyph, worded as plain cause plus action. The Voice step list shows exactly where it stopped. RESTART is orange again because that's the next thing to do.</div></div>
+      <div class="win">
+        <div class="titlebar"><span class="ico"><i></i></span>ALICE<span class="ctl"><span>–</span><span>□</span><span>✕</span></span></div>
+        <div class="body">
+          <div><div class="wordmark">ALICE</div><div class="bar"></div>
+            <div class="tagline"><b>A</b>CCIDENTAL <b>L</b>OGISTICS <b>I</b>NTELLIGENCE <b>C</b>OORDINATION <b>E</b>NGINE</div></div>
+          <div class="card">
+            <div class="card-head"><span class="eyebrow">PILOT</span><span class="chip ok"><svg><use href="#i-check"/></svg>signed in</span></div>
+            <div class="pilot"><div class="avatar">P</div><div><div class="account">pilot_ignis</div></div></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><span class="eyebrow">VOICE</span><span class="chip bad"><svg><use href="#i-x"/></svg>stopped</span></div>
+            <div class="steps">
+              <div class="step done"><svg style="color:var(--success)"><use href="#i-check"/></svg>Connected to ALICE's server</div>
+              <div class="step done"><svg style="color:var(--success)"><use href="#i-check"/></svg>Overlay ready</div>
+              <div class="step cur"><svg style="color:var(--error)"><use href="#i-x"/></svg>Microphone</div>
+            </div>
+          </div>
+          <div class="card err">
+            <div class="card-head"><svg style="width:14px;height:14px;color:var(--error)"><use href="#i-need"/></svg><span class="eyebrow" style="color:var(--error)">COULDN'T OPEN THE MICROPHONE</span></div>
+            <div class="errtext">"Headset Microphone (Arctis Nova 7)" isn't connected.<span class="sub">Plug it in, or pick another microphone under Controls, then restart.</span></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><span class="eyebrow">CONTROLS</span><span class="chip">editable again</span></div>
+            <div class="rows">
+              <div class="rlabel">Microphone</div><div class="input"><span class="v">Headset Microphone (Arctis Nova 7)</span><span class="chev">▾</span></div>
+            </div>
+            <div class="edit-hint">All six controls are back. Only the relevant one is shown here.</div>
+          </div>
+          <div class="actions"><button class="btn logs">Open logs</button><div class="start">RESTART ALICE</div></div>
+          <div class="footer"><span class="line">[voice] PortAudioError: Device unavailable [-9985]</span><span>v0.9.4</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>What changed from today's launcher</h2>
+  <ul class="notes">
+    <li><b>Status dots become chips</b> with a glyph and a word (✓ signed in, → sign in, ✕ stopped, ● live). Today an 8 px dot carries the state on colour alone, which breaks the grayscale rule.</li>
+    <li><b>Orange edge = "this needs you now".</b> It's the same rule as the workbench's Source/Destination cards and the In Progress option C: one card at a time at most, and none at all while live.</li>
+    <li><b>Hotkeys render as keycaps</b> (mono, with a 2 px bottom border) everywhere they appear: control rows, the summary line and the Voice "ready" text. A Right Shift warning sits inline, in the spirit of client-ui-capabilities.md.</li>
+    <li><b>Controls collapse while running.</b> They're already disabled then (the code calls <code>setEnabled(False)</code>), so a one-line summary keeps the window short and the Voice card in view.</li>
+    <li><b>Startup as a step list</b> instead of one changing sentence: server → overlay → speech model → listening. The download keeps its progress bar plus MB counts. A failure marks the exact step it stopped on.</li>
+    <li><b>Unchanged on purpose:</b> the wordmark, bar, acronym, grid and glow (shared with the login pages and hero image), the 480 px width, Open logs, the status line plus version footer, and the green-then-red-on-hover STOP button.</li>
+    <li><b>The PTT sounds checkbox becomes a switch,</b> matching the Profit/Margin switch in the workbench.</li>
+    <li><b>Placeholders:</b> "pilot_ignis" and the version numbers are made up. The Discord avatar would replace the initial circle (marked P1 in client-ui-capabilities.md).</li>
+  </ul>
+</div>
+</body>
+</html>

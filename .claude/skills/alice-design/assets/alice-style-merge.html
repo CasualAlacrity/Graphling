@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ALICE Style Merge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0D0F10; --surface: #17191B; --surface-alt: #1F2224;
+  --border: #33373A; --border-subtle: #24272A;
+  --text-primary: #EDEAE4; --text-secondary: #9AA0A6; --text-disabled: #5C6266;
+  --accent: #F2650C; --accent-hover: #FF7A1F; --accent-active: #C94F00; --focus-ring: #FF9142;
+  --accent-muted: rgba(242,101,12,.16);
+  --success: #4CAF6D; --warning: #E8B23A; --error: #E5484D; --info: #4A90D9;
+  --on-accent: #1A1200;
+  --display: "Rajdhani", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", Menlo, Consolas, monospace;
+  --label: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; color: var(--text-primary); font-family: var(--label);
+  background:
+    radial-gradient(900px 500px at 8% -5%, rgba(74,144,217,.10), transparent 60%),
+    radial-gradient(800px 500px at 95% 0%, rgba(242,101,12,.08), transparent 60%),
+    #08090A;
+}
+.page { max-width: 1240px; margin: 0 auto; padding: 40px 16px 80px; }
+.kicker { font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: .16em; color: var(--accent); text-transform: uppercase; }
+h1 { font-family: var(--display); font-weight: 700; font-size: 34px; margin: 6px 0 8px; }
+.lede { color: var(--text-secondary); max-width: 860px; font-size: 14px; line-height: 1.55; }
+.lede b { color: var(--text-primary); font-weight: 600; }
+h2 { font-family: var(--display); font-weight: 600; font-size: 22px; margin: 56px 0 4px; }
+.sub { color: var(--text-secondary); font-size: 13px; margin: 0 0 16px; max-width: 900px; line-height: 1.5; }
+.notes { margin: 14px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px 24px; }
+.notes li { font-size: 12px; color: var(--text-secondary); line-height: 1.5; padding-left: 14px; position: relative; }
+.notes li::before { content: ""; position: absolute; left: 0; top: 7px; width: 6px; height: 6px; border: 1px solid var(--accent); }
+.notes b { color: var(--text-primary); font-weight: 600; }
+
+/* stage */
+.stage { position: relative; border: 1px solid var(--border-subtle); padding: 28px; overflow-x: auto;
+  background:
+    radial-gradient(1px 1px at 12% 20%, rgba(255,255,255,.5), transparent),
+    radial-gradient(1px 1px at 68% 12%, rgba(255,255,255,.35), transparent),
+    radial-gradient(1px 1px at 85% 70%, rgba(255,255,255,.4), transparent),
+    radial-gradient(1px 1px at 30% 82%, rgba(255,255,255,.3), transparent),
+    #0A0B0C; }
+
+/* ---------- workbench window ---------- */
+.window { width: 1152px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); position: relative; padding: 4px; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+.window::before, .window::after, .window > .br-b::before, .window > .br-b::after { content: ""; position: absolute; width: 14px; height: 14px; border-color: var(--accent); border-style: solid; }
+.window::before { top: 1px; left: 1px; border-width: 2px 0 0 2px; }
+.window::after { top: 1px; right: 1px; border-width: 2px 2px 0 0; }
+.window > .br-b::before { bottom: 1px; left: 1px; border-width: 0 0 2px 2px; }
+.window > .br-b::after { bottom: 1px; right: 1px; border-width: 0 2px 2px 0; }
+
+.tabs { display: flex; gap: 2px; padding: 6px 6px 0; border-bottom: 1px solid var(--border); }
+.tab { font-family: var(--display); font-weight: 600; font-size: 14px; color: var(--text-secondary); padding: 7px 18px; border: 1px solid var(--border); border-bottom: none; background: var(--surface-alt); border-radius: 6px 6px 0 0; }
+.tab.on { color: var(--accent); background: var(--surface); border-color: var(--accent); position: relative; top: 1px; }
+.tab .count { font-family: var(--mono); font-size: 11px; color: var(--text-disabled); margin-left: 4px; }
+.tab-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+
+/* cargo manifest cards */
+.card { background: var(--surface-alt); border: 1px solid var(--border-subtle); border-left: 3px solid var(--border); border-radius: 8px; padding: 10px 16px; display: flex; gap: 18px; align-items: flex-start; }
+.card.route { border-left-color: var(--accent); }
+.card-label { width: 128px; flex: none; display: flex; align-items: center; gap: 8px; padding-top: 17px; font-family: var(--display); font-weight: 600; font-size: 14px; letter-spacing: .03em; }
+.card-label svg { width: 16px; height: 16px; color: var(--text-secondary); }
+.card.route .card-label svg { color: var(--accent); }
+.fields { flex: 1; display: flex; gap: 14px; }
+.field { flex: 1; min-width: 0; }
+.field.narrow { flex: .55; }
+.flabel { font-size: 10.5px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; }
+.input { height: 32px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0 10px; display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12.5px; font-weight: 500; }
+.input .ph { color: var(--text-disabled); }
+.input .suffix { margin-left: auto; font-size: 10.5px; color: var(--text-disabled); white-space: nowrap; }
+.input .suffix b { color: var(--text-secondary); font-weight: 500; }
+.input .chev { margin-left: auto; color: var(--text-disabled); font-size: 11px; }
+.input.focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(242,101,12,.18); }
+
+.connector { display: flex; align-items: center; gap: 8px; margin: -8px 0 -8px 54px; height: 18px; }
+.connector .dot { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--accent); background: var(--surface-alt); display: grid; place-items: center; color: var(--accent); }
+.connector .dot svg { width: 12px; height: 12px; }
+.connector .lbl { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; color: var(--text-disabled); }
+
+.footer { display: flex; align-items: center; gap: 8px; }
+.toggle { height: 30px; padding: 0 10px; display: flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 6px; font-family: var(--display); font-weight: 600; font-size: 12.5px; color: var(--text-secondary); }
+.toggle svg { width: 14px; height: 14px; }
+.toggle.on { border-color: var(--accent); background: var(--accent-muted); color: var(--text-primary); }
+.toggle.on svg { color: var(--accent); }
+.spacer { flex: 1; }
+.btn { font-family: var(--display); font-weight: 600; font-size: 13.5px; padding: 7px 20px; border-radius: 6px; border: 1px solid var(--border); color: var(--text-secondary); background: transparent; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.success { background: var(--success); border-color: var(--success); color: var(--on-accent); }
+.btn.full { width: 100%; }
+
+/* results */
+.results { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.rgrid { display: grid; grid-template-columns: minmax(150px,1.2fr) 70px minmax(200px,1.5fr) 74px minmax(200px,1.5fr) minmax(140px,1fr) 30px; gap: 14px; align-items: center; padding: 11px 18px; }
+.rhead { background: var(--surface-alt); border-bottom: 1px solid var(--border); padding-top: 8px; padding-bottom: 8px; font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing: .08em; color: var(--text-disabled); text-transform: uppercase; }
+.rhead .r { text-align: right; }
+.sort { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; width: 100%; }
+.sort .on { color: var(--text-primary); }
+.switch { width: 26px; height: 13px; border-radius: 7px; background: var(--border); position: relative; }
+.switch::after { content: ""; position: absolute; left: 2px; top: 2px; width: 9px; height: 9px; border-radius: 50%; background: var(--text-primary); }
+.row { border-bottom: 1px solid var(--border-subtle); position: relative; }
+.row:last-child { border-bottom: none; }
+.row.hover { background: var(--surface-alt); }
+.row.hover::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); }
+.commodity { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.commodity svg { width: 17px; height: 17px; color: var(--text-secondary); flex: none; }
+.name { font-family: var(--display); font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.code { font-family: var(--mono); font-size: 10.5px; color: var(--text-disabled); }
+.num { font-family: var(--mono); font-weight: 600; }
+.unit { font-family: var(--mono); font-size: 10px; color: var(--text-disabled); font-weight: 500; }
+.scu { text-align: right; font-size: 13px; color: var(--text-secondary); }
+.term { display: flex; gap: 9px; align-items: flex-start; min-width: 0; }
+.term svg.pulse { width: 22px; height: 13px; flex: none; margin-top: 3px; }
+.term .tname { font-family: var(--display); font-weight: 600; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crumb { font-family: var(--mono); font-size: 10px; color: var(--text-disabled); white-space: nowrap; }
+.crumb b { color: var(--text-secondary); font-weight: 500; }
+.price { font-family: var(--mono); font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
+.price .k, .price .u { color: var(--text-disabled); }
+.leg { text-align: center; color: var(--text-disabled); }
+.leg svg { width: 18px; height: 18px; color: var(--text-disabled); display: block; margin: 0 auto; }
+.leg .t { font-family: var(--mono); font-size: 10px; color: var(--text-secondary); margin-top: 2px; }
+.leg .t.rough { color: var(--text-disabled); }
+.profit { text-align: right; }
+.profit .big { font-family: var(--mono); font-weight: 700; font-size: 15px; }
+.profit .small { font-family: var(--mono); font-size: 11px; color: var(--text-secondary); }
+.add { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border); display: grid; place-items: center; color: var(--text-secondary); }
+.add svg { width: 14px; height: 14px; }
+.row.hover .add { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+
+/* legend */
+.legend { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 16px; font-size: 12px; color: var(--text-secondary); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.legend svg { width: 26px; height: 14px; }
+
+/* ---------- accent options ---------- */
+.opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(370px, 1fr)); gap: 20px; }
+.opt-head { margin-bottom: 10px; }
+.tag { display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing: .1em; color: var(--accent); border: 1px solid var(--accent); padding: 2px 7px; margin-right: 8px; }
+.tag.rec { background: var(--accent); color: var(--on-accent); }
+.opt-name { font-family: var(--display); font-weight: 600; font-size: 17px; }
+.opt-trade { font-size: 12px; color: var(--text-secondary); margin-top: 4px; line-height: 1.45; }
+.run { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+.run-top { display: flex; align-items: baseline; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle); }
+.run-ship { font-family: var(--display); font-weight: 600; font-size: 14px; border-left: 2px solid var(--accent); padding-left: 8px; }
+.run-age { font-family: var(--mono); font-size: 10px; color: var(--text-disabled); }
+.money { display: flex; gap: 18px; margin-left: auto; }
+.money div { text-align: right; }
+.money .l { font-family: var(--mono); font-size: 9.5px; color: var(--text-disabled); letter-spacing: .06em; }
+.money .v { font-family: var(--mono); font-size: 12.5px; font-weight: 700; }
+.legrow { display: flex; align-items: center; gap: 10px; padding: 10px 2px; border-bottom: 1px solid var(--border-subtle); }
+.chev { color: var(--text-secondary); font-size: 12px; width: 10px; }
+.badge { font-family: var(--display); font-weight: 700; font-size: 10.5px; letter-spacing: .06em; padding: 1px 7px; border: 1px solid var(--border); border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; }
+.badge svg { width: 10px; height: 10px; }
+.legname { font-family: var(--display); font-weight: 600; font-size: 13px; }
+.legdetail { font-family: var(--mono); font-size: 10.5px; color: var(--text-secondary); }
+.status { margin-left: auto; font-family: var(--mono); font-size: 10px; padding: 2px 7px; border: 1px solid var(--border); border-radius: 4px; color: var(--text-disabled); }
+.expanded { padding: 12px 0 4px 20px; }
+.steps { display: flex; align-items: flex-start; margin-bottom: 14px; }
+.step { width: 74px; text-align: center; flex: none; }
+.sdot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border); margin: 0 auto 6px; display: grid; place-items: center; font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--text-disabled); }
+.slabel { font-family: var(--display); font-weight: 600; font-size: 10.5px; color: var(--text-disabled); line-height: 1.15; }
+.rail { flex: 1; height: 2px; background: var(--border); margin-top: 10px; min-width: 6px; }
+.finrow { display: flex; align-items: center; gap: 10px; padding: 12px 2px 0; }
+.finrow .lbl { font-family: var(--display); font-size: 12px; font-style: italic; color: var(--text-disabled); flex: 1; }
+.pos { color: var(--success); }
+
+/* ---------- presence layer ---------- */
+.pgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px 28px; align-items: start; }
+.pcap { font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; color: var(--text-disabled); text-transform: uppercase; margin: 0 0 8px; }
+.strip { width: 360px; background: rgba(23,25,27,.94); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 10px 14px; }
+.strip .next { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; color: var(--accent); }
+.strip .step-t { font-family: var(--display); font-weight: 600; font-size: 17px; margin-top: 1px; }
+.strip .tip { font-size: 11.5px; color: var(--text-secondary); margin-top: 3px; }
+.strip .tip i { color: var(--text-primary); font-style: normal; }
+.logline { display: flex; align-items: center; gap: 8px; font-family: var(--display); font-weight: 600; font-size: 14px; padding: 2px 0; }
+.logline.sub { padding-left: 22px; font-family: var(--mono); font-weight: 500; font-size: 11.5px; color: var(--text-secondary); }
+.logline svg { width: 14px; height: 14px; flex: none; }
+.logline .q { color: var(--warning); }
+.fading { opacity: .45; }
+.vstate { display: flex; align-items: center; gap: 10px; }
+.vstate .mic { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--border); color: var(--text-secondary); flex: none; }
+.vstate .mic svg { width: 13px; height: 13px; }
+.vstate .mic.live { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 3px rgba(242,101,12,.18); }
+.vstate .st { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; color: var(--text-disabled); width: 74px; flex: none; }
+.vstate .txt { font-size: 12.5px; color: var(--text-secondary); line-height: 1.4; }
+.vstate .txt.heard { color: var(--text-primary); font-style: italic; }
+.bars { display: flex; gap: 2px; align-items: center; height: 14px; }
+.bars i { width: 3px; background: var(--accent); border-radius: 1px; }
+.dots { display: flex; gap: 4px; }
+.dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--text-secondary); }
+.dots i:nth-child(2) { opacity: .6; } .dots i:nth-child(3) { opacity: .3; }
+.vlist { display: flex; flex-direction: column; gap: 10px; }
+
+.ocards { display: flex; gap: 12px; }
+.ocard { width: 250px; background: rgba(23,25,27,.94); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.ocard.first { border-top: 3px solid var(--accent); }
+.ocard.second { border-top: 3px solid var(--border); }
+.ocard .on { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; color: var(--accent); }
+.ocard.second .on { color: var(--text-secondary); }
+.ocard .line { font-size: 12px; color: var(--text-secondary); display: flex; justify-content: space-between; gap: 8px; }
+.ocard .line b { font-family: var(--display); font-size: 13.5px; color: var(--text-primary); font-weight: 600; text-align: right; }
+.ocard .line .m { font-family: var(--mono); font-size: 11.5px; color: var(--text-primary); font-weight: 500; }
+.ocard .dim { font-family: var(--mono); font-size: 10.5px; color: var(--text-disabled); }
+.ocard .total { border-top: 1px solid var(--border-subtle); padding-top: 8px; margin-top: 2px; }
+.ocard .total .v { font-family: var(--mono); font-weight: 700; font-size: 20px; }
+.ocard .total .u { font-family: var(--mono); font-size: 11px; color: var(--text-secondary); }
+.ocard .delta { font-family: var(--mono); font-size: 11px; color: var(--text-secondary); }
+.say { font-size: 11.5px; color: var(--text-secondary); margin-top: 8px; }
+.say i { color: var(--text-primary); font-style: normal; }
+
+.rcard { width: 360px; background: rgba(23,25,27,.94); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.rcard .in { padding: 12px 14px; }
+.rcard .acts { display: flex; gap: 8px; margin-top: 10px; }
+.rcard .acts .btn { flex: 1; padding: 6px 0; }
+.timeout { height: 2px; background: var(--border-subtle); }
+.timeout i { display: block; height: 100%; width: 62%; background: var(--accent); }
+.timer { width: 220px; background: rgba(23,25,27,.94); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; }
+.timer .ring { width: 34px; height: 34px; flex: none; }
+.timer .tv { font-family: var(--mono); font-weight: 700; font-size: 20px; }
+.timer .tl { font-size: 11px; color: var(--text-secondary); }
+
+@media (max-width: 720px) {
+  h1 { font-size: 26px; }
+  .stage { padding: 16px; }
+  .strip, .rcard { width: 100%; }
+  .ocards { flex-direction: column; }
+  .ocard { width: 100%; }
+}
+
+/* icon-only toggles */
+.footer { position: relative; }
+.toggle.icon { width: 30px; padding: 0; justify-content: center; }
+.toggle.icon svg { width: 15px; height: 15px; color: var(--text-disabled); }
+.toggle.icon.on svg { color: var(--accent); }
+.qtip { position: absolute; left: 0; top: -30px; background: var(--surface-alt); border: 1px solid var(--border); color: var(--text-primary); font-size: 11px; padding: 3px 8px; border-radius: 4px; white-space: nowrap; }
+
+/* run states */
+.upcoming { display: flex; align-items: center; gap: 10px; padding: 12px 2px 2px; }
+.upcoming .ring { width: 14px; height: 14px; border-radius: 50%; border: 2px dashed var(--border); flex: none; }
+.upcoming .lbl { font-family: var(--display); font-weight: 600; font-size: 12.5px; color: var(--text-disabled); font-style: italic; }
+.upcoming .why { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--text-disabled); }
+.summary { margin-top: 12px; background: var(--surface-alt); border: 1px solid var(--border-subtle); border-left: 3px solid var(--success); border-radius: 8px; padding: 12px 14px; }
+.summary .ttl { font-family: var(--display); font-weight: 600; font-size: 13.5px; margin-bottom: 8px; }
+.sumline { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11.5px; color: var(--text-secondary); padding: 2px 0; }
+.sumline.total { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 8px; font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.summary .lock { font-size: 11px; color: var(--text-disabled); margin: 10px 0 8px; }
+
+/* option set as compact rows */
+.oset { width: 780px; background: rgba(23,25,27,.94); border: 1px solid var(--border); border-radius: 8px; }
+.ogrid { display: grid; grid-template-columns: 26px minmax(120px,1fr) minmax(170px,1.35fr) 58px minmax(170px,1.35fr) 150px; gap: 12px; align-items: center; padding: 10px 16px; }
+.ohead { padding-top: 7px; padding-bottom: 7px; background: var(--surface-alt); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .08em; color: var(--text-disabled); text-transform: uppercase; }
+.ohead .r { text-align: right; }
+.orow { position: relative; border-bottom: 1px solid var(--border-subtle); }
+.orow:last-child { border-bottom: none; }
+.orow.lead::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); }
+.onum { width: 24px; height: 24px; border: 1px solid var(--border); border-radius: 4px; display: grid; place-items: center; font-family: var(--mono); font-weight: 700; font-size: 12px; color: var(--text-secondary); }
+.orow.lead .onum { border-color: var(--accent); color: var(--accent); }
+.profit .delta { font-family: var(--mono); font-size: 10.5px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-cargo" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l9-4 9 4-9 4-9-4z"/><path d="M3 8v9l9 4 9-4V8"/><path d="M12 12v9"/></g></symbol>
+    <symbol id="i-rocket" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c2.5 2 4 5.5 4 9.5 0 2-1 4-1 4l-3 2-3-2s-1-2-1-4c0-4 1.5-7.5 4-9.5z"/><path d="M9 15l-3 1 1-3M15 15l3 1-1-3"/><circle cx="12" cy="10" r="1.4"/></g></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M14 6l6 6-6 6"/></g></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></g></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z"/><circle cx="12" cy="10" r="2"/></g></symbol>
+    <symbol id="i-station" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v6M12 15v6M3 12h6M15 12h6"/></g></symbol>
+    <symbol id="i-loader" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5v11h14"/><circle cx="8" cy="19" r="2"/><circle cx="16" cy="19" r="2"/><rect x="8" y="8" width="8" height="6" rx="1"/></g></symbol>
+    <symbol id="i-mask" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9c0-2 2-3 9-3s9 1 9 3c0 5-3 8-6 8-1.5 0-2-2-3-2s-1.5 2-3 2c-3 0-6-3-6-8z"/><circle cx="8" cy="11" r="1.5"/><circle cx="16" cy="11" r="1.5"/></g></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v15M6 13l6 6 6-6"/></g></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V5M6 11l6-6 6 6"/></g></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></g></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r=".6" fill="currentColor"/></g></symbol>
+    <symbol id="i-need" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.3" r=".6" fill="currentColor"/></g></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></g></symbol>
+    <symbol id="p-stable" viewBox="0 0 26 14"><path d="M0 7 L8 7 L11 6.3 L14 7.5 L26 7" fill="none" stroke="#4CAF6D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="p-moderate" viewBox="0 0 26 14"><path d="M0 7 Q6.5 1 13 7 T26 7" fill="none" stroke="#E8B23A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="p-volatile" viewBox="0 0 26 14"><path d="M0 7 L3 7 L5 1 L7 13 L9 3 L11 11 L13 5 L15 9 L17 6 L26 7" fill="none" stroke="#E5484D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="p-unknown" viewBox="0 0 26 14"><path d="M1 7 L25 7" fill="none" stroke="#5C6266" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="2.5 3.5"/></symbol>
+  </defs>
+</svg>
+
+<div class="page">
+  <div class="kicker">ALICE · Style merge · draft 1 · 2026-10-17</div>
+  <h1>Mockup style, current decisions</h1>
+  <p class="lede">The original mockups' look (<b>Cargo Manifest cards, rounded corners, route connector, stroke icons, pulse glyphs</b>) applied to what the overlay actually does today: the 60%-width window with tabs, option toggles, travel time, sort toggle, the trade-run stepper. Plus the presence layer, which the mockups never covered. React to anything here; whatever we settle becomes the rewritten skill.</p>
+
+  <!-- ================= ROUTE SEARCH ================= -->
+  <h2>1 · Workbench: Route Search</h2>
+  <p class="sub">Drawn at 1152 px, the real width on a 1920 px screen (60%). Second row shows the hover state.</p>
+  <div class="stage">
+    <div class="window"><span class="br-b"></span>
+      <div class="tabs">
+        <div class="tab on">Route Search</div>
+        <div class="tab">In Progress <span class="count">(1)</span></div>
+        <div class="tab">Ledger</div>
+      </div>
+      <div class="tab-body">
+        <div class="card">
+          <div class="card-label"><svg><use href="#i-cargo"/></svg>Ship &amp; Cargo</div>
+          <div class="fields">
+            <div class="field"><div class="flabel">Ship</div><div class="input">Drake Caterpillar</div></div>
+            <div class="field narrow"><div class="flabel">Cargo</div><div class="input">576<span class="suffix">SCU</span></div></div>
+            <div class="field"><div class="flabel">Commodity</div><div class="input"><span class="ph">Any commodity…</span></div></div>
+          </div>
+        </div>
+        <div class="card route">
+          <div class="card-label"><svg><use href="#i-pin"/></svg>Source</div>
+          <div class="fields">
+            <div class="field"><div class="flabel">Terminal</div><div class="input focus">ArcCorp Mining Area 045<span class="suffix"><b>Stanton</b> › <b>ArcCorp</b> › Wala</span></div></div>
+            <div class="field narrow"><div class="flabel">Min inventory</div><div class="input"><span class="ph">Any</span><span class="chev">▾</span></div></div>
+          </div>
+        </div>
+        <div class="connector"><div class="dot"><svg><use href="#i-down"/></svg></div><span class="lbl">ROUTE</span></div>
+        <div class="card route">
+          <div class="card-label"><svg><use href="#i-pin"/></svg>Destination</div>
+          <div class="fields">
+            <div class="field"><div class="flabel">Terminal</div><div class="input"><span class="ph">Any terminal…</span></div></div>
+            <div class="field narrow"><div class="flabel">Max inventory</div><div class="input"><span class="ph">Any</span><span class="chev">▾</span></div></div>
+          </div>
+        </div>
+        <div class="footer">
+          <span class="qtip">Space stations only</span>
+          <div class="toggle icon on" title="Space stations only"><svg><use href="#i-station"/></svg></div>
+          <div class="toggle icon" title="Autoload-capable terminals only"><svg><use href="#i-loader"/></svg></div>
+          <div class="toggle icon" title="No-questions-asked terminals only (sells hot cargo)"><svg><use href="#i-mask"/></svg></div>
+          <div class="spacer"></div>
+          <button class="btn">Reset</button>
+          <button class="btn primary">Search</button>
+        </div>
+
+        <div class="results">
+          <div class="rgrid rhead">
+            <div>Commodity</div><div class="r">Load</div><div>Origin · buy/SCU</div><div style="text-align:center">Travel</div><div>Destination · sell/SCU</div>
+            <div class="r"><span class="sort"><span class="on">Profit</span><span class="switch"></span><span>Margin</span></span></div><div></div>
+          </div>
+          <div class="rgrid row">
+            <div class="commodity"><svg><use href="#i-cargo"/></svg><div style="min-width:0"><div class="name">Laranite</div><div class="code">LARA</div></div></div>
+            <div class="scu"><span class="num">576</span> <span class="unit">SCU</span></div>
+            <div class="term"><svg class="pulse"><use href="#p-stable"/></svg><div style="min-width:0"><div class="tname">ArcCorp Mining Area 045</div><div class="crumb"><b>ArcCorp</b> › Wala</div><div class="price"><span class="k">buy</span> 2,735 <span class="u">aUEC</span></div></div></div>
+            <div class="leg"><svg><use href="#i-arrow"/></svg><div class="t">11m 40s</div></div>
+            <div class="term"><svg class="pulse"><use href="#p-moderate"/></svg><div style="min-width:0"><div class="tname">Area18 TDD</div><div class="crumb"><b>ArcCorp</b> › Area18</div><div class="price"><span class="k">sell</span> 3,120 <span class="u">aUEC</span></div></div></div>
+            <div class="profit"><div class="big">221,760 <span class="unit" style="font-size:11px">aUEC</span></div><div class="small">14.1%</div></div>
+            <div class="add"><svg><use href="#i-plus"/></svg></div>
+          </div>
+          <div class="rgrid row hover">
+            <div class="commodity"><svg><use href="#i-cargo"/></svg><div style="min-width:0"><div class="name">Agricium</div><div class="code">AGRI</div></div></div>
+            <div class="scu"><span class="num">576</span> <span class="unit">SCU</span></div>
+            <div class="term"><svg class="pulse"><use href="#p-stable"/></svg><div style="min-width:0"><div class="tname">Shubin Mining SMO-10</div><div class="crumb"><b>microTech</b> › Calliope</div><div class="price"><span class="k">buy</span> 2,480 <span class="u">aUEC</span></div></div></div>
+            <div class="leg"><svg><use href="#i-arrow"/></svg><div class="t">8m 05s</div></div>
+            <div class="term"><svg class="pulse"><use href="#p-stable"/></svg><div style="min-width:0"><div class="tname">Port Tressler Admin</div><div class="crumb"><b>microTech</b> › orbit</div><div class="price"><span class="k">sell</span> 2,790 <span class="u">aUEC</span></div></div></div>
+            <div class="profit"><div class="big">178,560 <span class="unit" style="font-size:11px">aUEC</span></div><div class="small">12.5%</div></div>
+            <div class="add"><svg><use href="#i-plus"/></svg></div>
+          </div>
+          <div class="rgrid row">
+            <div class="commodity"><svg><use href="#i-cargo"/></svg><div style="min-width:0"><div class="name">Titanium</div><div class="code">TITA</div></div></div>
+            <div class="scu"><span class="num">576</span> <span class="unit">SCU</span></div>
+            <div class="term"><svg class="pulse"><use href="#p-moderate"/></svg><div style="min-width:0"><div class="tname">Deakins Research</div><div class="crumb"><b>Hurston</b> › Ita</div><div class="price"><span class="k">buy</span> 820 <span class="u">aUEC</span></div></div></div>
+            <div class="leg"><svg><use href="#i-arrow"/></svg><div class="t rough">~14m</div></div>
+            <div class="term"><svg class="pulse"><use href="#p-volatile"/></svg><div style="min-width:0"><div class="tname">Lorville CBD</div><div class="crumb"><b>Hurston</b> › Lorville</div><div class="price"><span class="k">sell</span> 1,005 <span class="u">aUEC</span></div></div></div>
+            <div class="profit"><div class="big">106,560 <span class="unit" style="font-size:11px">aUEC</span></div><div class="small">22.6%</div></div>
+            <div class="add"><svg><use href="#i-plus"/></svg></div>
+          </div>
+          <div class="rgrid row">
+            <div class="commodity"><svg><use href="#i-cargo"/></svg><div style="min-width:0"><div class="name">Medical Supplies</div><div class="code">MEDS</div></div></div>
+            <div class="scu"><span class="num">288</span> <span class="unit">SCU</span></div>
+            <div class="term"><svg class="pulse"><use href="#p-unknown"/></svg><div style="min-width:0"><div class="tname">Baijini Point Admin</div><div class="crumb"><b>ArcCorp</b> › orbit</div><div class="price"><span class="k">buy</span> 1,620 <span class="u">aUEC</span></div></div></div>
+            <div class="leg"><svg><use href="#i-arrow"/></svg><div class="t">6m 30s</div></div>
+            <div class="term"><svg class="pulse"><use href="#p-stable"/></svg><div style="min-width:0"><div class="tname">Grim HEX</div><div class="crumb"><b>Crusader</b> › Yela</div><div class="price"><span class="k">sell</span> 1,955 <span class="u">aUEC</span></div></div></div>
+            <div class="profit"><div class="big">96,480 <span class="unit" style="font-size:11px">aUEC</span></div><div class="small">20.7%</div></div>
+            <div class="add"><svg><use href="#i-plus"/></svg></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="legend">
+      <span><svg><use href="#p-stable"/></svg>Stable, CoV &lt; 3%</span>
+      <span><svg><use href="#p-moderate"/></svg>Moderate, 3–8%</span>
+      <span><svg><use href="#p-volatile"/></svg>Volatile, &gt; 8%</span>
+      <span><svg><use href="#p-unknown"/></svg>No history (new)</span>
+    </div>
+  </div>
+  <ul class="notes">
+    <li><b>Kept from the mockups:</b> Cargo Manifest cards (neutral edge for Ship &amp; Cargo, orange for Source/Destination), the ROUTE connector, 8/6/10 px radii, the orange focus glow, stroke icons, and a commodity name above its code.</li>
+    <li><b>Kept from the code:</b> 60% window with tabs, corner brackets on the root window only, the option toggles, travel time, the Profit/Margin switch, and Reset / Search.</li>
+    <li><b>New merges:</b> the terminal breadcrumb sits <i>inside</i> the field as a suffix (as short as the tooltip version, but visible), and the travel time sits under the route arrow. The option toggles are icon-only, with the label in a tooltip (shown above the active one).</li>
+    <li><b>Load (SCU) is played down</b> (secondary colour, smaller than profit), following the option-card rule that SCU isn't a choice dimension. Profit is the loudest thing in the row.</li>
+    <li><b>Pulse thresholds</b> use the sampled 3% and 8% cut-offs, not the skill's 10/25. Fourth state added: dashed grey for "no history". Rough travel times show as <code>~14m</code> in dim text.</li>
+    <li><b>Dropped:</b> the "Filter Trade Routes" panel header (the tab already says it), the 📦 emoji (it renders inconsistently in Qt on Windows), and filled Font Awesome icons.</li>
+  </ul>
+
+  <!-- ================= IN PROGRESS (option C) ================= -->
+  <h2>2 · In Progress: option C, before and after</h2>
+  <p class="sub">Step actions are orange, the badges use neutral arrows, and green is only for finished things. <b style="color:var(--text-primary)">Finalize Run doesn't exist until every leg is finalized.</b> Before that, the run shows a dim "upcoming" row explaining what unlocks it. The shipped code already disables the button in that state, but it still shows a greyed-out button next to the upcoming row. Here the button only appears once there's something to sign off.</p>
+  <div class="stage">
+    <div class="opts">
+      <div>
+        <div class="opt-head"><span class="tag">MID-RUN</span><span class="opt-name">Sell leg in progress</span>
+          <div class="opt-trade">Nothing has been sold yet, so there's nothing to finalize: no button, just the upcoming step.</div></div>
+        <div class="run">
+          <div class="run-top"><span class="run-ship">Caterpillar · Laranite</span><span class="run-age">18m ago</span>
+            <div class="money"><div><div class="l">LOAD</div><div class="v">576 SCU</div></div><div><div class="l">INVESTED</div><div class="v">1,575,360</div></div></div></div>
+          <div class="legrow"><span class="chev">▸</span><span class="badge" style="color:var(--text-secondary)"><svg><use href="#i-down"/></svg>BUY</span><div><div class="legname">ArcCorp Mining Area 045</div><div class="legdetail">576 SCU @ 2,735 aUEC</div></div><span class="status" style="color:var(--success);border-color:var(--success)">✓ finalized</span></div>
+          <div class="legrow" style="border-bottom:none"><span class="chev">▾</span><span class="badge" style="color:var(--text-secondary)"><svg><use href="#i-up"/></svg>SELL</span><div><div class="legname">Area18 TDD</div><div class="legdetail">576 SCU Laranite</div></div><span class="status" style="color:var(--accent);border-color:var(--accent)">unloading</span></div>
+          <div class="expanded">
+            <div class="steps">
+              <div class="step"><div class="sdot" style="background:var(--success);border-color:var(--success);color:var(--on-accent)">✓</div><div class="slabel">Travel</div></div><div class="rail" style="background:var(--success)"></div>
+              <div class="step"><div class="sdot" style="background:var(--accent);border-color:var(--accent);color:var(--on-accent)">2</div><div class="slabel" style="color:var(--accent)">Confirm unloaded</div></div><div class="rail"></div>
+              <div class="step"><div class="sdot">3</div><div class="slabel">Sell cargo</div></div><div class="rail"></div>
+              <div class="step"><div class="sdot">4</div><div class="slabel">Finalize</div></div>
+            </div>
+            <button class="btn primary full">Mark Done</button>
+          </div>
+          <div class="upcoming"><span class="ring"></span><span class="lbl">Run summary and finalization</span><span class="why">after both legs are finalized</span></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="opt-head"><span class="tag rec">READY</span><span class="opt-name">Every leg finalized</span>
+          <div class="opt-trade">The upcoming row becomes the run summary, and Finalize Run (the only green button) signs it off and moves it to the Ledger.</div></div>
+        <div class="run">
+          <div class="run-top"><span class="run-ship">Caterpillar · Laranite</span><span class="run-age">41m ago</span>
+            <div class="money"><div><div class="l">LOAD</div><div class="v">576 SCU</div></div><div><div class="l">INVESTED</div><div class="v">1,575,360</div></div></div></div>
+          <div class="legrow"><span class="chev">▸</span><span class="badge" style="color:var(--text-secondary)"><svg><use href="#i-down"/></svg>BUY</span><div><div class="legname">ArcCorp Mining Area 045</div><div class="legdetail">576 SCU @ 2,735 aUEC</div></div><span class="status" style="color:var(--success);border-color:var(--success)">✓ finalized</span></div>
+          <div class="legrow" style="border-bottom:none"><span class="chev">▸</span><span class="badge" style="color:var(--text-secondary)"><svg><use href="#i-up"/></svg>SELL</span><div><div class="legname">Area18 TDD</div><div class="legdetail">576 SCU @ 3,120 aUEC</div></div><span class="status" style="color:var(--success);border-color:var(--success)">✓ finalized</span></div>
+          <div class="summary">
+            <div class="ttl">Run summary</div>
+            <div class="sumline"><span>Revenue</span><span>1,797,120 aUEC</span></div>
+            <div class="sumline"><span>Invested</span><span>−1,575,360 aUEC</span></div>
+            <div class="sumline"><span>Autoload fees</span><span>−4,180 aUEC</span></div>
+            <div class="sumline total"><span>Profit</span><span class="pos">+217,580 aUEC</span></div>
+            <div class="lock">Moves this run to the Ledger. Recorded values can't be changed after this.</div>
+            <button class="btn success full">Finalize Run</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <ul class="notes">
+    <li><b>Green = finished:</b> done steps, finalized legs, profit and the Finalize Run sign-off. Orange = the thing to do now. Status colours are never used for decoration or leg types.</li>
+    <li><b>Buy/Sell badges</b> use an ↓/↑ arrow plus text, so they still read in grayscale.</li>
+    <li><b>Profit</b> always carries its sign (<code>+217,580</code>), so it never relies on colour alone.</li>
+  </ul>
+
+  <!-- ================= PRESENCE LAYER ================= -->
+  <h2>3 · Presence layer (designed, not built)</h2>
+  <p class="sub">The in-game strip. The mockups never covered it, and the skill has nothing on it yet. Every surface is non-modal, never takes focus, fades on its own and never scrolls. The same card style is used throughout: translucent surface, 8 px radius, and an orange edge when it's ALICE's current focus.</p>
+  <div class="stage">
+    <div class="pgrid">
+      <div>
+        <p class="pcap">Mini tracker · resting</p>
+        <div class="strip">
+          <div class="next">NEXT</div>
+          <div class="step-t">Travel to Area18 TDD</div>
+          <div class="tip">When you land, just say it, e.g. <i>"I'm at Area18."</i></div>
+        </div>
+        <p class="pcap" style="margin-top:18px">Mini tracker · what ALICE logged (fades after ~4 s)</p>
+        <div class="strip">
+          <div class="logline"><svg style="color:var(--success)"><use href="#i-check"/></svg>Cargo unloaded</div>
+          <div class="logline"><svg style="color:var(--success)"><use href="#i-check"/></svg>Cargo sold</div>
+          <div class="logline sub"><svg style="color:var(--text-secondary)"><use href="#i-info"/></svg>3,120 aUEC/SCU</div>
+          <div class="logline sub"><svg style="color:var(--warning)"><use href="#i-need"/></svg>Autoload fees: <span class="q">???</span></div>
+        </div>
+        <ul class="notes" style="grid-template-columns:1fr">
+          <li>✔️ / ℹ️ / ❗ are drawn as <b>check, circle-i and triangle-!</b> glyphs instead of emoji. The shapes stay distinct in grayscale and render the same on every Windows box.</li>
+        </ul>
+      </div>
+
+      <div>
+        <p class="pcap">Voice loop states (same strip)</p>
+        <div class="strip vlist">
+          <div class="vstate"><span class="mic live"><svg><use href="#i-mic"/></svg></span><span class="st">LISTENING</span><span class="bars"><i style="height:5px"></i><i style="height:11px"></i><i style="height:14px"></i><i style="height:8px"></i><i style="height:4px"></i></span></div>
+          <div class="vstate"><span class="mic"><svg><use href="#i-mic"/></svg></span><span class="st">HEARD</span><span class="txt heard">"sold the cargo, thirty-one twenty per SCU"</span></div>
+          <div class="vstate"><span class="mic"><svg><use href="#i-mic"/></svg></span><span class="st">THINKING</span><span class="dots"><i></i><i></i><i></i></span></div>
+          <div class="vstate"><span class="mic"><svg><use href="#i-mic"/></svg></span><span class="st">ALICE</span><span class="txt">Logged the sale at 3,120 a SCU. What were the autoload fees?</span></div>
+        </div>
+        <p class="pcap" style="margin-top:18px">Timer</p>
+        <div class="timer">
+          <svg class="ring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="#24272A" stroke-width="3"/><circle cx="18" cy="18" r="15" fill="none" stroke="#F2650C" stroke-width="3" stroke-linecap="round" stroke-dasharray="94.2" stroke-dashoffset="34" transform="rotate(-90 18 18)"/></svg>
+          <div><div class="tv">03:12</div><div class="tl">Cargo loading</div></div>
+        </div>
+      </div>
+
+      <div>
+        <p class="pcap">Route card · workbench closed</p>
+        <div class="rcard">
+          <div class="in">
+            <div class="next" style="font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--accent)">SUGGESTED ROUTE</div>
+            <div class="step-t" style="font-family:var(--display);font-weight:600;font-size:16px;margin-top:2px">576 SCU Laranite → Area18 TDD</div>
+            <div class="legdetail" style="margin-top:2px">from ArcCorp Mining Area 045 · ≈ 415,800 aUEC/h</div>
+            <div class="acts"><button class="btn">Dismiss</button><button class="btn primary">Accept</button></div>
+          </div>
+          <div class="timeout"><i></i></div>
+        </div>
+      </div>
+    </div>
+    <p class="pcap" style="margin-top:28px">Option set · the search-result row, trimmed for the strip</p>
+    <div class="oset">
+      <div class="ogrid ohead"><div>#</div><div>Commodity</div><div>From · buy/SCU</div><div style="text-align:center">Travel</div><div>To · sell/SCU</div><div class="r">Profit / hour</div></div>
+      <div class="ogrid orow lead">
+        <div class="onum">1</div>
+        <div class="commodity"><svg><use href="#i-cargo"/></svg><div style="min-width:0"><div class="name">Laranite</div><div class="code">LARA · 576 SCU</div></div></div>
+        <div class="term"><svg class="pulse"><use href="#p-stable"/></svg><div style="min-width:0"><div class="tname">ArcCorp Mining Area 045</div><div class="crumb"><b>ArcCorp</b> › Wala</div><div class="price"><span class="k">buy</span> 2,735 <span class="u">aUEC</span></div></div></div>
+        <div class="leg"><svg><use href="#i-arrow"/></svg><div class="t">11m 40s</div></div>
+        <div class="term"><svg class="pulse"><use href="#p-moderate"/></svg><div style="min-width:0"><div class="tname">Area18 TDD</div><div class="crumb"><b>ArcCorp</b> › Area18</div><div class="price"><span class="k">sell</span> 3,120 <span class="u">aUEC</span></div></div></div>
+        <div class="profit"><div class="big">415,800 <span class="unit" style="font-size:11px">aUEC/h</span></div><div class="delta">&nbsp;</div></div>
+      </div>
+      <div class="ogrid orow">
+        <div class="onum">2</div>
+        <div class="commodity"><svg><use href="#i-cargo"/></svg><div style="min-width:0"><div class="name">Agricium</div><div class="code">AGRI · 576 SCU</div></div></div>
+        <div class="term"><svg class="pulse"><use href="#p-stable"/></svg><div style="min-width:0"><div class="tname">Shubin Mining SMO-10</div><div class="crumb"><b>microTech</b> › Calliope</div><div class="price"><span class="k">buy</span> 2,480 <span class="u">aUEC</span></div></div></div>
+        <div class="leg"><svg><use href="#i-arrow"/></svg><div class="t">8m 05s</div></div>
+        <div class="term"><svg class="pulse"><use href="#p-stable"/></svg><div style="min-width:0"><div class="tname">Port Tressler Admin</div><div class="crumb"><b>microTech</b> › orbit</div><div class="price"><span class="k">sell</span> 2,790 <span class="u">aUEC</span></div></div></div>
+        <div class="profit"><div class="big">397,400 <span class="unit" style="font-size:11px">aUEC/h</span></div><div class="delta">−18,400 /h vs 1</div></div>
+      </div>
+    </div>
+    <div class="say">Answer by voice: <i>"Go with option 2."</i> Or click the number.</div>
+  </div>
+  <ul class="notes">
+    <li><b>Option set = the search row, trimmed:</b> same commodity / terminal / pulse / travel cells, so a pilot who knows the workbench already knows how to read it. Dropped: the separate Load column (SCU moves under the code, dimmed, since it isn't a choice factor) and the + button (the number is the click target).</li>
+    <li><b>Receipt order still holds,</b> just left to right: what, from, to, then the total last on the right, which is where ALICE's sentence ends too. Profit/h replaces per-run profit, because that's what <code>find_best_route</code> ranks on.</li>
+    <li><b>Option 1</b> gets the orange left tick because it's ALICE's lead. The runner-up states its delta against it. No row is labelled "best".</li>
+    <li><b>Route card:</b> the thin orange bar along the bottom is the auto-dismiss countdown. Accept is orange because the pilot is making the choice. The card never accepts on its own.</li>
+  </ul>
+</div>
+</body>
+</html>

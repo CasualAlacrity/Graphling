@@ -18,8 +18,9 @@ have their own docs and are only summarised here:
 
 These bind every screen below:
 
-- **No scrollbars in the overlay.** A scrollbar means the layout failed. Curate, cap, or
-  collapse instead.
+- **No horizontal scrollbars anywhere.** Vertical scrolling is allowed only on lists that
+  genuinely grow (Route Search results, In Progress, Ledger). Never in the presence layer
+  or the launcher: curate, cap or collapse instead (reconfirmed 2026-10-17).
 - **Information, not decisions.** ALICE shows information and options; the pilot chooses. No
   auto-play, and no screen that commits something on the pilot's behalf.
 - **Glanceable mid-flight.** Anything shown during play is read in a second, is non-modal,
