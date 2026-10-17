@@ -69,12 +69,17 @@ SINGLE_TURNS: list[SingleTurn] = [
     SingleTurn("Arrival", "Landed.", "mark_arrived", BUYING),
     SingleTurn("Arrival", "Landed.", "(clarify) mark_arrived", TWO_RUNS),
     SingleTurn("Arrival", "I'm at the buyer.", "mark_arrived", SELLING),
-    SingleTurn("Buy", "Bought 640 at 14.2", "mark_cargo_acquired", BUYING),
-    SingleTurn("Buy", "Bought 640 at 14.2", "(clarify) mark_cargo_acquired", TWO_RUNS),
+    # Prices as pilots say them, with the unit (Jeff, 2026-10-17): "14.2 thousand" for
+    # 14,200, "11 hundred" for 1,100. Live UEX prices are whole aUEC, mostly thousands; the
+    # bare "14.2" these rows used to say isn't how anyone says a price today.
+    SingleTurn("Buy", "Bought 640 at 3.2 thousand", "mark_cargo_acquired", BUYING),
+    SingleTurn("Buy", "Bought 640 at 32 hundred", "mark_cargo_acquired", BUYING),
+    SingleTurn("Buy", "Bought 640 at 3.2 thousand", "(clarify) mark_cargo_acquired", TWO_RUNS),
     SingleTurn("Buy", "Got the copper", "mark_cargo_acquired", BUYING),
     SingleTurn("Buy", "Got the copper", "mark_cargo_acquired", TWO_RUNS),
     SingleTurn("Unload", "Cargo's off", "confirm_cargo_unloaded", SELLING),
     SingleTurn("Sell", "Sold it all, 4,567 a unit", "mark_cargo_sold", SELLING),
+    SingleTurn("Sell", "Sold it all at 45 hundred", "mark_cargo_sold", SELLING),
     SingleTurn("Sell", "Sold 300, keeping the rest for Area18.", "mark_cargo_sold", SELLING),
     SingleTurn("Run status", "Where am I going again?", "trade_run_status", SELLING),
     SingleTurn("Run status", "What's after this?", "trade_run_status", BUYING),
@@ -146,7 +151,7 @@ CONVERSATIONS: list[Conversation] = [
             Turn(ROUTE_FROM_ORISON, "best_route"),
             Turn("Yeah, do it", "start_trade_run"),
             Turn("Landed.", "mark_arrived"),
-            Turn("Bought 640 at 14.2", "mark_cargo_acquired"),
+            Turn("Bought 640 at 14.2 thousand", "mark_cargo_acquired"),
             Turn("Loaded.", "confirm_cargo_loaded"),
             Turn("Where am I going again?", "trade_run_status"),
             Turn("I'm at the buyer.", "mark_arrived"),
@@ -208,7 +213,7 @@ CONVERSATIONS: list[Conversation] = [
         purpose="Whisper hears 640 for 620: the pilot corrects it right after the readback.",
         scenario=BUYING,
         turns=(
-            Turn("Bought 640 at 14.2", "mark_cargo_acquired"),
+            Turn("Bought 640 at 14.2 thousand", "mark_cargo_acquired"),
             Turn("No, it was 620, not 640.", "(gap) correct_trade_value"),
         ),
     ),
@@ -238,7 +243,7 @@ CONVERSATIONS: list[Conversation] = [
         purpose="Set a timer mid-run, then ask about it without naming it.",
         scenario=BUYING,
         turns=(
-            Turn("Bought 640 at 14.2", "mark_cargo_acquired"),
+            Turn("Bought 640 at 14.2 thousand", "mark_cargo_acquired"),
             Turn("Loading takes 15, ping me", "start_timer"),
             Turn("How long left?", "check_timer"),
         ),

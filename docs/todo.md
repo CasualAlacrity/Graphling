@@ -152,6 +152,12 @@ when it didn't.
 - "Best refinery for Gold near me" (row 46): she answered without knowing the pilot's
   location. Ask, or use a known location; never imply "near you" without one.
 
+**6b. Spoken prices (2026-10-17).** Live UEX prices are whole aUEC, mostly in the
+thousands (1,247 checked, none with decimals). Pilots say the unit: "14.2 thousand" for
+14,200, "11 hundred" for 1,100 (Jeff). The old "Bought 640 at 14.2" rows were refused for
+not being a whole number; the matrix now says prices this way. Check that these convert
+correctly, and how Whisper writes them ("14.2 thousand" vs "14,200").
+
 **7. New capabilities wanted:**
 - Time-budget routes: "Something short, I've got 20 minutes" (row 48).
 - Ledger history: "How much did I make today?", "What was my last run?" (rows 85, 86;
