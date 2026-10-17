@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from db.models import User
 from server import uex_cache_service
 from server.dependencies import get_current_user
+from tools.uexcorp.reachability import Reachability
 from tools.uexcorp.reference_cache import UexReferenceCache
 
 router = APIRouter(prefix="/uex-cache", tags=["uex-cache"])
@@ -11,6 +12,11 @@ router = APIRouter(prefix="/uex-cache", tags=["uex-cache"])
 @router.get("/reference", response_model=UexReferenceCache)
 async def get_reference(user: User = Depends(get_current_user)):
     return await uex_cache_service.get_reference_cache()
+
+
+@router.get("/reachability", response_model=Reachability)
+async def get_reachability(user: User = Depends(get_current_user)):
+    return await uex_cache_service.get_reachability()
 
 
 @router.get("/commodity-prices/{commodity_id}", response_model=list[dict])

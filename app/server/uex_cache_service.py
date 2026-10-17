@@ -6,10 +6,15 @@ Thin SessionLocal-wrapping layer around the same tools/uexcorp/reference_cache_s
 and tools/uexcorp/price_cache.py functions the client used to call directly — their
 read-through-or-fetch logic didn't need to change at all, only who calls them.
 """
+import time
+
 from db.session import SessionLocal
 from server import uex_budget
 from server.config import settings
 from tools.uexcorp.client import UEXCorpClient
+from tools.uexcorp.price_cache import (
+    all_cached_origin_routes as _all_cached_origin_routes,
+)
 from tools.uexcorp.price_cache import (
     cached_routes_from_terminal as _cached_routes_from_terminal,
 )
@@ -40,6 +45,7 @@ from tools.uexcorp.price_cache import (
 from tools.uexcorp.price_cache import (
     get_vehicle_rental_price_rows as _get_vehicle_rental_price_rows,
 )
+from tools.uexcorp.reachability import Reachability, build_reachability
 from tools.uexcorp.reference_cache import UexReferenceCache
 from tools.uexcorp.reference_cache_store import load_reference_cache, store_reference_cache
 
@@ -118,3 +124,22 @@ async def get_vehicle_rental_price_rows(vehicle_id: int) -> list[dict]:
 async def get_orbit_distance_rows(orbit_id: int, star_system_id: int) -> list[dict]:
     async with SessionLocal() as session:
         return await _get_orbit_distance_rows(uex_client, session, orbit_id, star_system_id)
+
+
+# Building this walks every prefetched route (tens of thousands of rows), and every client
+# asks at startup, so one build serves everyone for a few minutes. The prefetch refreshes
+# routes hourly; a few minutes of lag changes nothing about which terminals trade what.
+REACHABILITY_TTL_S = 300
+_reachability: Reachability | None = None
+_reachability_built_at = 0.0
+
+
+async def get_reachability() -> Reachability:
+    global _reachability, _reachability_built_at
+    now = time.monotonic()
+    if _reachability is None or now - _reachability_built_at > REACHABILITY_TTL_S:
+        async with SessionLocal() as session:
+            rows_by_origin = await _all_cached_origin_routes(session)
+        _reachability = build_reachability(rows_by_origin)
+        _reachability_built_at = now
+    return _reachability

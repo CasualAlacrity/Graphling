@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QApplication
 import ledger_client
 from db import trade_run_store
 from overlay import theme
+from tools.uexcorp.reachability import Reachability
 
 
 @pytest.fixture(scope="session")
@@ -52,16 +53,6 @@ def wired_panels(qasync_loop, monkeypatch, fake_cache):
 
     call_log = []
 
-    async def fake_commodity_ids_at(terminal_id, side):
-        call_log.append(("commodity_ids_at", terminal_id, side))
-        await asyncio.sleep(0.01)
-        return {c.id for c in fake_cache.commodities}
-
-    async def fake_terminal_ids_for(commodity_id, side):
-        call_log.append(("terminal_ids_for", commodity_id, side))
-        await asyncio.sleep(0.01)
-        return {t.id for t in fake_cache.terminals}
-
     async def fake_search_routes(**kwargs):
         call_log.append(("search_routes", kwargs))
         await asyncio.sleep(0.01)
@@ -76,6 +67,13 @@ def wired_panels(qasync_loop, monkeypatch, fake_cache):
     monkeypatch.setattr(uex_lookup, "commodity_names", [c.name for c in fake_cache.commodities])
     monkeypatch.setattr(uex_lookup, "terminal_names", [t.nickname for t in fake_cache.terminals])
     monkeypatch.setattr(uex_lookup, "ship_names", [v.name_full for v in fake_cache.vehicles])
+    # Orison (1) sells both commodities, Seraphim (2) accepts Agricium only, Baijini (3)
+    # accepts Laranite only — enough for narrowing in both directions.
+    for name in ("reachability", "_offers", "_accepts", "_sellers_of", "_buyers_of"):
+        monkeypatch.setattr(uex_lookup, name, None)
+    uex_lookup.set_reachability(Reachability(
+        offers={1: [10, 20], 2: [], 3: []}, accepts={2: [10], 3: [20]},
+    ))
     monkeypatch.setattr(uex_lookup, "SOURCE_INVENTORY_LEVELS", [])
     monkeypatch.setattr(uex_lookup, "DESTINATION_INVENTORY_LEVELS", [])
 
@@ -94,8 +92,6 @@ def wired_panels(qasync_loop, monkeypatch, fake_cache):
     monkeypatch.setattr(filter_panel_module, "inventory_code_for", lambda status_name, status_type: None)
     monkeypatch.setattr(filter_panel_module, "is_space_terminal", lambda terminal: False)
     monkeypatch.setattr(filter_panel_module, "terminal_breadcrumb", lambda terminal: "")
-    monkeypatch.setattr(filter_panel_module, "commodity_ids_at", fake_commodity_ids_at)
-    monkeypatch.setattr(filter_panel_module, "terminal_ids_for", fake_terminal_ids_for)
     monkeypatch.setattr(filter_panel_module, "search_routes", fake_search_routes)
 
     monkeypatch.setattr(results_panel_module, "commodity_code_for", lambda commodity_id, fallback: fallback)

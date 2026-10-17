@@ -20,7 +20,8 @@ from qasync import asyncSlot
 from overlay import theme, uex_lookup
 from overlay.theme import HudWindow
 from overlay.uex_lookup import (
-    commodity_ids_at,
+    commodities_accepted_at,
+    commodities_offered_at,
     find_commodity,
     find_location,
     find_terminal,
@@ -30,7 +31,8 @@ from overlay.uex_lookup import (
     location_names,
     search_routes,
     terminal_breadcrumb,
-    terminal_ids_for,
+    terminals_buying,
+    terminals_selling,
 )
 
 
@@ -381,69 +383,52 @@ class FilterPanel(HudWindow):
         location = find_location(text)
         return set(location.terminal_ids) if location is not None else None
 
-    @staticmethod
-    async def _commodity_ids_at_any(terminal_ids, side):
-        semaphore = asyncio.Semaphore(uex_lookup.ROUTE_FANOUT_CONCURRENCY)
-
-        async def fetch(terminal_id):
-            async with semaphore:
-                return await commodity_ids_at(terminal_id, side)
-
-        results = await asyncio.gather(*(fetch(terminal_id) for terminal_id in terminal_ids))
-        return set().union(*results)
-
     async def _refresh_filters_async(self):
         commodity = find_commodity(self.commodity_input.text())
         source_ids = self._scope_ids(self.source_terminal_input.text())
         destination_ids = self._scope_ids(self.destination_terminal_input.text())
 
+        # Everything below is set lookups on the reachability map loaded at startup — no
+        # request per pick. With no map (the server couldn't supply it) nothing narrows.
+        offered_at_source = commodities_offered_at(source_ids) if source_ids is not None else None
+        accepted_at_destination = commodities_accepted_at(destination_ids) if destination_ids is not None else None
+        narrowing = uex_lookup.reachability is not None
+
         # Commodity candidates: narrowed by whichever of source/destination are set.
-        if source_ids is not None and destination_ids is not None:
-            bought_at_source, sold_at_destination = await asyncio.gather(
-                self._commodity_ids_at_any(source_ids, "buy"), self._commodity_ids_at_any(destination_ids, "sell")
-            )
-            commodity_ids = bought_at_source & sold_at_destination
+        commodity_candidates = list(uex_lookup.commodity_names)
+        if narrowing and (offered_at_source is not None or accepted_at_destination is not None):
+            if offered_at_source is not None and accepted_at_destination is not None:
+                commodity_ids = offered_at_source & accepted_at_destination
+            elif offered_at_source is not None:
+                commodity_ids = offered_at_source
+            else:
+                commodity_ids = accepted_at_destination
             commodity_candidates = [c.name for c in uex_lookup.uex_cache.commodities if c.id in commodity_ids]
-        elif source_ids is not None:
-            commodity_ids = await self._commodity_ids_at_any(source_ids, "buy")
-            commodity_candidates = [c.name for c in uex_lookup.uex_cache.commodities if c.id in commodity_ids]
-        elif destination_ids is not None:
-            commodity_ids = await self._commodity_ids_at_any(destination_ids, "sell")
-            commodity_candidates = [c.name for c in uex_lookup.uex_cache.commodities if c.id in commodity_ids]
-        else:
-            commodity_candidates = list(uex_lookup.commodity_names)
 
-        # Source candidates: direct from commodity, or fanned out from destination
-        # (every terminal that sells anything the destination will buy) — fetched
-        # concurrently, since a terminal can carry dozens of commodities.
-        if commodity is not None:
-            terminal_ids = await terminal_ids_for(commodity.id, "buy")
-            source_reachable = [t.nickname for t in uex_lookup.uex_cache.terminals if t.id in terminal_ids]
-        elif destination_ids is not None and len(destination_ids) == 1:
-            reachable_commodity_ids = await self._commodity_ids_at_any(destination_ids, "sell")
-            results = await asyncio.gather(*(terminal_ids_for(cid, "buy") for cid in reachable_commodity_ids))
-            terminal_ids = set().union(*results)
-            terminal_ids -= destination_ids  # a terminal can't be its own source
-            source_reachable = [t.nickname for t in uex_lookup.uex_cache.terminals if t.id in terminal_ids]
-        else:
-            source_reachable = list(uex_lookup.terminal_names)
+        def nicknames(terminal_ids):
+            return [t.nickname for t in uex_lookup.uex_cache.terminals if t.id in terminal_ids]
 
-        # Destination candidates: direct from commodity, or fanned out from source
-        # (every terminal that buys anything the source sells), same concurrency.
-        # Only a single terminal fans out: a region sells nearly everything, so its
-        # fan-out would fetch every commodity's prices (the multi-second UI stall seen
-        # picking "Crusader") just to conclude almost every terminal is reachable.
-        if commodity is not None:
-            terminal_ids = await terminal_ids_for(commodity.id, "sell")
-            destination_reachable = [t.nickname for t in uex_lookup.uex_cache.terminals if t.id in terminal_ids]
-        elif source_ids is not None and len(source_ids) == 1:
-            available_commodity_ids = await self._commodity_ids_at_any(source_ids, "buy")
-            results = await asyncio.gather(*(terminal_ids_for(cid, "sell") for cid in available_commodity_ids))
-            terminal_ids = set().union(*results)
-            terminal_ids -= source_ids
-            destination_reachable = [t.nickname for t in uex_lookup.uex_cache.terminals if t.id in terminal_ids]
-        else:
-            destination_reachable = list(uex_lookup.terminal_names)
+        # Source candidates: direct from the commodity, or every terminal that sells
+        # anything the destination will accept.
+        source_reachable = list(uex_lookup.terminal_names)
+        if narrowing and commodity is not None:
+            source_reachable = nicknames(terminals_selling({commodity.id}))
+        elif narrowing and accepted_at_destination is not None:
+            terminal_ids = terminals_selling(accepted_at_destination)
+            if len(destination_ids) == 1:  # a lone terminal can't be its own source; a region can
+                terminal_ids = terminal_ids - destination_ids
+            source_reachable = nicknames(terminal_ids)
+
+        # Destination candidates: direct from the commodity, or every terminal that
+        # accepts anything the source sells.
+        destination_reachable = list(uex_lookup.terminal_names)
+        if narrowing and commodity is not None:
+            destination_reachable = nicknames(terminals_buying({commodity.id}))
+        elif narrowing and offered_at_source is not None:
+            terminal_ids = terminals_buying(offered_at_source)
+            if len(source_ids) == 1:
+                terminal_ids = terminal_ids - source_ids
+            destination_reachable = nicknames(terminal_ids)
 
         # Space Only only narrows a field once something actually drives its reachable
         # set (commodity, or the other terminal) — with nothing set yet there's no
@@ -561,6 +546,7 @@ class FilterPanel(HudWindow):
         self.search_button.setEnabled(False)
         self.search_button.setText("SEARCHING…")
         try:
+            await uex_lookup.refresh_reachability_if_stale()
             routes = await search_routes(
                 commodity_id=commodity.id if commodity else None,
                 source_terminal_id=source_terminal.id if source_terminal else None,

@@ -209,3 +209,17 @@ async def test_destination_region_with_commodity_is_a_single_cached_fetch(call_l
     )
     assert call_log == [1]
     assert len(routes) == 2
+
+
+async def test_sold_out_source_and_full_destination_are_hidden(call_log, monkeypatch):
+    rows = [
+        {**_route_row(1, 100, 200), "status_origin": 1},
+        {**_route_row(1, 100, 201), "scu_destination": 0},
+        {**_route_row(1, 100, 202), "status_destination": 7},
+        _route_row(1, 101, 200),
+    ]
+    monkeypatch.setitem(FAKE_ROUTES_BY_COMMODITY, 1, rows)
+    routes = await uex_lookup.search_routes(
+        commodity_id=1, source_terminal_id=None, destination_terminal_id=None, **SEARCH_DEFAULTS,
+    )
+    assert [(r.origin_terminal_id, r.destination_terminal_id) for r in routes] == [(101, 200)]

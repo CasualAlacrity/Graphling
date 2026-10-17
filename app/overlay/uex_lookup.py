@@ -1,4 +1,5 @@
 import asyncio
+from datetime import UTC, datetime
 from typing import NamedTuple
 
 from langsmith import tracing_context
@@ -8,6 +9,7 @@ from tools.starcitizenwiki.client import StarCitizenWikiClient
 from tools.travel_time import estimate_travel_time
 from tools.uexcorp.client import UEXCorpClient
 from tools.uexcorp.matching import find_commodity_by_id as _find_commodity_by_id
+from tools.uexcorp.reachability import Reachability, destination_full, source_sold_out
 from tools.uexcorp.reference_cache import TerminalType
 from tools.uexcorp.trade_data import UEXTradeRoute
 
@@ -25,6 +27,14 @@ terminal_names = []
 SOURCE_INVENTORY_LEVELS = []
 DESTINATION_INVENTORY_LEVELS = []
 _star_system_codes = {}
+# What each terminal offers/accepts, fetched once from the server (see
+# tools/uexcorp/reachability.py). None until loaded, or if the server couldn't supply it —
+# the filter panel then simply doesn't narrow, rather than going back to a request per pick.
+reachability = None
+_offers = {}
+_accepts = {}
+_sellers_of = {}
+_buyers_of = {}
 
 
 async def _load_uex_cache():
@@ -45,6 +55,11 @@ def init():
     global SOURCE_INVENTORY_LEVELS, DESTINATION_INVENTORY_LEVELS, _star_system_codes
 
     uex_cache = asyncio.run(_load_uex_cache())
+    try:
+        set_reachability(asyncio.run(uex_cache_client.get_reachability()))
+    except Exception as exc:
+        # Narrowing is a convenience; a search still works without it.
+        print(f"[ALICE] Couldn't load terminal reachability, filters won't narrow: {exc}")
     ship_names = [v.name_full for v in uex_cache.vehicles if v.scu >= 1 and v.is_concept == 0]
     commodity_names = [c.name for c in uex_cache.commodities if c.is_buyable == 1]
     terminal_names = [t.nickname for t in uex_cache.terminals if t.type == TerminalType.COMMODITY]
@@ -53,6 +68,65 @@ def init():
     SOURCE_INVENTORY_LEVELS = [status.name for status in uex_cache.commodity_statuses if status.type == "buy"]
     DESTINATION_INVENTORY_LEVELS = [status.name for status in uex_cache.commodity_statuses if status.type == "sell"]
     _star_system_codes = {system.name: system.code for system in uex_cache.star_systems}
+
+
+def set_reachability(loaded: Reachability):
+    """Installs a fetched map and derives the commodity -> terminals direction from it."""
+    global reachability, _offers, _accepts, _sellers_of, _buyers_of
+    reachability = loaded
+    _offers = {terminal_id: set(ids) for terminal_id, ids in loaded.offers.items()}
+    _accepts = {terminal_id: set(ids) for terminal_id, ids in loaded.accepts.items()}
+    _sellers_of = {}
+    for terminal_id, commodity_ids in _offers.items():
+        for commodity_id in commodity_ids:
+            _sellers_of.setdefault(commodity_id, set()).add(terminal_id)
+    _buyers_of = {}
+    for terminal_id, commodity_ids in _accepts.items():
+        for commodity_id in commodity_ids:
+            _buyers_of.setdefault(commodity_id, set()).add(terminal_id)
+
+
+REACHABILITY_MAX_AGE_S = 600
+
+
+async def refresh_reachability_if_stale():
+    """Re-fetches the map when it's older than REACHABILITY_MAX_AGE_S — called when a
+    search starts, so a long-running session keeps up without a timer. A failed refresh
+    keeps the old map."""
+    if reachability is not None:
+        age = (datetime.now(UTC) - reachability.built_at).total_seconds()
+        if age < REACHABILITY_MAX_AGE_S:
+            return
+    try:
+        set_reachability(await uex_cache_client.get_reachability())
+    except Exception as exc:
+        print(f"[ALICE] Couldn't refresh terminal reachability: {exc}")
+
+
+def _union(index, keys):
+    result = set()
+    for key in keys:
+        result |= index.get(key, set())
+    return result
+
+
+def commodities_offered_at(terminal_ids):
+    """Commodities these terminals have stock to sell, or None when the map isn't loaded
+    (the caller then leaves the field unnarrowed). A terminal the map has no routes for
+    offers nothing."""
+    return _union(_offers, terminal_ids) if reachability is not None else None
+
+
+def commodities_accepted_at(terminal_ids):
+    return _union(_accepts, terminal_ids) if reachability is not None else None
+
+
+def terminals_selling(commodity_ids):
+    return _union(_sellers_of, commodity_ids) if reachability is not None else None
+
+
+def terminals_buying(commodity_ids):
+    return _union(_buyers_of, commodity_ids) if reachability is not None else None
 
 
 def route_terminal_name(terminal_id, fallback_terminal_name):
@@ -300,6 +374,12 @@ def _filter_by_destination(rows, terminal_ids):
 
 
 async def _commodity_ids_at_any(terminal_ids, side):
+    # The loaded map answers this without a request per terminal; the network path below
+    # is only the fallback for when the map couldn't be loaded.
+    from_map = commodities_offered_at(terminal_ids) if side == "buy" else commodities_accepted_at(terminal_ids)
+    if from_map is not None:
+        return from_map
+
     # A region can hold dozens of terminals — bounded like the route fan-out, so picking
     # "Stanton" doesn't open a connection per terminal at once.
     semaphore = asyncio.Semaphore(ROUTE_FANOUT_CONCURRENCY)
@@ -415,9 +495,13 @@ async def _search_routes(
     # no origin-side equivalent to apply.
     constrain_destination_to_nqa = nqa_only and destination_terminal_id is None
 
+    # A sold-out source or a full destination can't be traded, so those routes never show —
+    # the same rule that decides which commodities and terminals the filters offer.
     return [
         route for route in routes
-        if (min_source_code is None or route.status_origin >= min_source_code)
+        if not source_sold_out(route.status_origin, route.scu_origin)
+        and not destination_full(route.status_destination, route.scu_destination)
+        and (min_source_code is None or route.status_origin >= min_source_code)
         and (max_destination_code is None or route.status_destination <= max_destination_code)
         and (not constrain_origin_to_space or route.is_on_ground_origin == 0)
         and (not constrain_destination_to_space or route.is_on_ground_destination == 0)

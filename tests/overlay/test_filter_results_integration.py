@@ -153,3 +153,65 @@ def test_region_in_source_and_destination_reaches_search_routes(qasync_loop, wir
     kwargs = searches[-1]
     assert kwargs["source_terminal_id"] is None and kwargs["destination_terminal_id"] is None
     assert kwargs["source_scope_ids"] and kwargs["destination_scope_ids"]
+
+
+def test_picking_a_source_narrows_the_other_fields_without_any_request(qasync_loop, wired_panels):
+    filter_panel, _results_panel, call_log = wired_panels
+
+    async def scenario():
+        filter_panel.source_terminal_input.setText("Orison TDD")
+        filter_panel.refresh_filters()
+        await asyncio.sleep(0.05)
+
+    qasync_loop.run_until_complete(scenario())
+
+    # Orison sells both commodities; only Seraphim and Baijini accept anything it sells.
+    assert filter_panel.current_commodity_candidates == ["Agricium", "Laranite"]
+    assert filter_panel.current_destination_candidates[:2] == ["Seraphim Station", "Baijini Point"]
+    assert "Orison TDD" not in filter_panel.current_destination_candidates
+    assert call_log == []
+
+
+def test_picking_a_commodity_narrows_terminals_to_those_that_trade_it(qasync_loop, wired_panels):
+    filter_panel, _results_panel, _call_log = wired_panels
+
+    async def scenario():
+        filter_panel.commodity_input.setText("Laranite")
+        filter_panel.refresh_filters()
+        await asyncio.sleep(0.05)
+
+    qasync_loop.run_until_complete(scenario())
+
+    assert "Baijini Point" in filter_panel.current_destination_candidates
+    assert "Seraphim Station" not in filter_panel.current_destination_candidates
+    assert "Orison TDD" in filter_panel.current_source_candidates
+
+
+def test_a_region_narrows_without_any_request(qasync_loop, wired_panels):
+    filter_panel, _results_panel, call_log = wired_panels
+
+    async def scenario():
+        filter_panel.source_terminal_input.setText("Crusader")
+        filter_panel.refresh_filters()
+        await asyncio.sleep(0.05)
+
+    qasync_loop.run_until_complete(scenario())
+
+    assert filter_panel.current_commodity_candidates == ["Agricium", "Laranite"]
+    assert call_log == []
+
+
+def test_without_a_reachability_map_nothing_narrows(qasync_loop, wired_panels, monkeypatch):
+    from overlay import uex_lookup
+
+    filter_panel, _results_panel, _call_log = wired_panels
+    monkeypatch.setattr(uex_lookup, "reachability", None)
+
+    async def scenario():
+        filter_panel.source_terminal_input.setText("Seraphim Station")
+        filter_panel.refresh_filters()
+        await asyncio.sleep(0.05)
+
+    qasync_loop.run_until_complete(scenario())
+
+    assert filter_panel.current_commodity_candidates == ["Agricium", "Laranite"]

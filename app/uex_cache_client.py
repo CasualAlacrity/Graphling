@@ -8,6 +8,7 @@ changed. Returns plain dicts/UexReferenceCache — exactly what the old SessionL
 calls returned, nothing about the callers' own parsing needed to change.
 """
 from api_client import authenticated_client, raise_for_status
+from tools.uexcorp.reachability import Reachability
 from tools.uexcorp.reference_cache import UexReferenceCache
 
 
@@ -16,6 +17,13 @@ async def get_reference_cache() -> UexReferenceCache:
         response = await client.get("/uex-cache/reference")
         raise_for_status(response)
         return UexReferenceCache.model_validate(response.json())
+
+
+async def get_reachability() -> Reachability:
+    async with await authenticated_client() as client:
+        response = await client.get("/uex-cache/reachability")
+        raise_for_status(response)
+        return Reachability.model_validate(response.json())
 
 
 async def get_commodity_price_rows(commodity_id: int) -> list[dict]:

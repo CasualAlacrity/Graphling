@@ -122,6 +122,18 @@ async def cached_routes_from_terminals(session: AsyncSession, terminal_ids: list
     return fresh
 
 
+async def all_cached_origin_routes(session: AsyncSession) -> dict[int, list[dict]]:
+    """Every origin's fresh prefetched routes in one query: terminal id -> rows. Never
+    calls UEX."""
+    result = await session.execute(select(UexPriceCache).where(UexPriceCache.kind == UexCacheKind.ROUTE_BY_ORIGIN))
+    now = datetime.now(UTC)
+    fresh: dict[int, list[dict]] = {}
+    for cache_row in result.scalars():
+        if now - cache_row.fetched_at <= CACHE_TTL[UexCacheKind.ROUTE_BY_ORIGIN]:
+            fresh[cache_row.entity_id] = cache_row.rows
+    return fresh
+
+
 async def route_origin_fetched_at(session: AsyncSession) -> dict[int, datetime]:
     """When each origin terminal's routes were last fetched, for the prefetch to skip
     ones that are still recent (e.g. right after a restart)."""
