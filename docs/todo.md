@@ -158,9 +158,9 @@ old tools are deleted (19 -> 16 tools, tool descriptions ~9,650 -> ~7,375 tokens
 Hull A -> the ship (1,615,950 aUEC), "quant" -> one answer, FS-9 sell -> "no terminal buys
 the FS-9 LMG", "Cat" -> Caterpillar (no rental terminal has one in UEX). Still open:
 category + size search ("cheapest size 3 quantum drive" now says it can't find it rather
-than answering about Quantainium), and location filters fail on "Grim Hex" ("What's RMC
-going for at Grim Hex?": the location alias rewrites it to the station's legal name,
-which no terminal is named). Original plan: Hull A
+than answering about Quantainium). Fixed the same day: the terminal filter now matches
+places ("at Grim Hex", "in Area 18", "at Lorville" keep every terminal there; it used to
+pick one terminal, often the landing pad). Original plan: Hull A
 goes to item lookup every run (its five liveries match "Hull A" better than the ship, and
 none of them is sold anywhere; UEX does sell many other liveries in-game, e.g. at Dumper's
 Depot), and "FS-9" lists a magazine plus four skins of the LMG. Plan, in two steps:

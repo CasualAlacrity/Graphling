@@ -358,3 +358,51 @@ async def test_safe_run_returns_an_unresolved_name_as_its_message():
         raise UnresolvedName("Couldn't find a location matching 'banana'.")
 
     assert await _Tool()._safe_run(_lookup()) == "Couldn't find a location matching 'banana'."
+
+
+# --- the terminal filter matches places (2026-10-17) ---------------------------------
+
+def _price_rows():
+    rows = []
+    for terminal in ("TDD - Cloudview Center - Orison", "Orison Municipal Services", "Admin - GrimHEX",
+                     "Admin - Ruin Station"):
+        rows.append(SimpleNamespace(terminal_name=terminal))
+    return rows
+
+
+@pytest.mark.parametrize(("said", "kept"), [
+    # "What's RMC going for at Grim Hex?": the alias names the station, which no terminal is
+    # named; every terminal at the station is what the pilot meant.
+    ("Grim Hex", ["Admin - GrimHEX"]),
+    ("Orison", ["Orison Municipal Services", "TDD - Cloudview Center - Orison"]),
+    # A terminal named exactly keeps just that terminal.
+    ("Orison Municipal Services", ["Orison Municipal Services"]),
+])
+def test_the_terminal_filter_keeps_every_terminal_at_a_named_place(said, kept):
+    from tools.uexcorp.matching import _filter_by_terminal_or_place
+
+    cache = SimpleNamespace(**vars(CACHE))
+    for terminal in cache.terminals:
+        terminal.nickname = None
+    rows = _filter_by_terminal_or_place(_price_rows(), said, cache)
+
+    assert sorted(row.terminal_name for row in rows) == sorted(kept)
+
+
+
+def test_a_place_beats_a_terminal_nicknamed_after_it():
+    """Landing pads are nicknamed with the bare place name; "Orison" still means every
+    terminal at Orison, not just the pad."""
+    from tools.uexcorp.matching import _filter_by_terminal_or_place
+
+    cache = SimpleNamespace(**vars(CACHE))
+    for terminal in cache.terminals:
+        terminal.nickname = None
+    cache.terminals = list(cache.terminals) + [
+        SimpleNamespace(name="Landing Services - Orison", code=None, type=TerminalType.ITEM, nickname="Orison",
+                        space_station_name=None, city_name="Orison", outpost_name=None,
+                        orbit_name="Crusader", star_system_name="Stanton"),
+    ]
+    rows = _filter_by_terminal_or_place(_price_rows(), "Orison", cache)
+
+    assert sorted(row.terminal_name for row in rows) == ["Orison Municipal Services", "TDD - Cloudview Center - Orison"]

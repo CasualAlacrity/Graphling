@@ -338,6 +338,51 @@ def filter_by_match(rows, query, candidates, attr):
     return result
 
 
+def _filter_by_terminal_or_place(rows, query, cache):
+    """Keeps the rows at the terminal, or the place, the pilot named.
+
+    A pilot saying "at Grim Hex", "in Area 18" or "at Port Tressler" means any terminal
+    there, not one of them. Resolving that to a single terminal (filter_by_match) failed
+    every way (2026-10-17): "Area 18" and "Lorville" landed on their *Landing Services*
+    terminals, which sell nothing, "Port Tressler" tied 15 terminals and asked which, and
+    "Grim Hex" (the alias gives the station's legal name, which no terminal is named)
+    didn't resolve at all. So: an exact terminal name or nickname ("TDD Orison") keeps
+    that terminal; otherwise every terminal at the named place (terminals_within, the
+    same place matching best_route uses); only if neither fits, the old single-terminal
+    resolution and its hedge."""
+    if not query:
+        return rows
+
+    # A place's own name first: the landing-pad terminals are nicknamed with the bare place
+    # name ("Area 18", "Lorville"), so an exact-nickname check alone kept only the pad and
+    # dropped the trade desks (TDD Area 18 buying Laranite at 8,900, 2026-10-17).
+    places = _places_in(cache.terminals)
+    place = _exact_name(canonicalize(query, "location"), places)
+    if place:
+        named = places[place]
+    else:
+        wanted = query.strip().casefold()
+        named = _exact_name_matches(query, cache.terminals)
+        for terminal in cache.terminals:
+            nickname = getattr(terminal, "nickname", None)
+            if nickname and nickname.casefold() == wanted and terminal not in named:
+                named.append(terminal)
+    if not named:
+        region = terminals_within(query, cache.terminals, cache)
+        if region is None:
+            return filter_by_match(rows, query, cache.terminals, "terminal_name")
+        named = region.terminals
+
+    names = set()
+    for terminal in named:
+        names.add(terminal.name)
+    kept = []
+    for row in rows:
+        if getattr(row, "terminal_name", None) in names:
+            kept.append(row)
+    return kept
+
+
 def _find_orbit_by_name(cache, orbit_name):
     for o in cache.orbits:
         if o.name == orbit_name:
@@ -361,7 +406,7 @@ async def filter_by_location(rows, cache, client, star_system=None, orbit=None, 
     """
     rows = filter_by_match(rows, star_system, cache.star_systems, "star_system_name")
     rows = filter_by_match(rows, orbit, cache.orbits, "orbit_name")
-    rows = filter_by_match(rows, terminal, cache.terminals, "terminal_name")
+    rows = _filter_by_terminal_or_place(rows, terminal, cache)
     rows = filter_by_match(rows, moon, cache.moons, "moon_name")
 
     if near:
